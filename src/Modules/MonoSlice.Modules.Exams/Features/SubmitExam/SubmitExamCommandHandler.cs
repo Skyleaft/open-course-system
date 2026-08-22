@@ -65,6 +65,18 @@ public sealed class SubmitExamCommandHandler : ICommandHandler<SubmitExamCommand
             throw new NotFoundException(nameof(QuizExam), submission.ExamId);
         }
 
+        // Flush buffered answers from Redis cache into submission entity
+        var cachedAnswers = await _cacheService.GetAsync<Dictionary<Guid, MonoSlice.Modules.Exams.Features.SaveAnswer.CachedAnswerDto>>(
+            $"exam_answers:{submission.Id}", cancellationToken);
+
+        if (cachedAnswers is not null && cachedAnswers.Count > 0)
+        {
+            foreach (var cached in cachedAnswers.Values)
+            {
+                submission.SaveAnswer(cached.QuestionId, cached.SelectedOptionIds, cached.EssayText);
+            }
+        }
+
         // Automatic Objective Grading
         decimal totalPossiblePoints = 0m;
         decimal earnedPoints = 0m;
@@ -125,8 +137,9 @@ public sealed class SubmitExamCommandHandler : ICommandHandler<SubmitExamCommand
         submission.Complete(calculatedPercentage, exam.PassingScore);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        // Remove active exam session from Redis
+        // Remove active exam session and answer cache from Redis
         await _cacheService.RemoveAsync($"exam_session:{submission.Id}", cancellationToken);
+        await _cacheService.RemoveAsync($"exam_answers:{submission.Id}", cancellationToken);
 
         // Publish integration event to Redis stream
         var integrationEvent = new ExamSubmittedIntegrationEvent(

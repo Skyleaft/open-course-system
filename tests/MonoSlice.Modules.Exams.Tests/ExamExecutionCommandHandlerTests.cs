@@ -73,7 +73,19 @@ public class ExamExecutionCommandHandlerTests
         var submissionId = startResult.Data.SubmissionId;
 
         // 3. Save Answers (Q1 correct, Q2 wrong)
-        var saveHandler = new SaveAnswerCommandHandler(_dbContext, _currentUser);
+        var cachedAnswersDict = new Dictionary<Guid, MonoSlice.Modules.Exams.Features.SaveAnswer.CachedAnswerDto>();
+        _cacheService.SetAsync(
+            Arg.Is<string>(k => k == $"exam_answers:{submissionId}"),
+            Arg.Do<Dictionary<Guid, MonoSlice.Modules.Exams.Features.SaveAnswer.CachedAnswerDto>>(d => cachedAnswersDict = d),
+            Arg.Any<TimeSpan?>(),
+            Arg.Any<CancellationToken>());
+
+        _cacheService.GetAsync<Dictionary<Guid, MonoSlice.Modules.Exams.Features.SaveAnswer.CachedAnswerDto>>(
+            Arg.Is<string>(k => k == $"exam_answers:{submissionId}"),
+            Arg.Any<CancellationToken>())
+            .Returns(_ => cachedAnswersDict);
+
+        var saveHandler = new SaveAnswerCommandHandler(_cacheService, _currentUser);
         await saveHandler.Handle(new SaveAnswerCommand
         {
             SubmissionId = submissionId,

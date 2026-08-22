@@ -167,13 +167,14 @@
   - [x] `GET /api/v1/exams/submissions/{submissionId}/questions`:
     - [x] Apply Fisher-Yates shuffle with seed to questions and options.
     - [x] Strip `isCorrect` and `explanation` from response payload.
-  - [x] `POST /api/v1/exams/submissions/{submissionId}/answers`: Auto-save student answers per question.
+  - [x] `POST /api/v1/exams/submissions/{submissionId}/answers`: Auto-save student answers buffered in Redis (`exam_answers:{submissionId}`) to prevent database write load.
   - [x] `POST /api/v1/exams/submissions/{submissionId}/snapshots/presign`:
     - [x] Validate active session token.
     - [x] Generate MinIO Presigned PUT URL for `exam-snapshots` bucket (`2-minute expiry`).
   - [x] `POST /api/v1/exams/submissions/{submissionId}/finish`:
+    - [x] Flush buffered answers from Redis into PostgreSQL `QuizSubmission` entity.
     - [x] Finalize submission status (`Completed`).
-    - [x] Invalidate session token in Redis.
+    - [x] Invalidate session token and purge answer buffer in Redis.
     - [x] Publish message to Redis Stream `stream:exam-events` (`XADD`).
   - [x] `GET /api/v1/exams/submissions/{submissionId}/result`: Return graded results or simulation instant explanation.
 

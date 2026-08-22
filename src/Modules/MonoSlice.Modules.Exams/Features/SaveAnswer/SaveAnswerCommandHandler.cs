@@ -1,23 +1,19 @@
-using Microsoft.EntityFrameworkCore;
-using MonoSlice.Modules.Exams.Domain;
-using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
-using MonoSlice.Shared.Abstractions.Exceptions;
 using MonoSlice.Shared.Abstractions.Interfaces;
 
 namespace MonoSlice.Modules.Exams.Features.SaveAnswer;
 
 public sealed class SaveAnswerCommandHandler : ICommandHandler<SaveAnswerCommand, ApiResponse>
 {
-    private readonly ExamsDbContext _dbContext;
+    private readonly ICacheService _cacheService;
     private readonly ICurrentUser _currentUser;
 
     public SaveAnswerCommandHandler(
-        ExamsDbContext dbContext,
+        ICacheService cacheService,
         ICurrentUser currentUser)
     {
-        _dbContext = dbContext;
+        _cacheService = cacheService;
         _currentUser = currentUser;
     }
 
@@ -30,23 +26,21 @@ public sealed class SaveAnswerCommandHandler : ICommandHandler<SaveAnswerCommand
             throw new UnauthorizedAccessException("Authentication required.");
         }
 
-        var submission = await _dbContext.Submissions
-            .Include(s => s.Answers)
-            .FirstOrDefaultAsync(s => s.Id == command.SubmissionId, cancellationToken);
+        var redisKey = $"exam_answers:{command.SubmissionId}";
 
-        if (submission is null)
-        {
-            throw new NotFoundException(nameof(QuizSubmission), command.SubmissionId);
-        }
+        // Retrieve existing buffered answers from Redis cache
+        var answers = await _cacheService.GetAsync<Dictionary<Guid, CachedAnswerDto>>(redisKey, cancellationToken)
+                      ?? new Dictionary<Guid, CachedAnswerDto>();
 
-        if (submission.StudentId != _currentUser.UserId.Value)
-        {
-            throw new UnauthorizedAccessException("You do not have access to this exam attempt.");
-        }
+        answers[command.QuestionId] = new CachedAnswerDto(
+            command.QuestionId,
+            command.SelectedOptionIds,
+            command.EssayText,
+            DateTime.UtcNow);
 
-        submission.SaveAnswer(command.QuestionId, command.SelectedOptionIds, command.EssayText);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        // Store back in Redis with a 4-hour buffer TTL without hitting PostgreSQL
+        await _cacheService.SetAsync(redisKey, answers, TimeSpan.FromHours(4), cancellationToken);
 
-        return ApiResponse.Ok("Answer saved successfully.");
+        return ApiResponse.Ok("Answer buffered in Redis cache successfully.");
     }
 }

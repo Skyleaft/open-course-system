@@ -367,6 +367,16 @@ Bucket Configuration MatrixBucket NameAccess PolicyRetention & LifecycleAllowed 
 | - ProctorViolationAlert(Guid studentId, Guid submissionId, string violationType, int count)        |
 | - ProctorSnapshotReceived(Guid studentId, string snapshotPresignedViewUrl)                         |
 +----------------------------------------------------------------------------------------------------+
+
+### 6.3 High-Concurrency Exam Answer Autosave with Redis Buffering
+Untuk menangani beban konkurensi tinggi saat ribuan peserta ujian mengklik opsi jawaban atau mengetik esai secara berkala, sistem menerapkan **Redis In-Memory Answer Buffering**:
+1. **Autosave Interception (`POST /api/v1/exams/submissions/{submissionId}/answers`)**:
+   - Seluruh pembaruan jawaban peserta disimpan langsung ke dalam Redis Hash/Cache (`exam_answers:{submissionId}`) dengan TTL 4 jam.
+   - **PostgreSQL tidak dipanggil (Zero DB writes)** selama proses pengerjaan ujian berlangsung, mencegah connection pool exhaustion dan disk I/O bottleneck.
+2. **Batch Flush on Finalization (`POST /api/v1/exams/submissions/{submissionId}/finish`)**:
+   - Saat peserta menyelesaikan ujian, seluruh jawaban yang terkumpul di Redis di-flush ke entitas `QuizSubmission` dalam database PostgreSQL dalam satu transaksi atomic EF Core.
+   - Buffer jawaban di Redis kemudian dibersihkan (`DEL exam_answers:{submissionId}`).
+
 7. Redis Streams Event-Driven Pipeline & DLSUntuk menjamin skalabilitas saat ribuan submission kuis terjadi secara simultan, evaluasi nilai diproses secara asinkron menggunakan Redis Streams Consumer Groups dengan kebijakan dead-letter dan stream trimming.[ Submission Finished Slice ]
              │
              ▼
