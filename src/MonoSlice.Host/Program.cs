@@ -97,28 +97,28 @@ using (var scope = app.Services.CreateScope())
     try
     {
         var usersDb = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
-        await usersDb.Database.EnsureCreatedAsync();
+        await usersDb.Database.MigrateAsync();
 
         var paymentsDb = scope.ServiceProvider.GetRequiredService<PaymentsDbContext>();
-        await paymentsDb.Database.EnsureCreatedAsync();
+        await paymentsDb.Database.MigrateAsync();
 
         var coursesDb = scope.ServiceProvider.GetRequiredService<CoursesDbContext>();
-        await coursesDb.Database.EnsureCreatedAsync();
+        await coursesDb.Database.MigrateAsync();
 
         var examsDb = scope.ServiceProvider.GetRequiredService<ExamsDbContext>();
-        await examsDb.Database.EnsureCreatedAsync();
+        await examsDb.Database.MigrateAsync();
 
         var assessmentsDb = scope.ServiceProvider.GetRequiredService<AssessmentsDbContext>();
-        await assessmentsDb.Database.EnsureCreatedAsync();
+        await assessmentsDb.Database.MigrateAsync();
 
         var commsDb = scope.ServiceProvider.GetRequiredService<CommunicationsDbContext>();
-        await commsDb.Database.EnsureCreatedAsync();
+        await commsDb.Database.MigrateAsync();
 
-        logger.LogInformation("Database schemas ensured successfully.");
+        logger.LogInformation("Database schemas migrated successfully.");
     }
     catch (Exception ex)
     {
-        logger.LogWarning(ex, "Could not ensure database creation on startup. Please ensure PostgreSQL is running.");
+        logger.LogWarning(ex, "Could not apply database migrations on startup. Please ensure PostgreSQL is running.");
     }
 }
 

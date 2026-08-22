@@ -55,7 +55,7 @@ public sealed class PaymentsDbContext : DbContext
             builder.HasIndex(o => o.CourseId);
             builder.HasIndex(o => o.ExternalPaymentReference)
                 .IsUnique()
-                .HasFilter("external_payment_reference IS NOT NULL");
+                .HasFilter("\"ExternalPaymentReference\" IS NOT NULL");
         });
     }
 }

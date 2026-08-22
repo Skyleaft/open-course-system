@@ -5,7 +5,7 @@ public sealed class MessagingSettings
     public const string SectionName = "Messaging";
 
     /// <summary>
-    /// Message broker provider: "RabbitMQ" or "Kafka"
+    /// Message broker provider: "RabbitMQ", "Kafka", or "InMemory"
     /// </summary>
     public string Provider { get; set; } = "RabbitMQ";
 

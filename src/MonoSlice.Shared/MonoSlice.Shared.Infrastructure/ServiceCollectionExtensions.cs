@@ -123,7 +123,11 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton<IIntegrationEventDispatcher, IntegrationEventDispatcher>();
 
-        if (string.Equals(messagingSettings.Provider, "Kafka", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(messagingSettings.Provider, "InMemory", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IEventBus, Messaging.InMemory.InMemoryEventBus>();
+        }
+        else if (string.Equals(messagingSettings.Provider, "Kafka", StringComparison.OrdinalIgnoreCase))
         {
             services.AddSingleton<IEventBus, KafkaEventBus>();
             services.AddHostedService<KafkaConsumerHostedService>();
