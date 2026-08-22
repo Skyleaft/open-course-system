@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <PackageReference Include="Mediator.SourceGenerator">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Scalar.AspNetCore" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="AspNetCore.HealthChecks.NpgSql" />
+    <PackageReference Include="AspNetCore.HealthChecks.Redis" />
+    <PackageReference Include="AspNetCore.HealthChecks.Rabbitmq" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\MonoSlice.Shared\MonoSlice.Shared.Abstractions\MonoSlice.Shared.Abstractions.csproj" />
+    <ProjectReference Include="..\MonoSlice.Shared\MonoSlice.Shared.Infrastructure\MonoSlice.Shared.Infrastructure.csproj" />
+    <ProjectReference Include="..\Modules\MonoSlice.Modules.Users\MonoSlice.Modules.Users.csproj" />
+    <ProjectReference Include="..\Modules\MonoSlice.Modules.Catalog\MonoSlice.Modules.Catalog.csproj" />
+    <ProjectReference Include="..\Modules\MonoSlice.Modules.Orders\MonoSlice.Modules.Orders.csproj" />
+  </ItemGroup>
+
+</Project>

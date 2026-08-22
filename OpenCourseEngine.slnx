@@ -1,0 +1,20 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MonoSlice.Host/MonoSlice.Host.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/">
+    <Project Path="src/Modules/MonoSlice.Modules.Catalog/MonoSlice.Modules.Catalog.csproj" />
+    <Project Path="src/Modules/MonoSlice.Modules.Orders/MonoSlice.Modules.Orders.csproj" />
+    <Project Path="src/Modules/MonoSlice.Modules.Users/MonoSlice.Modules.Users.csproj" />
+  </Folder>
+  <Folder Name="/src/Shared/">
+    <Project Path="src/MonoSlice.Shared/MonoSlice.Shared.Abstractions/MonoSlice.Shared.Abstractions.csproj" />
+    <Project Path="src/MonoSlice.Shared/MonoSlice.Shared.Infrastructure/MonoSlice.Shared.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MonoSlice.IntegrationTests/MonoSlice.IntegrationTests.csproj" />
+    <Project Path="tests/MonoSlice.Modules.Catalog.Tests/MonoSlice.Modules.Catalog.Tests.csproj" />
+    <Project Path="tests/MonoSlice.Modules.Orders.Tests/MonoSlice.Modules.Orders.Tests.csproj" />
+    <Project Path="tests/MonoSlice.Modules.Users.Tests/MonoSlice.Modules.Users.Tests.csproj" />
+  </Folder>
+</Solution>

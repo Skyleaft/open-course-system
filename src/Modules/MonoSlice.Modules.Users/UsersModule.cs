@@ -1,0 +1,128 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.IdentityModel.Tokens;
+using MonoSlice.Modules.Users.Auth;
+using MonoSlice.Modules.Users.Contracts;
+using MonoSlice.Modules.Users.Domain;
+using MonoSlice.Modules.Users.Features.AssignRole;
+using MonoSlice.Modules.Users.Features.GetProfile;
+using MonoSlice.Modules.Users.Features.Login;
+using MonoSlice.Modules.Users.Features.RefreshToken;
+using MonoSlice.Modules.Users.Features.Register;
+using MonoSlice.Modules.Users.Persistence;
+using MonoSlice.Shared.Abstractions.Contracts;
+using MonoSlice.Shared.Abstractions.Interfaces;
+
+namespace MonoSlice.Modules.Users;
+
+public static class UsersModule
+{
+    public static IServiceCollection AddUsersModule(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var authSection = configuration.GetSection(AuthSettings.SectionName);
+        services.Configure<AuthSettings>(authSection);
+        var authSettings = authSection.Get<AuthSettings>() ?? new AuthSettings();
+
+        var connectionString = configuration.GetConnectionString("UsersDb") ??
+                               configuration.GetConnectionString("DefaultConnection") ??
+                               "Host=localhost;Database=monoslice_users;Username=postgres;Password=postgres";
+
+        if (connectionString.StartsWith("InMemory:", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddDbContext<UsersDbContext>(options =>
+            {
+                options.UseInMemoryDatabase(connectionString[9..]);
+            });
+        }
+        else
+        {
+            services.AddDbContext<UsersDbContext>(options =>
+            {
+                options.UseNpgsql(connectionString, npgsqlOptions =>
+                {
+                    npgsqlOptions.MigrationsHistoryTable("__EFMigrationsHistory", UsersDbContext.DefaultSchema);
+                });
+            });
+        }
+
+        services.AddIdentity<ApplicationUser, ApplicationRole>(options =>
+        {
+            options.Password.RequireDigit = true;
+            options.Password.RequireLowercase = true;
+            options.Password.RequireNonAlphanumeric = false;
+            options.Password.RequireUppercase = true;
+            options.Password.RequiredLength = 6;
+            options.User.RequireUniqueEmail = true;
+            options.Lockout.MaxFailedAccessAttempts = 5;
+            options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+        })
+        .AddEntityFrameworkStores<UsersDbContext>()
+        .AddDefaultTokenProviders();
+
+        services.AddAuthentication()
+        .AddJwtBearer(options =>
+        {
+            options.RequireHttpsMetadata = false;
+            options.SaveToken = true;
+            options.TokenValidationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidIssuer = authSettings.JwtIssuer,
+                ValidateAudience = true,
+                ValidAudience = authSettings.JwtAudience,
+                ValidateIssuerSigningKey = true,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(authSettings.JwtSecret)),
+                ClockSkew = TimeSpan.Zero
+            };
+        });
+
+        services.ConfigureApplicationCookie(options =>
+        {
+            options.Cookie.Name = authSettings.CookieName;
+            options.Cookie.HttpOnly = true;
+            options.ExpireTimeSpan = TimeSpan.FromDays(authSettings.RefreshTokenExpiryDays);
+            options.SlidingExpiration = true;
+        });
+
+        services.AddAuthorization();
+
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUser, CurrentUserService>();
+        services.AddScoped<IUsersModuleApi, UsersModuleApi>();
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        services.AddHostedService<SeedRolesService>();
+
+        return services;
+    }
+
+    public static IApplicationBuilder UseUsersAuth(this IApplicationBuilder app)
+    {
+        app.UseAuthentication();
+        app.UseMiddleware<CompositeAuthMiddleware>();
+        app.UseAuthorization();
+        return app;
+    }
+
+    public static IEndpointRouteBuilder MapUsersEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/users")
+            .WithTags("Users");
+
+        group.MapRegisterEndpoint();
+        group.MapLoginEndpoint();
+        group.MapRefreshTokenEndpoint();
+        group.MapGetProfileEndpoint();
+        group.MapAssignRoleEndpoint();
+
+        return app;
+    }
+}

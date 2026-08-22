@@ -1,0 +1,97 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: monoslice-api
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__UsersDb=Host=postgres;Port=5432;Database=monoslice_users;Username=postgres;Password=postgres
+      - ConnectionStrings__CatalogDb=Host=postgres;Port=5432;Database=monoslice_catalog;Username=postgres;Password=postgres
+      - ConnectionStrings__OrdersDb=Host=postgres;Port=5432;Database=monoslice_orders;Username=postgres;Password=postgres
+      - Cache__Provider=Redis
+      - Cache__Redis__ConnectionString=redis:6379
+      - Messaging__Provider=RabbitMQ
+      - Messaging__RabbitMQ__Host=rabbitmq
+      - Messaging__RabbitMQ__Port=5672
+      - Messaging__RabbitMQ__Username=guest
+      - Messaging__RabbitMQ__Password=guest
+      - OpenTelemetry__Endpoint=http://jaeger:4317
+      - OpenTelemetry__ServiceName=MonoSlice.Host
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - monoslice-network
+
+  postgres:
+    image: postgres:18-alpine
+    container_name: monoslice-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_MULTIPLE_DATABASES: monoslice_users,monoslice_catalog,monoslice_orders
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - monoslice-network
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: monoslice-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - monoslice-network
+
+  redis:
+    image: redis:8-alpine
+    container_name: monoslice-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - monoslice-network
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: monoslice-jaeger
+    ports:
+      - "16686:16686" # Jaeger Web UI
+      - "4317:4317"   # OTLP gRPC receiver
+    networks:
+      - monoslice-network
+
+networks:
+  monoslice-network:
+    driver: bridge
+
+volumes:
+  pgdata:

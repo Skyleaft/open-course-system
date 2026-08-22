@@ -52,7 +52,7 @@ public class WordDocumentService(NavigationManager navigationManager):IDocx
                 
                 if (format == "decimal")
                 {
-                    // This is a question (Soal)
+                    // This is a question (Soal) 
                     numberIteration += 1;
                     currentSoal = new Soal
                     {
