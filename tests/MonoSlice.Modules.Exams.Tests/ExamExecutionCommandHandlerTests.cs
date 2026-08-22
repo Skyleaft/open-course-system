@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Exams.Domain;
+using MonoSlice.Modules.Exams.Domain.Services;
 using MonoSlice.Modules.Exams.Features.SaveAnswer;
 using MonoSlice.Modules.Exams.Features.StartExam;
 using MonoSlice.Modules.Exams.Features.SubmitExam;
@@ -18,6 +19,7 @@ public class ExamExecutionCommandHandlerTests
     private readonly ICacheService _cacheService;
     private readonly IEventStreamPublisher _eventPublisher;
     private readonly IServiceProvider _serviceProvider;
+    private readonly IExamFinalizerService _finalizerService;
 
     public ExamExecutionCommandHandlerTests()
     {
@@ -30,6 +32,7 @@ public class ExamExecutionCommandHandlerTests
         _cacheService = Substitute.For<ICacheService>();
         _eventPublisher = Substitute.For<IEventStreamPublisher>();
         _serviceProvider = Substitute.For<IServiceProvider>();
+        _finalizerService = new ExamFinalizerService(_dbContext, _cacheService, _eventPublisher);
     }
 
     [Fact]
@@ -101,7 +104,7 @@ public class ExamExecutionCommandHandlerTests
         }, CancellationToken.None);
 
         // 4. Submit Exam
-        var submitHandler = new SubmitExamCommandHandler(_dbContext, _currentUser, _cacheService, _eventPublisher);
+        var submitHandler = new SubmitExamCommandHandler(_finalizerService, _currentUser);
         var submitResult = await submitHandler.Handle(new SubmitExamCommand(submissionId), CancellationToken.None);
 
         Assert.True(submitResult.Success);

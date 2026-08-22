@@ -51,6 +51,9 @@ public sealed class UpdateExamCommandHandler : ICommandHandler<UpdateExamCommand
             command.DurationMinutes,
             command.PassingScore,
             command.MaxAllowedViolations,
+            command.MaxAttempts,
+            command.AvailableFromUtc,
+            command.AvailableToUtc,
             command.CourseId,
             command.ShuffleQuestions,
             command.ShuffleOptions);

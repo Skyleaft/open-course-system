@@ -13,6 +13,9 @@ public sealed class QuizExam : AggregateRoot<Guid>
     public int DurationMinutes { get; private set; } = 60;
     public decimal PassingScore { get; private set; } = 70m;
     public int MaxAllowedViolations { get; private set; } = 3;
+    public int MaxAttempts { get; private set; } = 1;
+    public DateTime? AvailableFromUtc { get; private set; }
+    public DateTime? AvailableToUtc { get; private set; }
     public bool IsPublished { get; private set; }
     public bool ShuffleQuestions { get; private set; } = true;
     public bool ShuffleOptions { get; private set; } = true;
@@ -32,6 +35,9 @@ public sealed class QuizExam : AggregateRoot<Guid>
         int durationMinutes,
         decimal passingScore,
         int maxAllowedViolations = 3,
+        int maxAttempts = 1,
+        DateTime? availableFromUtc = null,
+        DateTime? availableToUtc = null,
         Guid? courseId = null,
         bool shuffleQuestions = true,
         bool shuffleOptions = true)
@@ -56,6 +62,16 @@ public sealed class QuizExam : AggregateRoot<Guid>
             throw new BusinessRuleException("Passing score must be between 0 and 100.");
         }
 
+        if (maxAttempts <= 0)
+        {
+            throw new BusinessRuleException("Max attempts must be at least 1.");
+        }
+
+        if (availableFromUtc.HasValue && availableToUtc.HasValue && availableToUtc.Value <= availableFromUtc.Value)
+        {
+            throw new BusinessRuleException("Exam closing time (AvailableToUtc) must be after opening time (AvailableFromUtc).");
+        }
+
         return new QuizExam
         {
             Id = Guid.CreateVersion7(),
@@ -66,6 +82,9 @@ public sealed class QuizExam : AggregateRoot<Guid>
             DurationMinutes = durationMinutes,
             PassingScore = passingScore,
             MaxAllowedViolations = Math.Max(1, maxAllowedViolations),
+            MaxAttempts = maxAttempts,
+            AvailableFromUtc = availableFromUtc,
+            AvailableToUtc = availableToUtc,
             CourseId = courseId,
             ShuffleQuestions = shuffleQuestions,
             ShuffleOptions = shuffleOptions,
@@ -81,6 +100,9 @@ public sealed class QuizExam : AggregateRoot<Guid>
         int durationMinutes,
         decimal passingScore,
         int maxAllowedViolations,
+        int maxAttempts,
+        DateTime? availableFromUtc,
+        DateTime? availableToUtc,
         Guid? courseId,
         bool shuffleQuestions,
         bool shuffleOptions)
@@ -100,12 +122,25 @@ public sealed class QuizExam : AggregateRoot<Guid>
             throw new BusinessRuleException("Passing score must be between 0 and 100.");
         }
 
+        if (maxAttempts <= 0)
+        {
+            throw new BusinessRuleException("Max attempts must be at least 1.");
+        }
+
+        if (availableFromUtc.HasValue && availableToUtc.HasValue && availableToUtc.Value <= availableFromUtc.Value)
+        {
+            throw new BusinessRuleException("Exam closing time (AvailableToUtc) must be after opening time (AvailableFromUtc).");
+        }
+
         Title = title.Trim();
         Description = description?.Trim();
         Mode = mode;
         DurationMinutes = durationMinutes;
         PassingScore = passingScore;
         MaxAllowedViolations = Math.Max(1, maxAllowedViolations);
+        MaxAttempts = maxAttempts;
+        AvailableFromUtc = availableFromUtc;
+        AvailableToUtc = availableToUtc;
         CourseId = courseId;
         ShuffleQuestions = shuffleQuestions;
         ShuffleOptions = shuffleOptions;

@@ -1,12 +1,14 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Exams.Domain;
+using MonoSlice.Modules.Exams.Domain.Services;
 using MonoSlice.Modules.Exams.Features.Proctor.ForceDisconnectCandidate;
 using MonoSlice.Modules.Exams.Features.Proctor.GetLiveCandidates;
 using MonoSlice.Modules.Exams.Features.Proctor.WarnCandidate;
 using MonoSlice.Modules.Exams.Hubs;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Interfaces;
+using MonoSlice.Shared.Abstractions.Messaging;
 using NSubstitute;
 using Xunit;
 
@@ -18,6 +20,8 @@ public class ProctorControlCommandHandlerTests
     private readonly IHubContext<ExamHub> _hubContext;
     private readonly ICacheService _cacheService;
     private readonly ICurrentUser _currentUser;
+    private readonly IEventStreamPublisher _eventPublisher;
+    private readonly IExamFinalizerService _finalizerService;
 
     public ProctorControlCommandHandlerTests()
     {
@@ -29,6 +33,8 @@ public class ProctorControlCommandHandlerTests
         _hubContext = Substitute.For<IHubContext<ExamHub>>();
         _cacheService = Substitute.For<ICacheService>();
         _currentUser = Substitute.For<ICurrentUser>();
+        _eventPublisher = Substitute.For<IEventStreamPublisher>();
+        _finalizerService = new ExamFinalizerService(_dbContext, _cacheService, _eventPublisher);
 
         var clients = Substitute.For<IHubClients>();
         var clientProxy = Substitute.For<IClientProxy>();
@@ -69,7 +75,7 @@ public class ProctorControlCommandHandlerTests
         await _dbContext.Submissions.AddAsync(submission);
         await _dbContext.SaveChangesAsync();
 
-        var handler = new ForceDisconnectCandidateCommandHandler(_dbContext, _hubContext, _cacheService);
+        var handler = new ForceDisconnectCandidateCommandHandler(_dbContext, _finalizerService, _hubContext);
         var result = await handler.Handle(new ForceDisconnectCandidateCommand
         {
             SubmissionId = submission.Id,
@@ -103,8 +109,8 @@ public class ProctorControlCommandHandlerTests
         Assert.True(result.Success);
         Assert.NotNull(result.Data);
         Assert.Single(result.Data);
-        Assert.Equal(submission.Id, result.Data[0].SubmissionId);
-        Assert.True(result.Data[0].IsOnline);
+        Assert.Equal(studentId, result.Data[0].StudentId);
         Assert.Equal(1, result.Data[0].ViolationCount);
+        Assert.True(result.Data[0].IsOnline);
     }
 }

@@ -54,6 +54,17 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
             throw new BusinessRuleException("This exam is not yet published.");
         }
 
+        // Check Exam Availability Schedule Window
+        if (exam.AvailableFromUtc.HasValue && DateTime.UtcNow < exam.AvailableFromUtc.Value)
+        {
+            throw new BusinessRuleException($"This exam is scheduled to open at {exam.AvailableFromUtc.Value:yyyy-MM-dd HH:mm:ss} UTC.");
+        }
+
+        if (exam.AvailableToUtc.HasValue && DateTime.UtcNow > exam.AvailableToUtc.Value)
+        {
+            throw new BusinessRuleException($"This exam closed at {exam.AvailableToUtc.Value:yyyy-MM-dd HH:mm:ss} UTC.");
+        }
+
         // Verify course enrollment if linked to a course
         if (exam.CourseId.HasValue)
         {
@@ -88,26 +99,41 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
                     exam.Id,
                     exam.Title,
                     exam.Mode.ToString(),
+                    existing.AttemptNumber,
+                    exam.MaxAttempts,
                     existing.StartedAtUtc,
                     existing.MaxAllowedEndTimeUtc,
+                    exam.AvailableToUtc,
                     existing.ActiveSessionToken,
                     exam.Questions.Count,
-                    exam.DurationMinutes);
+                    existing.DurationMinutes);
 
                 return ApiResponse.Ok(existingAttempt, "Resuming active exam attempt.");
             }
         }
 
-        // Create new attempt
+        // Check Max Attempt limits
+        var completedAttemptsCount = await _dbContext.Submissions
+            .CountAsync(s => s.ExamId == exam.Id && s.StudentId == studentId && s.Status != SubmissionStatus.InProgress, cancellationToken);
+
+        if (completedAttemptsCount >= exam.MaxAttempts)
+        {
+            throw new BusinessRuleException($"Maximum attempt limit of {exam.MaxAttempts} reached for this exam.");
+        }
+
+        // Create new attempt with time capping against exam.AvailableToUtc
         var randomSeed = Random.Shared.Next(1, 1_000_000);
         var activeSessionToken = Guid.CreateVersion7().ToString("N");
+        var attemptNumber = completedAttemptsCount + 1;
 
         var submission = QuizSubmission.Create(
             exam.Id,
             studentId,
             exam.DurationMinutes,
             randomSeed,
-            activeSessionToken);
+            activeSessionToken,
+            attemptNumber,
+            exam.AvailableToUtc);
 
         await _dbContext.Submissions.AddAsync(submission, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
@@ -121,11 +147,14 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
             exam.Id,
             exam.Title,
             exam.Mode.ToString(),
+            submission.AttemptNumber,
+            exam.MaxAttempts,
             submission.StartedAtUtc,
             submission.MaxAllowedEndTimeUtc,
+            exam.AvailableToUtc,
             submission.ActiveSessionToken,
             exam.Questions.Count,
-            exam.DurationMinutes);
+            submission.DurationMinutes);
 
         return ApiResponse.Ok(dto, "Exam attempt started successfully.");
     }

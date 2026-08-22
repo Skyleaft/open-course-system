@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Exams.Domain;
 using MonoSlice.Modules.Exams.Domain.Services;
+using MonoSlice.Modules.Exams.Features.SaveAnswer;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
@@ -13,13 +14,16 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
 {
     private readonly ExamsDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
+    private readonly ICacheService _cacheService;
 
     public GetExamQuestionsQueryHandler(
         ExamsDbContext dbContext,
-        ICurrentUser currentUser)
+        ICurrentUser currentUser,
+        ICacheService cacheService)
     {
         _dbContext = dbContext;
         _currentUser = currentUser;
+        _cacheService = cacheService;
     }
 
     public async ValueTask<ApiResponse<StudentExamPaperDto>> Handle(
@@ -60,6 +64,10 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
             throw new NotFoundException(nameof(QuizExam), submission.ExamId);
         }
 
+        // Retrieve any previously buffered answers from Redis to restore student state
+        var cachedAnswers = await _cacheService.GetAsync<Dictionary<Guid, CachedAnswerDto>>(
+            $"exam_answers:{submission.Id}", cancellationToken) ?? [];
+
         // Apply Fisher-Yates shuffle deterministically
         var questions = exam.Questions.ToList();
         if (exam.ShuffleQuestions)
@@ -84,12 +92,17 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
 
             var optionDtos = options.Select(o => new StudentOptionDto(o.Id, o.Text)).ToList();
 
+            // Populate previously saved answers if student is reconnecting/resuming
+            cachedAnswers.TryGetValue(q.Id, out var savedAnswer);
+
             questionDtos.Add(new StudentQuestionDto(
                 q.Id,
                 q.QuestionText,
                 q.Type.ToString(),
                 q.Points,
                 displayOrder++,
+                savedAnswer?.SelectedOptionIds,
+                savedAnswer?.EssayText,
                 optionDtos));
         }
 

@@ -19,6 +19,7 @@ using MonoSlice.Modules.Exams.Features.SaveAnswer;
 using MonoSlice.Modules.Exams.Features.StartExam;
 using MonoSlice.Modules.Exams.Features.SubmitExam;
 using MonoSlice.Modules.Exams.Features.UpdateExam;
+using MonoSlice.Modules.Exams.Domain.Services;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Contracts;
 
@@ -54,7 +55,8 @@ public static class ExamsModule
             });
         }
 
-        // Register module contract API for synchronous inter-module communication
+        // Register module services and contract API
+        services.AddScoped<IExamFinalizerService, MonoSlice.Modules.Exams.Domain.Services.ExamFinalizerService>();
         services.AddScoped<IExamsModuleApi, ExamsModuleApi>();
 
         return services;

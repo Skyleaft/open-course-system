@@ -7,6 +7,8 @@ public sealed class QuizSubmission : AggregateRoot<Guid>
 {
     public Guid ExamId { get; private set; }
     public Guid StudentId { get; private set; }
+    public int AttemptNumber { get; private set; } = 1;
+    public int DurationMinutes { get; private set; } = 60;
     public DateTime StartedAtUtc { get; private set; } = DateTime.UtcNow;
     public DateTime MaxAllowedEndTimeUtc { get; private set; }
     public DateTime? SubmittedAtUtc { get; private set; }
@@ -30,7 +32,9 @@ public sealed class QuizSubmission : AggregateRoot<Guid>
         Guid studentId,
         int durationMinutes,
         int randomSeed,
-        string activeSessionToken)
+        string activeSessionToken,
+        int attemptNumber = 1,
+        DateTime? availableToUtc = null)
     {
         if (examId == Guid.Empty)
         {
@@ -43,13 +47,20 @@ public sealed class QuizSubmission : AggregateRoot<Guid>
         }
 
         var startedAt = DateTime.UtcNow;
+        var naturalEnd = startedAt.AddMinutes(durationMinutes);
+        var maxAllowedEnd = availableToUtc.HasValue && availableToUtc.Value < naturalEnd
+            ? availableToUtc.Value
+            : naturalEnd;
+
         return new QuizSubmission
         {
             Id = Guid.CreateVersion7(),
             ExamId = examId,
             StudentId = studentId,
+            AttemptNumber = Math.Max(1, attemptNumber),
+            DurationMinutes = durationMinutes,
             StartedAtUtc = startedAt,
-            MaxAllowedEndTimeUtc = startedAt.AddMinutes(durationMinutes),
+            MaxAllowedEndTimeUtc = maxAllowedEnd,
             Status = SubmissionStatus.InProgress,
             RandomSeed = randomSeed,
             ActiveSessionToken = activeSessionToken

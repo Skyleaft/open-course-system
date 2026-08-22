@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Exams.Domain;
+using MonoSlice.Modules.Exams.Domain.Services;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Interfaces;
 using MonoSlice.Shared.Abstractions.Storage;
@@ -14,15 +15,18 @@ public sealed class ExamHub : Hub
     private readonly ExamsDbContext _dbContext;
     private readonly ICacheService _cacheService;
     private readonly IObjectStorageService _storageService;
+    private readonly IExamFinalizerService _finalizerService;
 
     public ExamHub(
         ExamsDbContext dbContext,
         ICacheService cacheService,
-        IObjectStorageService storageService)
+        IObjectStorageService storageService,
+        IExamFinalizerService finalizerService)
     {
         _dbContext = dbContext;
         _cacheService = cacheService;
         _storageService = storageService;
+        _finalizerService = finalizerService;
     }
 
     public async Task JoinExamRoom(Guid submissionId, string sessionToken)
@@ -103,8 +107,8 @@ public sealed class ExamHub : Hub
         // Check if timeout reached
         if (DateTime.UtcNow > submission.MaxAllowedEndTimeUtc)
         {
-            submission.MarkTimedOut();
-            await _dbContext.SaveChangesAsync();
+            // Flush buffered Redis answers and finalize submission as TimedOut
+            await _finalizerService.FinalizeAndGradeSubmissionAsync(submissionId, SubmissionStatus.TimedOut);
 
             await Clients.Group($"exam_{submissionId}").SendAsync("ForceDisconnectExam", "Timeout");
             await Clients.Group($"proctor_exam_{submission.ExamId}").SendAsync("CandidateStatusChanged", submissionId, "TimedOut");
@@ -154,9 +158,11 @@ public sealed class ExamHub : Hub
             submission.Violations.Count,
             reason);
 
-        // If disqualified, trigger immediate disconnection
+        // If disqualified, trigger immediate flush and disconnection
         if (submission.Status == SubmissionStatus.Disqualified)
         {
+            await _finalizerService.FinalizeAndGradeSubmissionAsync(submissionId, SubmissionStatus.Disqualified, reason);
+
             await Clients.Group(examGroup).SendAsync("ForceDisconnectExam", "Disqualified");
             await Clients.Group(proctorGroup).SendAsync("CandidateStatusChanged", submissionId, "Disqualified");
         }

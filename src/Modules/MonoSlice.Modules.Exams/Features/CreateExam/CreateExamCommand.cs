@@ -23,6 +23,12 @@ public sealed record CreateExamCommand : ICommand<ApiResponse<ExamDetailDto>>
 
     public int MaxAllowedViolations { get; init; } = 3;
 
+    public int MaxAttempts { get; init; } = 1;
+
+    public DateTime? AvailableFromUtc { get; init; }
+
+    public DateTime? AvailableToUtc { get; init; }
+
     public bool ShuffleQuestions { get; init; } = true;
 
     public bool ShuffleOptions { get; init; } = true;
@@ -38,6 +44,9 @@ public sealed record ExamDetailDto(
     int DurationMinutes,
     decimal PassingScore,
     int MaxAllowedViolations,
+    int MaxAttempts,
+    DateTime? AvailableFromUtc,
+    DateTime? AvailableToUtc,
     bool IsPublished,
     bool ShuffleQuestions,
     bool ShuffleOptions,

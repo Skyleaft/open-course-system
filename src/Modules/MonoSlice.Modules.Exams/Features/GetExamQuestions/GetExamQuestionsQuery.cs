@@ -20,6 +20,8 @@ public sealed record StudentQuestionDto(
     string Type,
     decimal Points,
     int DisplayOrder,
+    IReadOnlyList<Guid>? SelectedOptionIds,
+    string? EssayText,
     IReadOnlyList<StudentOptionDto> Options);
 
 public sealed record StudentOptionDto(

@@ -368,14 +368,25 @@ Bucket Configuration MatrixBucket NameAccess PolicyRetention & LifecycleAllowed 
 | - ProctorSnapshotReceived(Guid studentId, string snapshotPresignedViewUrl)                         |
 +----------------------------------------------------------------------------------------------------+
 
-### 6.3 High-Concurrency Exam Answer Autosave with Redis Buffering
-Untuk menangani beban konkurensi tinggi saat ribuan peserta ujian mengklik opsi jawaban atau mengetik esai secara berkala, sistem menerapkan **Redis In-Memory Answer Buffering**:
+### 6.3 High-Concurrency Exam Answer Autosave with Redis Buffering & Auto-Flush on Timeout
+Untuk menangani beban konkurensi tinggi saat ribuan peserta ujian mengklik opsi jawaban atau mengetik esai secara berkala, sistem menerapkan **Redis In-Memory Answer Buffering & Disaster Recovery**:
 1. **Autosave Interception (`POST /api/v1/exams/submissions/{submissionId}/answers`)**:
-   - Seluruh pembaruan jawaban peserta disimpan langsung ke dalam Redis Hash/Cache (`exam_answers:{submissionId}`) dengan TTL 4 jam.
+   - Seluruh pembaruan jawaban peserta disimpan langsung ke dalam Redis Cache (`exam_answers:{submissionId}`) dengan TTL 4 jam.
    - **PostgreSQL tidak dipanggil (Zero DB writes)** selama proses pengerjaan ujian berlangsung, mencegah connection pool exhaustion dan disk I/O bottleneck.
-2. **Batch Flush on Finalization (`POST /api/v1/exams/submissions/{submissionId}/finish`)**:
-   - Saat peserta menyelesaikan ujian, seluruh jawaban yang terkumpul di Redis di-flush ke entitas `QuizSubmission` dalam database PostgreSQL dalam satu transaksi atomic EF Core.
+2. **Reconnection & State Auto-Recovery (`GET /api/v1/exams/submissions/{submissionId}/questions`)**:
+   - Jika peserta mengalami putus koneksi, browser crash, atau refresh halaman, query pengambilan soal otomatis mengambil data `exam_answers:{submissionId}` dari Redis dan mengisi kembali `SelectedOptionIds` dan `EssayText` pada setiap soal.
+3. **Batch Flush on Finalization (`POST /api/v1/exams/submissions/{submissionId}/finish`)**:
+   - Saat peserta menyelesaikan ujian secara normal, seluruh jawaban yang terkumpul di Redis di-flush ke entitas `QuizSubmission` dalam database PostgreSQL dalam satu transaksi atomic EF Core melalui `IExamFinalizerService`.
    - Buffer jawaban di Redis kemudian dibersihkan (`DEL exam_answers:{submissionId}`).
+4. **Auto-Flush on Timeout & Abandonment (`ExamHub.Heartbeat` & Timeout Guard)**:
+   - Jika peserta meninggalkan ujian dan tidak kembali hingga waktu habis (`DateTime.UtcNow > MaxAllowedEndTimeUtc`), SignalR Heartbeat atau timeout processor otomatis melakukan batch-flush terhadap seluruh jawaban yang tersimpan di Redis, menghitung nilai objektif secara otomatis, dan mengubah status submission menjadi `TimedOut`. Jawaban peserta tetap tersimpan dan dinilai.
+5. **Auto-Flush on Proctor Disqualification (`POST /api/v1/proctor/submissions/{submissionId}/force-disconnect`)**:
+   - Saat pengawas mendiskualifikasi peserta, seluruh jawaban di Redis tetap di-flush ke database PostgreSQL untuk keperluan jejak audit sebelum sesi dibatalkan.
+6. **Dual Time Dimensions & Late-Start Capping**:
+   - `QuizExam.AvailableFromUtc` & `QuizExam.AvailableToUtc`: Rentang jadwal dibukanya kuis.
+   - `QuizExam.DurationMinutes`: Batas waktu countdown per attempt.
+   - `QuizSubmission.MaxAllowedEndTimeUtc = Min(StartedAtUtc + DurationMinutes, AvailableToUtc)`.
+
 
 7. Redis Streams Event-Driven Pipeline & DLSUntuk menjamin skalabilitas saat ribuan submission kuis terjadi secara simultan, evaluasi nilai diproses secara asinkron menggunakan Redis Streams Consumer Groups dengan kebijakan dead-letter dan stream trimming.[ Submission Finished Slice ]
              │

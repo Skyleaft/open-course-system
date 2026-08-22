@@ -83,4 +83,33 @@ public class QuizExamDomainTests
         submission.RecordViolation("FULLSCREEN_EXIT", "User exited full screen", maxAllowedViolations: 2);
         Assert.Equal(SubmissionStatus.Disqualified, submission.Status);
     }
+
+    [Fact]
+    public void Submission_ShouldCapMaxAllowedEndTime_WhenAvailableToUtcIsEarlierThanNaturalDuration()
+    {
+        var examId = Guid.CreateVersion7();
+        var studentId = Guid.CreateVersion7();
+        var deadline = DateTime.UtcNow.AddMinutes(15); // Quiz deadline closes in 15 minutes
+
+        var submission = QuizSubmission.Create(
+            examId,
+            studentId,
+            durationMinutes: 60, // Student gets 60 min, but should be capped at 15 min deadline
+            randomSeed: 12345,
+            activeSessionToken: "token123",
+            attemptNumber: 1,
+            availableToUtc: deadline);
+
+        Assert.Equal(deadline, submission.MaxAllowedEndTimeUtc);
+    }
+
+    [Fact]
+    public void QuizExam_InvalidAvailableDates_ShouldThrowException()
+    {
+        var from = DateTime.UtcNow.AddDays(2);
+        var to = DateTime.UtcNow.AddDays(1); // Invalid: To is earlier than From
+
+        Assert.Throws<BusinessRuleException>(() =>
+            QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", QuizMode.RealExam, 60, 70m, availableFromUtc: from, availableToUtc: to));
+    }
 }

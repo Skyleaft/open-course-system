@@ -10,8 +10,11 @@ public sealed record ExamAttemptDto(
     Guid ExamId,
     string Title,
     string Mode,
+    int AttemptNumber,
+    int MaxAttempts,
     DateTime StartedAtUtc,
     DateTime MaxAllowedEndTimeUtc,
+    DateTime? AvailableToUtc,
     string ActiveSessionToken,
     int TotalQuestions,
     int DurationMinutes);
