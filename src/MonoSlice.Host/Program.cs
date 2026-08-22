@@ -138,6 +138,10 @@ app.MapOrdersEndpoints();
 app.MapCatalogEndpoints();
 app.MapExamsEndpoints();
 
+// Realtime SignalR Hubs
+app.MapHub<MonoSlice.Modules.Exams.Hubs.ExamHub>("/hubs/exam");
+app.MapHub<MonoSlice.Shared.Infrastructure.Hubs.NotificationHub>("/hubs/notifications");
+
 app.Run();
 
 // Marker class for WebApplicationFactory in integration tests

@@ -181,28 +181,28 @@
 
 ## Phase 7: Realtime Anti-Cheat Engine & SignalR (`ExamHub` & Proctor Stream)
 
-- [ ] **7.1. SignalR Infrastructure & Redis Backplane**
-  - [ ] Configure SignalR with StackExchange.Redis backplane in host.
-  - [ ] Implement `ExamHub` and `NotificationHub` endpoints with JWT authorization.
+- [x] **7.1. SignalR Infrastructure & Redis Backplane**
+  - [x] Configure SignalR with StackExchange.Redis backplane in host.
+  - [x] Implement `ExamHub` and `NotificationHub` endpoints with JWT authorization.
 
-- [ ] **7.2. Hub Implementation (`ExamHub`)**
-  - [ ] Implement Client-to-Server methods:
-    - [ ] `JoinExamRoom(Guid submissionId, Guid sessionToken)`: Verify token against Redis, join SignalR group `exam_{submissionId}` and proctor group `proctor_exam_{quizId}`.
-    - [ ] `Heartbeat(Guid submissionId, Guid sessionToken)`: Update student liveness in Redis with expiration window.
-    - [ ] `ReportViolation(Guid submissionId, string violationType, string? details)`: Record violation to database JSONB and Redis. Check if violations $\ge \text{MaxAllowedViolations}$; if so, trigger auto-disqualification and broadcast `ForceDisconnectExam("Disqualified")`.
-    - [ ] `ReportSnapshotUploaded(Guid submissionId, string objectKey)`: Save `ProctoringSnapshot` record and broadcast `ProctorSnapshotReceived` to proctor group.
-  - [ ] Implement Server-to-Client broadcast events:
-    - [ ] `SyncTimer(long remainingSeconds, DateTime serverTimeUtc)`
-    - [ ] `ViolationWarning(int currentViolationCount, int maxAllowedViolations)`
-    - [ ] `ForceDisconnectExam(string terminationReason)` (`Disqualified`, `SessionReplaced`, `Timeout`)
-  - [ ] Implement Server-to-Proctor monitor events:
-    - [ ] `ProctorViolationAlert(Guid studentId, Guid submissionId, string violationType, int count)`
-    - [ ] `ProctorSnapshotReceived(Guid studentId, string snapshotPresignedViewUrl)`
+- [x] **7.2. Hub Implementation (`ExamHub`)**
+  - [x] Implement Client-to-Server methods:
+    - [x] `JoinExamRoom(Guid submissionId, Guid sessionToken)`: Verify token against Redis, join SignalR group `exam_{submissionId}` and proctor group `proctor_exam_{quizId}`.
+    - [x] `Heartbeat(Guid submissionId, Guid sessionToken)`: Update student liveness in Redis with expiration window.
+    - [x] `ReportViolation(Guid submissionId, string violationType, string? details)`: Record violation to database JSONB and Redis. Check if violations $\ge \text{MaxAllowedViolations}$; if so, trigger auto-disqualification and broadcast `ForceDisconnectExam("Disqualified")`.
+    - [x] `ReportSnapshotUploaded(Guid submissionId, string objectKey)`: Save `ProctoringSnapshot` record and broadcast `ProctorSnapshotReceived` to proctor group.
+  - [x] Implement Server-to-Client broadcast events:
+    - [x] `SyncTimer(long remainingSeconds, DateTime serverTimeUtc)`
+    - [x] `ViolationWarning(int currentViolationCount, int maxAllowedViolations)`
+    - [x] `ForceDisconnectExam(string terminationReason)` (`Disqualified`, `SessionReplaced`, `Timeout`)
+  - [x] Implement Server-to-Proctor monitor events:
+    - [x] `ProctorViolationAlert(Guid studentId, Guid submissionId, string violationType, int count)`
+    - [x] `ProctorSnapshotReceived(Guid studentId, string snapshotPresignedViewUrl)`
 
-- [ ] **7.3. Proctor Control API Slices**
-  - [ ] `GET /api/v1/proctor/exams/{quizId}/live-candidates`: Get active candidates in exam room with violation tallies.
-  - [ ] `POST /api/v1/proctor/submissions/{submissionId}/warn`: Proctor sends custom warning to candidate.
-  - [ ] `POST /api/v1/proctor/submissions/{submissionId}/force-disconnect`: Proctor forcibly disqualifies candidate.
+- [x] **7.3. Proctor Control API Slices**
+  - [x] `GET /api/v1/proctor/exams/{quizId}/live-candidates`: Get active candidates in exam room with violation tallies.
+  - [x] `POST /api/v1/proctor/submissions/{submissionId}/warn`: Proctor sends custom warning to candidate.
+  - [x] `POST /api/v1/proctor/submissions/{submissionId}/force-disconnect`: Proctor forcibly disqualifies candidate.
 
 ---
 

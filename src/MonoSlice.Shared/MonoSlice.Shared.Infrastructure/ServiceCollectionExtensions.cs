@@ -28,8 +28,34 @@ public static class ServiceCollectionExtensions
         services.AddCaching(configuration);
         services.AddStorage(configuration);
         services.AddMessaging(configuration);
+        services.AddRealtimeHubs(configuration);
         services.AddMediatorBehaviors();
         services.AddDapper(configuration);
+
+        return services;
+    }
+
+    public static IServiceCollection AddRealtimeHubs(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var signalR = services.AddSignalR(options =>
+        {
+            options.EnableDetailedErrors = true;
+        });
+
+        var redisConnStr = configuration.GetConnectionString("Redis");
+        if (!string.IsNullOrWhiteSpace(redisConnStr) && !redisConnStr.StartsWith("InMemory:", StringComparison.OrdinalIgnoreCase))
+        {
+            try
+            {
+                signalR.AddStackExchangeRedis(redisConnStr);
+            }
+            catch
+            {
+                // Fallback to local memory backplane
+            }
+        }
 
         return services;
     }

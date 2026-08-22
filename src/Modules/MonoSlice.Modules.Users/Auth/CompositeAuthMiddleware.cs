@@ -19,7 +19,10 @@ public sealed class CompositeAuthMiddleware
         if (context.User.Identity?.IsAuthenticated != true)
         {
             var authHeader = context.Request.Headers.Authorization.ToString();
-            if (!string.IsNullOrWhiteSpace(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            var hasBearerHeader = !string.IsNullOrWhiteSpace(authHeader) && authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase);
+            var isHubWithToken = context.Request.Path.StartsWithSegments("/hubs") && context.Request.Query.ContainsKey("access_token");
+
+            if (hasBearerHeader || isHubWithToken)
             {
                 var jwtResult = await context.AuthenticateAsync(JwtBearerDefaults.AuthenticationScheme);
                 if (jwtResult.Succeeded && jwtResult.Principal is not null)

@@ -336,4 +336,87 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
         var resultResponse = await _client.GetAsync($"/api/v1/exams/submissions/{submissionId}/result");
         Assert.True(resultResponse.IsSuccessStatusCode);
     }
+
+    [Fact]
+    public async Task ProctorLiveMonitoringAndControl_ShouldSucceed()
+    {
+        // 1. Register & Login Proctor
+        var proctorPayload = new
+        {
+            Email = "proctor_lead@example.com",
+            UserName = "proctor_lead",
+            Password = "Password123!",
+            FullName = "Lead Proctor"
+        };
+        await _client.PostAsJsonAsync("/api/v1/auth/register", proctorPayload);
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
+        {
+            UserNameOrEmail = "proctor_lead@example.com",
+            Password = "Password123!"
+        });
+        var loginData = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Users.Features.Login.LoginResponseDto>>();
+        Assert.NotNull(loginData?.Data?.AccessToken);
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", loginData.Data.AccessToken);
+
+        // 2. Create and Publish Exam
+        var examResponse = await _client.PostAsJsonAsync("/api/v1/exams", new
+        {
+            Title = "Proctored Final Exam",
+            Description = "Anti-cheat enabled exam",
+            Mode = "RealExam",
+            DurationMinutes = 30,
+            PassingScore = 60m
+        });
+        var examData = await examResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Exams.Features.CreateExam.ExamDetailDto>>();
+        Assert.NotNull(examData?.Data);
+        var examId = examData.Data.Id;
+
+        await _client.PostAsJsonAsync($"/api/v1/exams/{examId}/questions", new
+        {
+            QuestionText = "Is C# strongly typed?",
+            Type = "TrueFalse",
+            Points = 10m,
+            Options = new[]
+            {
+                new { Id = (Guid?)Guid.CreateVersion7(), Text = "True", IsCorrect = true },
+                new { Id = (Guid?)Guid.CreateVersion7(), Text = "False", IsCorrect = false }
+            }
+        });
+
+        await _client.PostAsync($"/api/v1/exams/{examId}/publish", null);
+
+        // 3. Start Exam as Student
+        var startResponse = await _client.PostAsync($"/api/v1/exams/{examId}/start", null);
+        var attemptData = await startResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Exams.Features.StartExam.ExamAttemptDto>>();
+        Assert.NotNull(attemptData?.Data);
+        var submissionId = attemptData.Data.SubmissionId;
+
+        // 4. Proctor checks Live Candidates
+        var liveResponse = await _client.GetAsync($"/api/v1/proctor/exams/{examId}/live-candidates");
+        Assert.True(liveResponse.IsSuccessStatusCode);
+        var liveData = await liveResponse.Content.ReadFromJsonAsync<ApiResponse<List<MonoSlice.Modules.Exams.Features.Proctor.GetLiveCandidates.LiveCandidateDto>>>();
+        Assert.NotNull(liveData?.Data);
+        Assert.Contains(liveData.Data, c => c.SubmissionId == submissionId);
+
+        // 5. Proctor Sends Realtime Warning
+        var warnResponse = await _client.PostAsJsonAsync($"/api/v1/proctor/submissions/{submissionId}/warn", new
+        {
+            Message = "Multiple faces detected by AI proctor."
+        });
+        Assert.True(warnResponse.IsSuccessStatusCode);
+
+        // 6. Proctor Forces Disconnection / Disqualification
+        var forceDisconnectResponse = await _client.PostAsJsonAsync($"/api/v1/proctor/submissions/{submissionId}/force-disconnect", new
+        {
+            Reason = "Unauthorized external monitor detected."
+        });
+        Assert.True(forceDisconnectResponse.IsSuccessStatusCode);
+
+        // 7. Verify result returns Disqualified
+        var resultResponse = await _client.GetAsync($"/api/v1/exams/submissions/{submissionId}/result");
+        var resultData = await resultResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Exams.Features.GetExamResult.ExamResultDetailsDto>>();
+        Assert.NotNull(resultData?.Data);
+        Assert.Equal("Disqualified", resultData.Data.Status);
+    }
 }

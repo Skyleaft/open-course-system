@@ -11,6 +11,9 @@ using MonoSlice.Modules.Exams.Features.GetExam;
 using MonoSlice.Modules.Exams.Features.GetExamQuestions;
 using MonoSlice.Modules.Exams.Features.GetExamResult;
 using MonoSlice.Modules.Exams.Features.PresignSnapshot;
+using MonoSlice.Modules.Exams.Features.Proctor.ForceDisconnectCandidate;
+using MonoSlice.Modules.Exams.Features.Proctor.GetLiveCandidates;
+using MonoSlice.Modules.Exams.Features.Proctor.WarnCandidate;
 using MonoSlice.Modules.Exams.Features.PublishExam;
 using MonoSlice.Modules.Exams.Features.SaveAnswer;
 using MonoSlice.Modules.Exams.Features.StartExam;
@@ -73,6 +76,13 @@ public static class ExamsModule
         examsV1Group.MapPresignSnapshotEndpoint();
         examsV1Group.MapSubmitExamEndpoint();
         examsV1Group.MapGetExamResultEndpoint();
+
+        var proctorV1Group = app.MapGroup("/api/v1/proctor")
+            .WithTags("Proctor");
+
+        proctorV1Group.MapGetLiveCandidatesEndpoint();
+        proctorV1Group.MapWarnCandidateEndpoint();
+        proctorV1Group.MapForceDisconnectCandidateEndpoint();
 
         return app;
     }
