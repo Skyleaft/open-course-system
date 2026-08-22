@@ -5,6 +5,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" />
+    <PackageReference Include="StackExchange.Redis" />
+    <PackageReference Include="AWSSDK.S3" />
     <PackageReference Include="RabbitMQ.Client" />
     <PackageReference Include="Confluent.Kafka" />
     <PackageReference Include="Mapster" />

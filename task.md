@@ -11,7 +11,7 @@
 | Phase | Category | Description | Status |
 | :--- | :--- | :--- | :---: |
 | **Phase 1** | **Infrastructure & Foundations** | PostgreSQL schemas, Redis, MinIO S3, OpenTelemetry, Docker Compose | `[x]` |
-| **Phase 2** | **Core Framework & Shared Layer** | VSA pipeline, DDD base abstractions, Mediator, API wrappers, S3 clients | `[ ]` |
+| **Phase 2** | **Core Framework & Shared Layer** | VSA pipeline, DDD base abstractions, Mediator, API wrappers, S3 clients | `[x]` |
 | **Phase 3** | **Identity & Access Module** | JWT rotation, RBAC, Single-device/session token guard with Redis | `[ ]` |
 | **Phase 4** | **Payments Module** | Orders, AccessType verification, webhook HMAC, auto-enrollment events | `[ ]` |
 | **Phase 5** | **Courses Module** | Course lifecycle, curriculum builder, lesson storage, assignment workflow | `[ ]` |
@@ -44,21 +44,21 @@
 
 ## Phase 2: Core Framework & Shared Layer (`MonoSlice.Shared`)
 
-- [ ] **2.1. Shared Abstractions (`MonoSlice.Shared.Abstractions`)**
-  - [ ] Implement DDD base abstractions: `AggregateRoot<TId>`, `Entity<TId>`, `ValueObject`, `IDomainEvent`, `IIntegrationEvent`.
-  - [ ] Implement CQRS abstractions compatible with source generator: `ICommand<TResult>`, `IQuery<TResult>`, `ICommandHandler<TCommand, TResult>`, `IQueryHandler<TQuery, TResult>`.
-  - [ ] Define standardized API envelope `ApiResponse<T>` and `ApiErrorResponse` with standard error codes and validation error details.
-  - [ ] Define inter-module contract interfaces: `IIdentityModuleApi`, `IPaymentsModuleApi`, `ICoursesModuleApi`, `IExamsModuleApi`, `IAssessmentsModuleApi`.
+- [x] **2.1. Shared Abstractions (`MonoSlice.Shared.Abstractions`)**
+  - [x] Implement DDD base abstractions: `AggregateRoot<TId>`, `Entity<TId>`, `ValueObject`, `IDomainEvent`, `IIntegrationEvent`.
+  - [x] Implement CQRS abstractions compatible with source generator: `ICommand<TResult>`, `IQuery<TResult>`, `ICommandHandler<TCommand, TResult>`, `IQueryHandler<TQuery, TResult>`.
+  - [x] Define standardized API envelope `ApiResponse<T>` and `ApiErrorResponse` with standard error codes and validation error details.
+  - [x] Define inter-module contract interfaces: `IIdentityModuleApi`, `IPaymentsModuleApi`, `ICoursesModuleApi`, `IExamsModuleApi`, `IAssessmentsModuleApi`.
 
-- [ ] **2.2. Shared Infrastructure (`MonoSlice.Shared.Infrastructure`)**
-  - [ ] Implement MinIO S3 Object Storage Service (`IObjectStorageService`):
-    - [ ] `GeneratePresignedUploadUrlAsync(bucket, objectKey, expiry, contentType)`
-    - [ ] `GeneratePresignedDownloadUrlAsync(bucket, objectKey, expiry)`
-    - [ ] `DeleteObjectAsync(bucket, objectKey)`
-  - [ ] Implement Redis Caching & Distributed Lock helper (`ICacheService`, `IDistributedLock`).
-  - [ ] Implement Redis Stream Publisher abstraction (`IEventStreamPublisher`) supporting `XADD` with `MAXLEN ~ 100000`.
-  - [ ] Implement OpenTelemetry tracing setup (W3C TraceContext propagator, EF Core / Npgsql span injector, Redis span enricher).
-  - [ ] Implement Mediator Source Generator pipeline behaviors (Validation behavior, Logging behavior, Metric & Trace behavior).
+- [x] **2.2. Shared Infrastructure (`MonoSlice.Shared.Infrastructure`)**
+  - [x] Implement MinIO S3 Object Storage Service (`IObjectStorageService`):
+    - [x] `GeneratePresignedUploadUrlAsync(bucket, objectKey, expiry, contentType)`
+    - [x] `GeneratePresignedDownloadUrlAsync(bucket, objectKey, expiry)`
+    - [x] `DeleteObjectAsync(bucket, objectKey)`
+  - [x] Implement Redis Caching & Distributed Lock helper (`ICacheService`, `IDistributedLock`).
+  - [x] Implement Redis Stream Publisher abstraction (`IEventStreamPublisher`) supporting `XADD` with `MAXLEN ~ 100000`.
+  - [x] Implement OpenTelemetry tracing setup (W3C TraceContext propagator, EF Core / Npgsql span injector, Redis span enricher).
+  - [x] Implement Mediator Source Generator pipeline behaviors (Validation behavior, Logging behavior, Metric & Trace behavior).
 
 ---
 
