@@ -1,0 +1,79 @@
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using MonoSlice.Modules.Exams.Contracts;
+using MonoSlice.Modules.Exams.Features.AddQuestion;
+using MonoSlice.Modules.Exams.Features.CreateExam;
+using MonoSlice.Modules.Exams.Features.GetExam;
+using MonoSlice.Modules.Exams.Features.GetExamQuestions;
+using MonoSlice.Modules.Exams.Features.GetExamResult;
+using MonoSlice.Modules.Exams.Features.PresignSnapshot;
+using MonoSlice.Modules.Exams.Features.PublishExam;
+using MonoSlice.Modules.Exams.Features.SaveAnswer;
+using MonoSlice.Modules.Exams.Features.StartExam;
+using MonoSlice.Modules.Exams.Features.SubmitExam;
+using MonoSlice.Modules.Exams.Features.UpdateExam;
+using MonoSlice.Modules.Exams.Persistence;
+using MonoSlice.Shared.Abstractions.Contracts;
+
+namespace MonoSlice.Modules.Exams;
+
+public static class ExamsModule
+{
+    public static IServiceCollection AddExamsModule(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        var connectionString = configuration.GetConnectionString("ExamsDb") ??
+                               configuration.GetConnectionString("CoursesDb") ??
+                               configuration.GetConnectionString("Database") ??
+                               configuration.GetConnectionString("DefaultConnection") ??
+                               "Host=localhost;Database=lms_db;Username=postgres;Password=postgres";
+
+        if (connectionString.StartsWith("InMemory:", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddDbContext<ExamsDbContext>(options =>
+            {
+                options.UseInMemoryDatabase(connectionString[9..]);
+            });
+        }
+        else
+        {
+            services.AddDbContext<ExamsDbContext>(options =>
+            {
+                options.UseNpgsql(connectionString, npgsqlOptions =>
+                {
+                    npgsqlOptions.MigrationsHistoryTable("__EFMigrationsHistory", ExamsDbContext.DefaultSchema);
+                });
+            });
+        }
+
+        // Register module contract API for synchronous inter-module communication
+        services.AddScoped<IExamsModuleApi, ExamsModuleApi>();
+
+        return services;
+    }
+
+    public static IEndpointRouteBuilder MapExamsEndpoints(this IEndpointRouteBuilder app)
+    {
+        var examsV1Group = app.MapGroup("/api/v1/exams")
+            .WithTags("Exams");
+
+        examsV1Group.MapCreateExamEndpoint();
+        examsV1Group.MapUpdateExamEndpoint();
+        examsV1Group.MapPublishExamEndpoint();
+        examsV1Group.MapAddQuestionEndpoint();
+        examsV1Group.MapGetExamEndpoint();
+        examsV1Group.MapStartExamEndpoint();
+        examsV1Group.MapGetExamQuestionsEndpoint();
+        examsV1Group.MapSaveAnswerEndpoint();
+        examsV1Group.MapPresignSnapshotEndpoint();
+        examsV1Group.MapSubmitExamEndpoint();
+        examsV1Group.MapGetExamResultEndpoint();
+
+        return app;
+    }
+}

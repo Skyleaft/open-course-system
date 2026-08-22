@@ -22,6 +22,7 @@
     <ProjectReference Include="..\Modules\MonoSlice.Modules.Users\MonoSlice.Modules.Users.csproj" />
     <ProjectReference Include="..\Modules\MonoSlice.Modules.Orders\MonoSlice.Modules.Orders.csproj" />
     <ProjectReference Include="..\Modules\MonoSlice.Modules.Catalog\MonoSlice.Modules.Catalog.csproj" />
+    <ProjectReference Include="..\Modules\MonoSlice.Modules.Exams\MonoSlice.Modules.Exams.csproj" />
   </ItemGroup>
 
 </Project>

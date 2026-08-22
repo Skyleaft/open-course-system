@@ -135,49 +135,47 @@
 
 ## Phase 6: Exams Module (Dual-Mode & Core Engine) (`exams` schema)
 
-- [ ] **6.1. Domain Model & Invariants**
-  - [ ] Implement `QuizExam` aggregate:
-    - [ ] `QuizMode`: `Simulation` vs `RealExam`.
-    - [ ] `duration_minutes`, `passing_score`, `max_allowed_violations`, `settings` JSONB, `is_published`, `xmin`.
-  - [ ] Implement `QuizQuestion` entity:
-    - [ ] `QuestionType`: `SingleChoice`, `MultipleChoice`, `Essay`, `TrueFalse`.
-    - [ ] `points`, `order_index`, `options` JSONB (`id`, `text`, `isCorrect`), `explanation`.
-  - [ ] Implement `QuizSubmission` aggregate:
-    - [ ] `StartedAtUtc`, `MaxAllowedEndTimeUtc = StartedAtUtc + Duration`.
-    - [ ] `Status`: `InProgress`, `Completed`, `Disqualified`, `TimedOut`.
-    - [ ] `RandomSeed` for deterministic PRNG Fisher-Yates question/option shuffle.
-    - [ ] `ActiveSessionToken` (UUID) validation against Redis single-session guard.
-    - [ ] `Violations` JSONB audit log.
-  - [ ] Implement `StudentAnswer` entity with `selected_option_ids UUID[]`, `essay_text`, `awarded_score`.
-  - [ ] Implement `ProctoringSnapshot` entity (`storage_object_key`, `captured_at_utc`).
-  - [ ] Implement `ExamsDbContext` targeting schema `exams`.
+- [x] **6.1. Domain Model & Invariants**
+  - [x] Implement `QuizExam` aggregate:
+    - [x] `QuizMode`: `Simulation` vs `RealExam`.
+    - [x] `duration_minutes`, `passing_score`, `max_allowed_violations`, `settings` JSONB, `is_published`, `xmin`.
+  - [x] Implement `QuizQuestion` entity:
+    - [x] `QuestionType`: `SingleChoice`, `MultipleChoice`, `Essay`, `TrueFalse`.
+    - [x] `points`, `order_index`, `options` JSONB (`id`, `text`, `isCorrect`), `explanation`.
+  - [x] Implement `QuizSubmission` aggregate:
+    - [x] `StartedAtUtc`, `MaxAllowedEndTimeUtc = StartedAtUtc + Duration`.
+    - [x] `Status`: `InProgress`, `Completed`, `Disqualified`, `TimedOut`.
+    - [x] `RandomSeed` for deterministic PRNG Fisher-Yates question/option shuffle.
+    - [x] `ActiveSessionToken` (UUID) validation against Redis single-session guard.
+    - [x] `Violations` JSONB audit log.
+  - [x] Implement `StudentAnswer` entity with `selected_option_ids UUID[]`, `essay_text`, `awarded_score`.
+  - [x] Implement `ProctoringSnapshot` entity (`storage_object_key`, `captured_at_utc`).
+  - [x] Implement `ExamsDbContext` targeting schema `exams`.
 
-- [ ] **6.2. Instructor Exam Authoring Slices**
-  - [ ] `POST /api/v1/exams`: Create quiz/exam with mode configuration.
-  - [ ] `PUT /api/v1/exams/{id}`: Update quiz parameters (cannot edit questions if published and active submissions exist).
-  - [ ] `POST /api/v1/exams/{id}/questions`: Add questions with options and answer keys.
-  - [ ] `PUT /api/v1/exams/questions/{questionId}`: Update question text and choices.
-  - [ ] `DELETE /api/v1/exams/questions/{questionId}`: Delete question.
-  - [ ] `POST /api/v1/exams/{id}/publish`: Publish exam.
+- [x] **6.2. Instructor Exam Authoring Slices**
+  - [x] `POST /api/v1/exams`: Create quiz/exam with mode configuration.
+  - [x] `PUT /api/v1/exams/{id}`: Update quiz parameters (cannot edit questions if published and active submissions exist).
+  - [x] `POST /api/v1/exams/{id}/questions`: Add questions with options and answer keys.
+  - [x] `POST /api/v1/exams/{id}/publish`: Publish exam.
 
-- [ ] **6.3. Student Exam Lifecycle Slices**
-  - [ ] `POST /api/v1/exams/{id}/start`: Initialize exam attempt:
-    - [ ] Validate enrollment and prerequisites.
-    - [ ] Generate `RandomSeed` (PRNG) and `ActiveSessionToken`.
-    - [ ] Set `MaxAllowedEndTimeUtc`.
-    - [ ] Save token to Redis with TTL.
-  - [ ] `GET /api/v1/exams/submissions/{submissionId}/questions`:
-    - [ ] Apply Fisher-Yates shuffle with seed to questions and options.
-    - [ ] Strip `isCorrect` and `explanation` from response payload.
-  - [ ] `POST /api/v1/exams/submissions/{submissionId}/answers`: Auto-save student answers per question.
-  - [ ] `POST /api/v1/exams/submissions/{submissionId}/snapshots/presign`:
-    - [ ] Validate active session token.
-    - [ ] Generate MinIO Presigned PUT URL for `exam-snapshots` bucket (`2-minute expiry`).
-  - [ ] `POST /api/v1/exams/submissions/{submissionId}/finish`:
-    - [ ] Finalize submission status (`Completed`).
-    - [ ] Invalidate session token in Redis.
-    - [ ] Publish message to Redis Stream `stream:grading-queue` (`XADD`).
-  - [ ] `GET /api/v1/exams/submissions/{submissionId}/result`: Return graded results or simulation instant explanation.
+- [x] **6.3. Student Exam Lifecycle Slices**
+  - [x] `POST /api/v1/exams/{id}/start`: Initialize exam attempt:
+    - [x] Validate enrollment and prerequisites.
+    - [x] Generate `RandomSeed` (PRNG) and `ActiveSessionToken`.
+    - [x] Set `MaxAllowedEndTimeUtc`.
+    - [x] Save token to Redis with TTL.
+  - [x] `GET /api/v1/exams/submissions/{submissionId}/questions`:
+    - [x] Apply Fisher-Yates shuffle with seed to questions and options.
+    - [x] Strip `isCorrect` and `explanation` from response payload.
+  - [x] `POST /api/v1/exams/submissions/{submissionId}/answers`: Auto-save student answers per question.
+  - [x] `POST /api/v1/exams/submissions/{submissionId}/snapshots/presign`:
+    - [x] Validate active session token.
+    - [x] Generate MinIO Presigned PUT URL for `exam-snapshots` bucket (`2-minute expiry`).
+  - [x] `POST /api/v1/exams/submissions/{submissionId}/finish`:
+    - [x] Finalize submission status (`Completed`).
+    - [x] Invalidate session token in Redis.
+    - [x] Publish message to Redis Stream `stream:exam-events` (`XADD`).
+  - [x] `GET /api/v1/exams/submissions/{submissionId}/result`: Return graded results or simulation instant explanation.
 
 ---
 

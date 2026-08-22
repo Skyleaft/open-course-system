@@ -13,7 +13,10 @@ public class MonoSliceApplicationFactory : WebApplicationFactory<Program>
     {
         Environment.SetEnvironmentVariable("ConnectionStrings__UsersDb", "InMemory:IntegrationTestUsersDb");
         Environment.SetEnvironmentVariable("ConnectionStrings__CatalogDb", "InMemory:IntegrationTestCatalogDb");
+        Environment.SetEnvironmentVariable("ConnectionStrings__CoursesDb", "InMemory:IntegrationTestCoursesDb");
         Environment.SetEnvironmentVariable("ConnectionStrings__OrdersDb", "InMemory:IntegrationTestOrdersDb");
+        Environment.SetEnvironmentVariable("ConnectionStrings__PaymentsDb", "InMemory:IntegrationTestPaymentsDb");
+        Environment.SetEnvironmentVariable("ConnectionStrings__ExamsDb", "InMemory:IntegrationTestExamsDb");
         Environment.SetEnvironmentVariable("Cache__Provider", "Memory");
         Environment.SetEnvironmentVariable("Messaging__Provider", "RabbitMQ");
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
@@ -222,5 +225,115 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
             FileUrl = "s3://submissions/student_repo.zip"
         });
         Assert.True(submitResponse.IsSuccessStatusCode);
+    }
+
+    [Fact]
+    public async Task ExamsFullLifecycle_ShouldSucceed()
+    {
+        // 1. Register & Login Instructor
+        var instructorPayload = new
+        {
+            Email = "instructor_exam@example.com",
+            UserName = "instructor_exam",
+            Password = "Password123!",
+            FullName = "Exam Instructor"
+        };
+        await _client.PostAsJsonAsync("/api/v1/auth/register", instructorPayload);
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
+        {
+            UserNameOrEmail = "instructor_exam@example.com",
+            Password = "Password123!"
+        });
+        var loginData = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Users.Features.Login.LoginResponseDto>>();
+        Assert.NotNull(loginData?.Data?.AccessToken);
+
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", loginData.Data.AccessToken);
+
+        // 2. Create Exam
+        var createExamPayload = new
+        {
+            Title = "Backend Architecture Certification",
+            Description = "Comprehensive .NET backend certification exam",
+            Mode = "RealExam",
+            DurationMinutes = 60,
+            PassingScore = 50m,
+            MaxAllowedViolations = 3,
+            ShuffleQuestions = true,
+            ShuffleOptions = true
+        };
+
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/exams", createExamPayload);
+        var createRaw = await createResponse.Content.ReadAsStringAsync();
+        Assert.True(createResponse.IsSuccessStatusCode, $"Create exam failed: {createRaw}");
+
+        var examData = await createResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Exams.Features.CreateExam.ExamDetailDto>>();
+        Assert.NotNull(examData?.Data);
+        var examId = examData.Data.Id;
+
+        // 3. Add Questions
+        var opt1Correct = Guid.CreateVersion7();
+        var opt1Wrong = Guid.CreateVersion7();
+        var addQ1Response = await _client.PostAsJsonAsync($"/api/v1/exams/{examId}/questions", new
+        {
+            QuestionText = "Which principle states that high-level modules should not depend on low-level modules?",
+            Type = "SingleChoice",
+            Points = 10m,
+            Explanation = "Dependency Inversion Principle (DIP)",
+            Options = new[]
+            {
+                new { Id = (Guid?)opt1Correct, Text = "Dependency Inversion Principle", IsCorrect = true },
+                new { Id = (Guid?)opt1Wrong, Text = "Single Responsibility Principle", IsCorrect = false }
+            }
+        });
+        Assert.True(addQ1Response.IsSuccessStatusCode);
+
+        var q1Data = await addQ1Response.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Exams.Features.AddQuestion.QuestionResultDto>>();
+        Assert.NotNull(q1Data?.Data);
+        var q1Id = q1Data.Data.Id;
+
+        // 4. Publish Exam
+        var publishResponse = await _client.PostAsync($"/api/v1/exams/{examId}/publish", null);
+        Assert.True(publishResponse.IsSuccessStatusCode);
+
+        // 5. Start Exam Attempt
+        var startResponse = await _client.PostAsync($"/api/v1/exams/{examId}/start", null);
+        var startRaw = await startResponse.Content.ReadAsStringAsync();
+        Assert.True(startResponse.IsSuccessStatusCode, $"Start exam failed: {startRaw}");
+
+        var attemptData = await startResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Exams.Features.StartExam.ExamAttemptDto>>();
+        Assert.NotNull(attemptData?.Data);
+        var submissionId = attemptData.Data.SubmissionId;
+
+        // 6. Get Exam Questions (Randomized)
+        var getQuestionsResponse = await _client.GetAsync($"/api/v1/exams/submissions/{submissionId}/questions");
+        Assert.True(getQuestionsResponse.IsSuccessStatusCode);
+
+        // 7. Save Answer
+        var saveAnswerResponse = await _client.PostAsJsonAsync($"/api/v1/exams/submissions/{submissionId}/answers", new
+        {
+            QuestionId = q1Id,
+            SelectedOptionIds = new[] { opt1Correct }
+        });
+        Assert.True(saveAnswerResponse.IsSuccessStatusCode);
+
+        // 8. Presign Proctor Snapshot
+        var presignResponse = await _client.PostAsync($"/api/v1/exams/submissions/{submissionId}/snapshots/presign", null);
+        Assert.True(presignResponse.IsSuccessStatusCode);
+
+        // 9. Finish and Submit Exam
+        var finishResponse = await _client.PostAsync($"/api/v1/exams/submissions/{submissionId}/finish", null);
+        var finishRaw = await finishResponse.Content.ReadAsStringAsync();
+        Assert.True(finishResponse.IsSuccessStatusCode, $"Finish exam failed: {finishRaw}");
+
+        var finishData = await finishResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Exams.Features.SubmitExam.ExamFinalResultDto>>();
+        Assert.NotNull(finishData?.Data);
+        Assert.Equal("Completed", finishData.Data.Status);
+        Assert.Equal(100m, finishData.Data.Score);
+        Assert.True(finishData.Data.IsPassed);
+
+        // 10. View Result
+        var resultResponse = await _client.GetAsync($"/api/v1/exams/submissions/{submissionId}/result");
+        Assert.True(resultResponse.IsSuccessStatusCode);
     }
 }
