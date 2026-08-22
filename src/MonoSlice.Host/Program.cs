@@ -6,6 +6,8 @@ using MonoSlice.Modules.Assessments;
 using MonoSlice.Modules.Assessments.Persistence;
 using MonoSlice.Modules.Catalog;
 using MonoSlice.Modules.Catalog.Persistence;
+using MonoSlice.Modules.Communications;
+using MonoSlice.Modules.Communications.Persistence;
 using MonoSlice.Modules.Exams;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Modules.Orders;
@@ -39,7 +41,8 @@ builder.Services.AddMonoSliceMapping(
     typeof(OrdersModule).Assembly,
     typeof(CatalogModule).Assembly,
     typeof(ExamsModule).Assembly,
-    typeof(AssessmentsModule).Assembly);
+    typeof(AssessmentsModule).Assembly,
+    typeof(CommunicationsModule).Assembly);
 
 // Source-Generated Mediator Dispatcher
 builder.Services.AddMediator(options =>
@@ -53,6 +56,7 @@ builder.Services.AddOrdersModule(builder.Configuration);
 builder.Services.AddCatalogModule(builder.Configuration);
 builder.Services.AddExamsModule(builder.Configuration);
 builder.Services.AddAssessmentsModule(builder.Configuration);
+builder.Services.AddCommunicationsModule(builder.Configuration);
 
 // Health Checks
 builder.Services.AddHealthChecks();
@@ -107,6 +111,9 @@ using (var scope = app.Services.CreateScope())
         var assessmentsDb = scope.ServiceProvider.GetRequiredService<AssessmentsDbContext>();
         await assessmentsDb.Database.EnsureCreatedAsync();
 
+        var commsDb = scope.ServiceProvider.GetRequiredService<CommunicationsDbContext>();
+        await commsDb.Database.EnsureCreatedAsync();
+
         logger.LogInformation("Database schemas ensured successfully.");
     }
     catch (Exception ex)
@@ -145,6 +152,7 @@ app.MapOrdersEndpoints();
 app.MapCatalogEndpoints();
 app.MapExamsEndpoints();
 app.MapAssessmentsEndpoints();
+app.MapCommunicationsEndpoints();
 
 // Realtime SignalR Hubs
 app.MapHub<MonoSlice.Modules.Exams.Hubs.ExamHub>("/hubs/exam");

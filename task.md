@@ -18,7 +18,7 @@
 | **Phase 6** | **Exams Module (Core Engine)** | Dual-mode quiz, PRNG Fisher-Yates shuffle, one-time token, snapshot presign | `[x]` |
 | **Phase 7** | **Realtime Anti-Cheat & SignalR Engine** | ExamHub, Redis backplane, violation broadcasts, proctor live stream | `[x]` |
 | **Phase 8** | **Assessments & Certification Module** | Redis Stream grading consumer, retry/DLQ handling, SHA-256 cert generator | `[x]` |
-| **Phase 9** | **Communications Module** | Global/Course announcements, nested discussion threads | `[ ]` |
+| **Phase 9** | **Communications Module** | Global/Course announcements, nested discussion threads | `[x]` |
 | **Phase 10** | **Frontend Client (SvelteKit 2)** | Student portal, exam runner + anti-cheat worker, instructor & proctor apps | `[ ]` |
 | **Phase 11** | **Integration, Testing & Hardening** | Unit/Domain tests, WebApplicationFactory integration tests, load tests | `[ ]` |
 
@@ -244,19 +244,19 @@
 
 ## Phase 9: Communications Module (`communications` schema)
 
-- [ ] **9.1. Domain & Persistence**
-  - [ ] Implement `Announcement` aggregate (`course_id` nullable for platform vs course level, `is_pinned`).
-  - [ ] Implement `DiscussionThread` aggregate (`course_id`, `lesson_id` nullable, `is_closed`).
-  - [ ] Implement `ThreadComment` entity with hierarchical self-referencing `parent_comment_id`.
-  - [ ] Implement `CommunicationsDbContext` targeting schema `communications`.
+- [x] **9.1. Domain & Persistence**
+  - [x] Implement `Announcement` aggregate (`course_id` nullable for platform vs course level, `is_pinned`).
+  - [x] Implement `DiscussionThread` aggregate (`course_id`, `lesson_id` nullable, `is_closed`).
+  - [x] Implement `ThreadComment` entity with hierarchical self-referencing `parent_comment_id`.
+  - [x] Implement `CommunicationsDbContext` targeting schema `communications`.
 
-- [ ] **9.2. Feature Slices**
-  - [ ] `POST /api/v1/communications/announcements`: Create platform or course announcement (Instructor/Admin).
-  - [ ] `GET /api/v1/communications/announcements`: Query announcements with filter by course.
-  - [ ] `POST /api/v1/communications/threads`: Start discussion thread on course or lesson.
-  - [ ] `GET /api/v1/communications/threads`: List threads with pagination.
-  - [ ] `POST /api/v1/communications/threads/{id}/comments`: Post comment / nested reply (rejected if `is_closed == true`).
-  - [ ] `POST /api/v1/communications/threads/{id}/close`: Close thread.
+- [x] **9.2. Feature Slices**
+  - [x] `POST /api/v1/communications/announcements`: Create platform or course announcement (Instructor/Admin).
+  - [x] `GET /api/v1/communications/announcements`: Query announcements with filter by course.
+  - [x] `POST /api/v1/communications/threads`: Start discussion thread on course or lesson.
+  - [x] `GET /api/v1/communications/threads`: List threads with pagination.
+  - [x] `POST /api/v1/communications/threads/{id}/comments`: Post comment / nested reply (rejected if `is_closed == true`).
+  - [x] `POST /api/v1/communications/threads/{id}/close`: Close thread.
 
 ---
 

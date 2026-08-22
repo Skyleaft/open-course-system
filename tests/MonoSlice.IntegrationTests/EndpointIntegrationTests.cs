@@ -18,6 +18,7 @@ public class MonoSliceApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("ConnectionStrings__PaymentsDb", "InMemory:IntegrationTestPaymentsDb");
         Environment.SetEnvironmentVariable("ConnectionStrings__ExamsDb", "InMemory:IntegrationTestExamsDb");
         Environment.SetEnvironmentVariable("ConnectionStrings__AssessmentsDb", "InMemory:IntegrationTestAssessmentsDb");
+        Environment.SetEnvironmentVariable("ConnectionStrings__CommunicationsDb", "InMemory:IntegrationTestCommunicationsDb");
         Environment.SetEnvironmentVariable("Cache__Provider", "Memory");
         Environment.SetEnvironmentVariable("Messaging__Provider", "RabbitMQ");
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
@@ -513,5 +514,143 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
         Assert.True(dlqResponse.IsSuccessStatusCode);
         var dlqData = await dlqResponse.Content.ReadFromJsonAsync<ApiResponse<List<MonoSlice.Modules.Assessments.Features.Admin.GetDeadLetters.DeadLetterDto>>>();
         Assert.NotNull(dlqData?.Data);
+    }
+
+    [Fact]
+    public async Task CommunicationsAnnouncements_CreateAndQuery_ShouldSucceed()
+    {
+        // 1. Authenticate
+        var unique = Guid.CreateVersion7().ToString("N")[..8];
+        var email = $"instructor_ann_{unique}@example.com";
+        var password = "Password123!";
+
+        await _client.PostAsJsonAsync("/api/v1/auth/register", new
+        {
+            Email = email,
+            Password = password,
+            FullName = "Instructor Ann"
+        });
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
+        {
+            UserNameOrEmail = email,
+            Password = password
+        });
+        var loginData = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Users.Features.Login.LoginResponseDto>>();
+        Assert.NotNull(loginData?.Data?.AccessToken);
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", loginData.Data.AccessToken);
+
+        // 2. Create Global Announcement
+        var courseId = Guid.CreateVersion7();
+        var globalPayload = new
+        {
+            Title = "Platform Update v2",
+            Content = "We have added new features!",
+            IsPinned = true
+        };
+        var globalResponse = await _client.PostAsJsonAsync("/api/v1/communications/announcements", globalPayload);
+        var globalRaw = await globalResponse.Content.ReadAsStringAsync();
+        Assert.True(globalResponse.IsSuccessStatusCode, $"Global announcement failed: {globalRaw}");
+
+        // 3. Create Course-specific Announcement
+        var coursePayload = new
+        {
+            CourseId = courseId,
+            Title = "Exam Date Announcement",
+            Content = "The mid-term exam is next week",
+            IsPinned = false
+        };
+        var courseResponse = await _client.PostAsJsonAsync("/api/v1/communications/announcements", coursePayload);
+        Assert.True(courseResponse.IsSuccessStatusCode);
+
+        // 4. Query Announcements with course filter
+        var listResponse = await _client.GetAsync($"/api/v1/communications/announcements?courseId={courseId}&includeGlobal=true");
+        Assert.True(listResponse.IsSuccessStatusCode);
+        var listData = await listResponse.Content.ReadFromJsonAsync<ApiResponse<List<MonoSlice.Modules.Communications.Features.CreateAnnouncement.AnnouncementDto>>>();
+        Assert.NotNull(listData?.Data);
+        Assert.Contains(listData.Data, a => a.Title == "Platform Update v2");
+        Assert.Contains(listData.Data, a => a.Title == "Exam Date Announcement");
+    }
+
+    [Fact]
+    public async Task CommunicationsDiscussionThreads_LifecycleWithComments_ShouldSucceed()
+    {
+        // 1. Authenticate
+        var unique = Guid.CreateVersion7().ToString("N")[..8];
+        var email = $"student_comm_{unique}@example.com";
+        var password = "Password123!";
+
+        await _client.PostAsJsonAsync("/api/v1/auth/register", new
+        {
+            Email = email,
+            Password = password,
+            FullName = "Student Comm"
+        });
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
+        {
+            UserNameOrEmail = email,
+            Password = password
+        });
+        var loginData = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Users.Features.Login.LoginResponseDto>>();
+        Assert.NotNull(loginData?.Data?.AccessToken);
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", loginData.Data.AccessToken);
+
+        // 2. Create Discussion Thread
+        var courseId = Guid.CreateVersion7();
+        var threadPayload = new
+        {
+            CourseId = courseId,
+            Title = "Understanding LINQ Expressions",
+            Content = "Can someone explain expression trees?"
+        };
+
+        var threadResponse = await _client.PostAsJsonAsync("/api/v1/communications/threads", threadPayload);
+        var threadRaw = await threadResponse.Content.ReadAsStringAsync();
+        Assert.True(threadResponse.IsSuccessStatusCode, $"Thread creation failed: {threadRaw}");
+        var threadData = await threadResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Communications.Features.CreateDiscussionThread.DiscussionThreadSummaryDto>>();
+        Assert.NotNull(threadData?.Data);
+        var threadId = threadData.Data.Id;
+
+        // 3. Post Top-level Comment
+        var commentPayload = new
+        {
+            Content = "Expression trees represent code as data structure."
+        };
+        var commentResponse = await _client.PostAsJsonAsync($"/api/v1/communications/threads/{threadId}/comments", commentPayload);
+        var commentRaw = await commentResponse.Content.ReadAsStringAsync();
+        Assert.True(commentResponse.IsSuccessStatusCode, $"Comment creation failed: {commentRaw}");
+        var commentData = await commentResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Communications.Features.GetDiscussionThread.ThreadCommentDto>>();
+        Assert.NotNull(commentData?.Data);
+        var parentCommentId = commentData.Data.Id;
+
+        // 4. Post Nested Reply
+        var replyPayload = new
+        {
+            ParentCommentId = parentCommentId,
+            Content = "Thanks! That clarifies it."
+        };
+        var replyResponse = await _client.PostAsJsonAsync($"/api/v1/communications/threads/{threadId}/comments", replyPayload);
+        Assert.True(replyResponse.IsSuccessStatusCode);
+
+        // 5. Get Thread Details with Hierarchical Nested Comments
+        var getThreadResponse = await _client.GetAsync($"/api/v1/communications/threads/{threadId}");
+        Assert.True(getThreadResponse.IsSuccessStatusCode);
+        var getThreadData = await getThreadResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Communications.Features.GetDiscussionThread.DiscussionThreadDetailDto>>();
+        Assert.NotNull(getThreadData?.Data);
+        Assert.Single(getThreadData.Data.Comments);
+        Assert.Single(getThreadData.Data.Comments[0].Replies);
+        Assert.Equal("Thanks! That clarifies it.", getThreadData.Data.Comments[0].Replies[0].Content);
+
+        // 6. Close Thread
+        var closeResponse = await _client.PostAsync($"/api/v1/communications/threads/{threadId}/close", null);
+        Assert.True(closeResponse.IsSuccessStatusCode);
+
+        // 7. Verify new comment is rejected on closed thread
+        var rejectedCommentResponse = await _client.PostAsJsonAsync($"/api/v1/communications/threads/{threadId}/comments", new
+        {
+            Content = "Attempt to comment on closed thread"
+        });
+        Assert.False(rejectedCommentResponse.IsSuccessStatusCode);
     }
 }

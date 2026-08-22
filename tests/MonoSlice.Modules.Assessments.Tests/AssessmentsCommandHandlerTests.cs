@@ -39,6 +39,7 @@ public class AssessmentsCommandHandlerTests
         var courseId = Guid.CreateVersion7();
 
         _currentUser.IsAuthenticated.Returns(true);
+        _currentUser.UserId.Returns(instructorId);
         _currentUser.Roles.Returns(["Instructor"]);
 
         var handler = new IssueCertificateCommandHandler(_dbContext, _currentUser);
