@@ -131,4 +131,96 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
         Assert.NotNull(orderData?.Data);
         Assert.Equal("Paid", orderData.Data.Status);
     }
+
+    [Fact]
+    public async Task CoursesFullLifecycle_ShouldSucceed()
+    {
+        // 1. Register and Login as Instructor
+        var instructorPayload = new
+        {
+            Email = "instructor_course@example.com",
+            UserName = "instructor_course",
+            Password = "Password123!",
+            FullName = "Course Instructor"
+        };
+        await _client.PostAsJsonAsync("/api/v1/auth/register", instructorPayload);
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
+        {
+            UserNameOrEmail = "instructor_course@example.com",
+            Password = "Password123!"
+        });
+        var loginData = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Users.Features.Login.LoginResponseDto>>();
+        Assert.NotNull(loginData?.Data?.AccessToken);
+
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", loginData.Data.AccessToken);
+
+        // 2. Create Course
+        var createCoursePayload = new
+        {
+            Title = "Complete .NET 10 & SvelteKit Masterclass",
+            Description = "Comprehensive full stack bootcamp",
+            AccessType = "OpenFree",
+            Price = 0m
+        };
+
+        var createCourseResponse = await _client.PostAsJsonAsync("/api/v1/courses", createCoursePayload);
+        var createCourseRaw = await createCourseResponse.Content.ReadAsStringAsync();
+        Assert.True(createCourseResponse.IsSuccessStatusCode, $"Create course failed: {createCourseRaw}");
+
+        var courseData = await createCourseResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Catalog.Features.CreateCourse.CourseDetailDto>>();
+        Assert.NotNull(courseData?.Data);
+        var courseId = courseData.Data.Id;
+
+        // 3. Publish Course
+        var publishResponse = await _client.PostAsync($"/api/v1/courses/{courseId}/publish", null);
+        Assert.True(publishResponse.IsSuccessStatusCode);
+
+        // 4. Add Section
+        var sectionResponse = await _client.PostAsJsonAsync($"/api/v1/courses/{courseId}/sections", new { Title = "Module 1: Introduction" });
+        var sectionData = await sectionResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Catalog.Features.AddSection.SectionResultDto>>();
+        Assert.NotNull(sectionData?.Data);
+        var sectionId = sectionData.Data.Id;
+
+        // 5. Add Lesson
+        var lessonResponse = await _client.PostAsJsonAsync($"/api/v1/courses/sections/{sectionId}/lessons", new
+        {
+            Title = "Welcome to the Course",
+            Type = "Video",
+            ContentUrl = "s3://courses/videos/lesson1.mp4",
+            DurationMinutes = 12
+        });
+        Assert.True(lessonResponse.IsSuccessStatusCode);
+
+        // 6. Create Assignment
+        var assignmentResponse = await _client.PostAsJsonAsync($"/api/v1/courses/{courseId}/assignments", new
+        {
+            Title = "Assignment 1: Setup Repository",
+            Instruction = "Push clean architecture template to Github",
+            DeadlineUtc = DateTime.UtcNow.AddDays(7),
+            MaxScore = 100m
+        });
+        var assignmentData = await assignmentResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Catalog.Features.CreateAssignment.AssignmentResultDto>>();
+        Assert.NotNull(assignmentData?.Data);
+        var assignmentId = assignmentData.Data.Id;
+
+        // 7. Query Course Syllabus
+        var getCourseResponse = await _client.GetAsync($"/api/v1/courses/{courseId}");
+        var courseCurriculum = await getCourseResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Catalog.Features.GetCourse.CourseCurriculumDto>>();
+        Assert.NotNull(courseCurriculum?.Data);
+        Assert.Single(courseCurriculum.Data.Sections);
+        Assert.Single(courseCurriculum.Data.Sections[0].Lessons);
+        Assert.Single(courseCurriculum.Data.Assignments);
+
+        // 8. Enroll in course
+        var enrollResponse = await _client.PostAsync($"/api/v1/courses/{courseId}/enroll", null);
+        Assert.True(enrollResponse.IsSuccessStatusCode);
+
+        // 9. Submit Assignment
+        var submitResponse = await _client.PostAsJsonAsync($"/api/v1/courses/assignments/{assignmentId}/submit", new
+        {
+            FileUrl = "s3://submissions/student_repo.zip"
+        });
+        Assert.True(submitResponse.IsSuccessStatusCode);
+    }
 }

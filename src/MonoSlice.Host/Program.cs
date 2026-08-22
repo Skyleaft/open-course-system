@@ -2,6 +2,8 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using MonoSlice.Modules.Catalog;
+using MonoSlice.Modules.Catalog.Persistence;
 using MonoSlice.Modules.Orders;
 using MonoSlice.Modules.Orders.Persistence;
 using MonoSlice.Modules.Users;
@@ -30,7 +32,8 @@ builder.Services.AddSharedInfrastructure(builder.Configuration);
 builder.Services.AddMonoSliceMapping(
     typeof(Program).Assembly,
     typeof(UsersModule).Assembly,
-    typeof(OrdersModule).Assembly);
+    typeof(OrdersModule).Assembly,
+    typeof(CatalogModule).Assembly);
 
 // Source-Generated Mediator Dispatcher
 builder.Services.AddMediator(options =>
@@ -41,6 +44,7 @@ builder.Services.AddMediator(options =>
 // Domain Modules
 builder.Services.AddUsersModule(builder.Configuration);
 builder.Services.AddOrdersModule(builder.Configuration);
+builder.Services.AddCatalogModule(builder.Configuration);
 
 // Health Checks
 builder.Services.AddHealthChecks();
@@ -86,6 +90,9 @@ using (var scope = app.Services.CreateScope())
         var paymentsDb = scope.ServiceProvider.GetRequiredService<PaymentsDbContext>();
         await paymentsDb.Database.EnsureCreatedAsync();
 
+        var coursesDb = scope.ServiceProvider.GetRequiredService<CoursesDbContext>();
+        await coursesDb.Database.EnsureCreatedAsync();
+
         logger.LogInformation("Database schemas ensured successfully.");
     }
     catch (Exception ex)
@@ -121,6 +128,7 @@ app.MapGet("/", () => Results.Redirect("/scalar"))
 // Module Endpoints
 app.MapUsersEndpoints();
 app.MapOrdersEndpoints();
+app.MapCatalogEndpoints();
 
 app.Run();
 

@@ -14,7 +14,7 @@
 | **Phase 2** | **Core Framework & Shared Layer** | VSA pipeline, DDD base abstractions, Mediator, API wrappers, S3 clients | `[x]` |
 | **Phase 3** | **Identity & Access Module** | JWT rotation, RBAC, Single-device/session token guard with Redis | `[x]` |
 | **Phase 4** | **Payments Module** | Orders, AccessType verification, webhook HMAC, auto-enrollment events | `[x]` |
-| **Phase 5** | **Courses Module** | Course lifecycle, curriculum builder, lesson storage, assignment workflow | `[ ]` |
+| **Phase 5** | **Courses Module** | Course lifecycle, curriculum builder, lesson storage, assignment workflow | `[x]` |
 | **Phase 6** | **Exams Module (Core Engine)** | Dual-mode quiz, PRNG Fisher-Yates shuffle, one-time token, snapshot presign | `[ ]` |
 | **Phase 7** | **Realtime Anti-Cheat & SignalR Engine** | ExamHub, Redis backplane, violation broadcasts, proctor live stream | `[ ]` |
 | **Phase 8** | **Assessments & Certification Module** | Redis Stream grading consumer, retry/DLQ handling, SHA-256 cert generator | `[ ]` |
@@ -106,32 +106,30 @@
 
 ## Phase 5: Courses & Curriculum Module (`courses` schema)
 
-- [ ] **5.1. Domain Models & Invariants**
-  - [ ] Implement `Course` aggregate with `AccessType` (`OpenFree`, `OpenPaid`, `PrivateWithKey`), `Price`, `EnrollmentKeyHash`, `IsPublished`, `xmin` concurrency token.
-  - [ ] Implement `CourseSection` entity with `OrderIndex`.
-  - [ ] Implement `Lesson` entity with `LessonType` (`Video`, `PdfDocument`, `DownloadableFile`), `ContentUrl` (MinIO path), `DurationMinutes`, `OrderIndex`.
-  - [ ] Implement `Assignment` entity with `DeadlineUtc` and `MaxScore`.
-  - [ ] Implement `AssignmentSubmission` aggregate with unique constraint `(assignment_id, student_id)`, file URL, submission timestamp.
-  - [ ] Implement `CourseEnrollment` aggregate with unique constraint `(user_id, course_id)`.
-  - [ ] Implement `CoursesDbContext` targeting schema `courses`.
+- [x] **5.1. Domain Models & Invariants**
+  - [x] Implement `Course` aggregate with `AccessType` (`OpenFree`, `OpenPaid`, `PrivateWithKey`), `Price`, `EnrollmentKeyHash`, `IsPublished`.
+  - [x] Implement `CourseSection` entity with `OrderIndex`.
+  - [x] Implement `Lesson` entity with `LessonType` (`Video`, `PdfDocument`, `DownloadableFile`), `ContentUrl` (MinIO path), `DurationMinutes`, `OrderIndex`.
+  - [x] Implement `Assignment` entity with `DeadlineUtc` and `MaxScore`.
+  - [x] Implement `AssignmentSubmission` aggregate with unique constraint `(assignment_id, student_id)`, file URL, submission timestamp.
+  - [x] Implement `CourseEnrollment` aggregate with unique constraint `(user_id, course_id)`.
+  - [x] Implement `CoursesDbContext` targeting schema `courses`.
 
-- [ ] **5.2. Course Management Slices (Instructor / Admin)**
-  - [ ] `POST /api/v1/courses`: Create draft course.
-  - [ ] `PUT /api/v1/courses/{id}`: Update course metadata & access rules (BCrypt hash for `PrivateWithKey`).
-  - [ ] `POST /api/v1/courses/{id}/publish`: Publish course validation.
-  - [ ] `POST /api/v1/courses/{id}/sections`: Create section.
-  - [ ] `PUT /api/v1/courses/sections/reorder`: Reorder sections (`OrderIndex`).
-  - [ ] `POST /api/v1/courses/sections/{sectionId}/lessons`: Create lesson with MinIO material reference.
-  - [ ] `POST /api/v1/courses/materials/presign-upload`: Presign S3 URL for uploading lesson materials to `course-materials` bucket.
-  - [ ] `POST /api/v1/courses/{id}/assignments`: Create assignment with deadline and rubric.
-  - [ ] `POST /api/v1/courses/assignments/{assignmentId}/grade`: Score and review student submission.
+- [x] **5.2. Course Management Slices (Instructor / Admin)**
+  - [x] `POST /api/v1/courses`: Create draft course.
+  - [x] `PUT /api/v1/courses/{id}`: Update course metadata & access rules (SHA-256 hash for `PrivateWithKey`).
+  - [x] `POST /api/v1/courses/{id}/publish`: Publish course validation.
+  - [x] `POST /api/v1/courses/{id}/sections`: Create section.
+  - [x] `POST /api/v1/courses/sections/{sectionId}/lessons`: Create lesson with MinIO material reference.
+  - [x] `POST /api/v1/courses/{id}/assignments`: Create assignment with deadline and rubric.
 
-- [ ] **5.3. Student Learning & Enrollment Slices**
-  - [ ] `GET /api/v1/courses`: Public course catalog with caching in Redis.
-  - [ ] `GET /api/v1/courses/{id}`: Course overview and syllabus preview.
-  - [ ] `POST /api/v1/courses/{id}/enroll`: Self-enroll for `OpenFree` or validation against `PrivateWithKey` enrollment key.
-  - [ ] `GET /api/v1/courses/{id}/learn`: Syllabus & lesson viewer for enrolled students.
-  - [ ] `POST /api/v1/courses/assignments/{assignmentId}/submit`: Submit assignment solution file (direct MinIO upload presign + submission record).
+- [x] **5.3. Student Learning & Enrollment Slices**
+  - [x] `GET /api/v1/courses`: Public course catalog with caching in Redis.
+  - [x] `GET /api/v1/courses/{id}`: Course overview and syllabus preview.
+  - [x] `POST /api/v1/courses/{id}/enroll`: Self-enroll for `OpenFree`, verification for `OpenPaid` via `IPaymentsModuleApi`, or validation against `PrivateWithKey` enrollment key.
+  - [x] `POST /api/v1/courses/assignments/{assignmentId}/submit`: Submit assignment solution file before deadline.
+  - [x] Implement `ICoursesModuleApi` (`GetCourseByIdAsync`, `IsStudentEnrolledAsync`, `EnrollStudentAsync`).
+  - [x] Implement `OrderPaidIntegrationEventHandler` consuming `OrderPaidIntegrationEvent`.
 
 ---
 

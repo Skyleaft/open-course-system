@@ -21,6 +21,7 @@
     <ProjectReference Include="..\MonoSlice.Shared\MonoSlice.Shared.Infrastructure\MonoSlice.Shared.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\MonoSlice.Modules.Users\MonoSlice.Modules.Users.csproj" />
     <ProjectReference Include="..\Modules\MonoSlice.Modules.Orders\MonoSlice.Modules.Orders.csproj" />
+    <ProjectReference Include="..\Modules\MonoSlice.Modules.Catalog\MonoSlice.Modules.Catalog.csproj" />
   </ItemGroup>
 
 </Project>
