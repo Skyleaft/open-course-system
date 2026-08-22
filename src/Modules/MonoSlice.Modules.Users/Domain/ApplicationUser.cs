@@ -25,6 +25,7 @@ public sealed class ApplicationUser : IdentityUser<Guid>
         }
     }
 
+    public string? Picture { get; set; }
     public DateTime? LastSeen { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
@@ -34,7 +35,7 @@ public sealed class ApplicationUser : IdentityUser<Guid>
     public ApplicationUser()
     {
         Id = Guid.CreateVersion7();
-        SecurityStamp = Guid.NewGuid().ToString("N");
+        SecurityStamp = Guid.CreateVersion7().ToString("N");
     }
 
     public ApplicationUser(string userName, string email) : this()

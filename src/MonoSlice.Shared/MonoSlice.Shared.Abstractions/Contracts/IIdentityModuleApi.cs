@@ -6,7 +6,8 @@ public sealed record UserContractDto(
     string FullName,
     IReadOnlyList<string> Roles,
     bool IsActive,
-    string UserName = "");
+    string UserName = "",
+    string? Picture = null);
 
 public interface IIdentityModuleApi
 {

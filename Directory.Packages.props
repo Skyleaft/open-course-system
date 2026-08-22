@@ -16,6 +16,7 @@
   <ItemGroup Label="Identity &amp; Auth">
     <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.11" />
     <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
+    <PackageVersion Include="Google.Apis.Auth" Version="1.69.0" />
   </ItemGroup>
   <ItemGroup Label="Caching">
     <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.11" />

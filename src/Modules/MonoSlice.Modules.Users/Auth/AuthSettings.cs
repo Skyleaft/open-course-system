@@ -11,4 +11,6 @@ public sealed class AuthSettings
     public int RefreshTokenExpiryDays { get; set; } = 7;
     public bool EnableCookieAuth { get; set; } = true;
     public string CookieName { get; set; } = ".MonoSlice.Auth";
+    public string GoogleClientId { get; set; } = string.Empty;
+    public string GoogleClientSecret { get; set; } = string.Empty;
 }

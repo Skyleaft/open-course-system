@@ -33,7 +33,8 @@ public sealed class UsersModuleApi : IIdentityModuleApi, IUsersModuleApi
             user.FullName,
             roles.ToList(),
             isActive,
-            user.UserName ?? string.Empty);
+            user.UserName ?? string.Empty,
+            user.Picture);
     }
 
     public async Task<bool> ValidateUserRoleAsync(
@@ -67,7 +68,8 @@ public sealed class UsersModuleApi : IIdentityModuleApi, IUsersModuleApi
                 user.FullName,
                 roles.ToList(),
                 isActive,
-                user.UserName ?? string.Empty));
+                user.UserName ?? string.Empty,
+                user.Picture));
         }
 
         return result;

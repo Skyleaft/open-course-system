@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS identity.users (
     email VARCHAR(256) NOT NULL UNIQUE,
     password_hash VARCHAR(500) NOT NULL,
     full_name VARCHAR(256) NOT NULL,
+    picture TEXT,
+    last_seen_utc TIMESTAMPTZ,
     roles VARCHAR(50)[] NOT NULL DEFAULT '{"Student"}',
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at_utc TIMESTAMPTZ NOT NULL,

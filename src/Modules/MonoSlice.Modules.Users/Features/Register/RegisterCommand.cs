@@ -28,5 +28,6 @@ public sealed record UserResponseDto(
     string FullName,
     string? FirstName,
     string? LastName,
+    string? Picture,
     IReadOnlyList<string> Roles,
     DateTime CreatedAt);

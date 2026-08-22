@@ -72,6 +72,7 @@
 - [x] **3.2. Authentication & Authorization Slices**
   - [x] `POST /api/v1/auth/register`: Register new user with default `Student` role.
   - [x] `POST /api/v1/auth/login`: Issue JWT token pair (Access Token + Refresh Token). Store active session fingerprint in Redis.
+  - [x] `POST /api/v1/auth/google`: Authenticate or auto-register user using Google OAuth ID token with default `Student` role, Mapster mapping, and `Guid.CreateVersion7()`.
   - [x] `POST /api/v1/auth/refresh-token`: Validate and rotate refresh token, revoking prior token.
   - [x] `POST /api/v1/auth/logout`: Revoke active refresh token and invalidate Redis session guard.
   - [x] `GET /api/v1/auth/me`: Return authenticated user profile and permissions.

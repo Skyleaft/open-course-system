@@ -25,4 +25,6 @@ public sealed record UserInfoDto(
     Guid Id,
     string UserName,
     string Email,
+    string FullName,
+    string? Picture,
     IReadOnlyList<string> Roles);

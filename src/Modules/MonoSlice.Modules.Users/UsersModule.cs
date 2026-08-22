@@ -13,6 +13,7 @@ using MonoSlice.Modules.Users.Contracts;
 using MonoSlice.Modules.Users.Domain;
 using MonoSlice.Modules.Users.Features.AssignRole;
 using MonoSlice.Modules.Users.Features.GetProfile;
+using MonoSlice.Modules.Users.Features.GoogleAuth;
 using MonoSlice.Modules.Users.Features.Login;
 using MonoSlice.Modules.Users.Features.Logout;
 using MonoSlice.Modules.Users.Features.RefreshToken;
@@ -101,6 +102,7 @@ public static class UsersModule
         services.AddScoped<ICurrentUser, CurrentUserService>();
         services.AddScoped<IUsersModuleApi, UsersModuleApi>();
         services.AddScoped<IIdentityModuleApi, UsersModuleApi>();
+        services.AddScoped<IGoogleAuthService, GoogleAuthService>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddHostedService<SeedRolesService>();
 
@@ -123,6 +125,7 @@ public static class UsersModule
 
         authV1Group.MapRegisterEndpoint();
         authV1Group.MapLoginEndpoint();
+        authV1Group.MapGoogleAuthEndpoint();
         authV1Group.MapRefreshTokenEndpoint();
         authV1Group.MapLogoutEndpoint();
         authV1Group.MapGetProfileEndpoint();
