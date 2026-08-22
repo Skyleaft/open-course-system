@@ -10,15 +10,13 @@ public sealed record RegisterCommand : ICommand<ApiResponse<UserResponseDto>>
     [EmailAddress]
     public string Email { get; init; } = string.Empty;
 
-    [Required]
-    [MinLength(3)]
-    [MaxLength(50)]
-    public string UserName { get; init; } = string.Empty;
+    public string? UserName { get; init; }
 
     [Required]
     [MinLength(6)]
     public string Password { get; init; } = string.Empty;
 
+    public string? FullName { get; init; }
     public string? FirstName { get; init; }
     public string? LastName { get; init; }
 }
@@ -27,6 +25,7 @@ public sealed record UserResponseDto(
     Guid Id,
     string UserName,
     string Email,
+    string FullName,
     string? FirstName,
     string? LastName,
     IReadOnlyList<string> Roles,

@@ -55,7 +55,7 @@ public class RedisDistributedLock : IDistributedLock
     {
         var db = _redis.GetDatabase();
         var lockKey = $"lock:{resourceKey}";
-        var lockToken = Guid.NewGuid().ToString();
+        var lockToken = Guid.CreateVersion7().ToString();
 
         var startTime = DateTime.UtcNow;
         var timeout = waitTimeout == default ? TimeSpan.Zero : waitTimeout;

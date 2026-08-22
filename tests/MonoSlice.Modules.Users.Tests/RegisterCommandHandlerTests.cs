@@ -49,7 +49,8 @@ public class RegisterCommandHandlerTests
             UserName = "newuser",
             Password = "Password123!",
             FirstName = "John",
-            LastName = "Doe"
+            LastName = "Doe",
+            FullName = "John Doe"
         };
 
         _userManager.FindByEmailAsync(command.Email)
@@ -58,7 +59,7 @@ public class RegisterCommandHandlerTests
         _userManager.CreateAsync(Arg.Any<ApplicationUser>(), command.Password)
             .Returns(IdentityResult.Success);
 
-        _userManager.AddToRoleAsync(Arg.Any<ApplicationUser>(), "User")
+        _userManager.AddToRoleAsync(Arg.Any<ApplicationUser>(), "Student")
             .Returns(IdentityResult.Success);
 
         // Act
@@ -69,6 +70,7 @@ public class RegisterCommandHandlerTests
         Assert.NotNull(result.Data);
         Assert.Equal(command.Email, result.Data.Email);
         Assert.Equal(command.UserName, result.Data.UserName);
-        Assert.Contains("User", result.Data.Roles);
+        Assert.Equal("John Doe", result.Data.FullName);
+        Assert.Contains("Student", result.Data.Roles);
     }
 }

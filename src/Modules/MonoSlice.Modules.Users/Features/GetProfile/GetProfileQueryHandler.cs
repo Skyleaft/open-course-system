@@ -37,9 +37,12 @@ public sealed class GetProfileQueryHandler : IQueryHandler<GetProfileQuery, ApiR
             throw new NotFoundException(nameof(ApplicationUser), _currentUser.UserId.Value);
         }
 
-        var roles = await _userManager.GetRolesAsync(user);
+        user.LastSeen = DateTime.UtcNow;
+        await _userManager.UpdateAsync(user);
 
+        var roles = await _userManager.GetRolesAsync(user);
         var dto = user.Adapt<UserResponseDto>() with { Roles = roles.ToList() };
+
         return ApiResponse.Ok(dto);
     }
 }

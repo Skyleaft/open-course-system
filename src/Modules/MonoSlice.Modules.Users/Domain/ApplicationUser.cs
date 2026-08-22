@@ -6,6 +6,26 @@ public sealed class ApplicationUser : IdentityUser<Guid>
 {
     public string? FirstName { get; set; }
     public string? LastName { get; set; }
+
+    public string FullName
+    {
+        get
+        {
+            if (string.IsNullOrWhiteSpace(FirstName) && string.IsNullOrWhiteSpace(LastName))
+                return UserName ?? Email ?? string.Empty;
+
+            return $"{FirstName} {LastName}".Trim();
+        }
+        set
+        {
+            if (string.IsNullOrWhiteSpace(value)) return;
+            var parts = value.Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+            FirstName = parts[0];
+            LastName = parts.Length > 1 ? parts[1] : null;
+        }
+    }
+
+    public DateTime? LastSeen { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
     public string? RefreshToken { get; set; }

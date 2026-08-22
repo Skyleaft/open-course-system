@@ -25,7 +25,7 @@ public sealed class SeedRolesService : IHostedService
             var roleManager = scope.ServiceProvider.GetService<RoleManager<ApplicationRole>>();
             if (roleManager is null) return;
 
-            string[] defaultRoles = ["Admin", "User", "Manager"];
+            string[] defaultRoles = ["Student", "Instructor", "Admin", "Proctor", "User", "Manager"];
 
             foreach (var roleName in defaultRoles)
             {

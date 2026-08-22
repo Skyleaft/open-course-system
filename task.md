@@ -12,7 +12,7 @@
 | :--- | :--- | :--- | :---: |
 | **Phase 1** | **Infrastructure & Foundations** | PostgreSQL schemas, Redis, MinIO S3, OpenTelemetry, Docker Compose | `[x]` |
 | **Phase 2** | **Core Framework & Shared Layer** | VSA pipeline, DDD base abstractions, Mediator, API wrappers, S3 clients | `[x]` |
-| **Phase 3** | **Identity & Access Module** | JWT rotation, RBAC, Single-device/session token guard with Redis | `[ ]` |
+| **Phase 3** | **Identity & Access Module** | JWT rotation, RBAC, Single-device/session token guard with Redis | `[x]` |
 | **Phase 4** | **Payments Module** | Orders, AccessType verification, webhook HMAC, auto-enrollment events | `[ ]` |
 | **Phase 5** | **Courses Module** | Course lifecycle, curriculum builder, lesson storage, assignment workflow | `[ ]` |
 | **Phase 6** | **Exams Module (Core Engine)** | Dual-mode quiz, PRNG Fisher-Yates shuffle, one-time token, snapshot presign | `[ ]` |
@@ -64,22 +64,22 @@
 
 ## Phase 3: Identity & Access Management Module (`identity` schema)
 
-- [ ] **3.1. Domain & Persistence**
-  - [ ] Implement `User` aggregate with `GuidV7` ID, `Email`, `PasswordHash`, `FullName`, `Roles` (`Student`, `Instructor`, `Admin`, `Proctor`), `IsActive`.
-  - [ ] Implement `RefreshToken` entity with rotation tracking, expiry, and revocation flags.
-  - [ ] Implement `IdentityDbContext` targeting schema `identity` with audit timestamp auto-filling.
+- [x] **3.1. Domain & Persistence**
+  - [x] Implement `User` aggregate with `GuidV7` ID, `Email`, `PasswordHash`, `FullName`, `LastSeen`, `Roles` (`Student`, `Instructor`, `Admin`, `Proctor`), `IsActive`.
+  - [x] Implement `RefreshToken` entity with rotation tracking, expiry, and revocation flags.
+  - [x] Implement `IdentityDbContext` targeting schema `identity` with audit timestamp auto-filling.
 
-- [ ] **3.2. Authentication & Authorization Slices**
-  - [ ] `POST /api/v1/auth/register`: Register new user with default `Student` role.
-  - [ ] `POST /api/v1/auth/login`: Issue JWT token pair (Access Token + Refresh Token). Store active session fingerprint in Redis.
-  - [ ] `POST /api/v1/auth/refresh-token`: Validate and rotate refresh token, revoking prior token.
-  - [ ] `POST /api/v1/auth/logout`: Revoke active refresh token and invalidate Redis session guard.
-  - [ ] `GET /api/v1/auth/me`: Return authenticated user profile and permissions.
-  - [ ] `POST /api/v1/auth/assign-role`: Admin-only slice to grant/revoke roles (`Instructor`, `Proctor`, `Admin`).
+- [x] **3.2. Authentication & Authorization Slices**
+  - [x] `POST /api/v1/auth/register`: Register new user with default `Student` role.
+  - [x] `POST /api/v1/auth/login`: Issue JWT token pair (Access Token + Refresh Token). Store active session fingerprint in Redis.
+  - [x] `POST /api/v1/auth/refresh-token`: Validate and rotate refresh token, revoking prior token.
+  - [x] `POST /api/v1/auth/logout`: Revoke active refresh token and invalidate Redis session guard.
+  - [x] `GET /api/v1/auth/me`: Return authenticated user profile and permissions.
+  - [x] `POST /api/v1/auth/assign-role`: Admin-only slice to grant/revoke roles (`Instructor`, `Proctor`, `Admin`).
 
-- [ ] **3.3. Inter-Module API & Token Guard**
-  - [ ] Implement `IIdentityModuleApi` (`GetUserByIdAsync`, `ValidateUserRoleAsync`, `GetUsersByIdsAsync`).
-  - [ ] Implement Redis-backed Single Active Device / Tab Guard middleware.
+- [x] **3.3. Inter-Module API & Token Guard**
+  - [x] Implement `IIdentityModuleApi` (`GetUserByIdAsync`, `ValidateUserRoleAsync`, `GetUsersByIdsAsync`).
+  - [x] Implement Redis-backed Single Active Device / Tab Guard middleware.
 
 ---
 

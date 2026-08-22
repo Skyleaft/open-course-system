@@ -26,11 +26,20 @@ public sealed class RegisterCommandHandler : ICommandHandler<RegisterCommand, Ap
             throw new BusinessRuleException($"User with email '{command.Email}' already exists.");
         }
 
-        var user = new ApplicationUser(command.UserName, command.Email)
+        var userName = !string.IsNullOrWhiteSpace(command.UserName)
+            ? command.UserName
+            : command.Email.Split('@')[0];
+
+        var user = new ApplicationUser(userName, command.Email)
         {
             FirstName = command.FirstName,
             LastName = command.LastName
         };
+
+        if (!string.IsNullOrWhiteSpace(command.FullName) && string.IsNullOrWhiteSpace(command.FirstName))
+        {
+            user.FullName = command.FullName;
+        }
 
         var result = await _userManager.CreateAsync(user, command.Password);
         if (!result.Succeeded)
@@ -39,9 +48,11 @@ public sealed class RegisterCommandHandler : ICommandHandler<RegisterCommand, Ap
             throw new ValidationException(errors);
         }
 
-        await _userManager.AddToRoleAsync(user, "User");
+        // Add default role 'Student'
+        await _userManager.AddToRoleAsync(user, "Student");
 
-        var responseDto = user.Adapt<UserResponseDto>() with { Roles = ["User"] };
+        var responseDto = user.Adapt<UserResponseDto>() with { Roles = ["Student"] };
+
         return ApiResponse.Ok(responseDto, "User registered successfully.");
     }
 }

@@ -14,6 +14,7 @@ using MonoSlice.Modules.Users.Domain;
 using MonoSlice.Modules.Users.Features.AssignRole;
 using MonoSlice.Modules.Users.Features.GetProfile;
 using MonoSlice.Modules.Users.Features.Login;
+using MonoSlice.Modules.Users.Features.Logout;
 using MonoSlice.Modules.Users.Features.RefreshToken;
 using MonoSlice.Modules.Users.Features.Register;
 using MonoSlice.Modules.Users.Persistence;
@@ -33,8 +34,9 @@ public static class UsersModule
         var authSettings = authSection.Get<AuthSettings>() ?? new AuthSettings();
 
         var connectionString = configuration.GetConnectionString("UsersDb") ??
+                               configuration.GetConnectionString("Database") ??
                                configuration.GetConnectionString("DefaultConnection") ??
-                               "Host=localhost;Database=monoslice_users;Username=postgres;Password=postgres";
+                               "Host=localhost;Database=lms_db;Username=postgres;Password=postgres";
 
         if (connectionString.StartsWith("InMemory:", StringComparison.OrdinalIgnoreCase))
         {
@@ -98,6 +100,7 @@ public static class UsersModule
         services.AddHttpContextAccessor();
         services.AddScoped<ICurrentUser, CurrentUserService>();
         services.AddScoped<IUsersModuleApi, UsersModuleApi>();
+        services.AddScoped<IIdentityModuleApi, UsersModuleApi>();
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
         services.AddHostedService<SeedRolesService>();
 
@@ -108,20 +111,22 @@ public static class UsersModule
     {
         app.UseAuthentication();
         app.UseMiddleware<CompositeAuthMiddleware>();
+        app.UseMiddleware<SessionGuardMiddleware>();
         app.UseAuthorization();
         return app;
     }
 
     public static IEndpointRouteBuilder MapUsersEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/users")
-            .WithTags("Users");
+        var authV1Group = app.MapGroup("/api/v1/auth")
+            .WithTags("Auth");
 
-        group.MapRegisterEndpoint();
-        group.MapLoginEndpoint();
-        group.MapRefreshTokenEndpoint();
-        group.MapGetProfileEndpoint();
-        group.MapAssignRoleEndpoint();
+        authV1Group.MapRegisterEndpoint();
+        authV1Group.MapLoginEndpoint();
+        authV1Group.MapRefreshTokenEndpoint();
+        authV1Group.MapLogoutEndpoint();
+        authV1Group.MapGetProfileEndpoint();
+        authV1Group.MapAssignRoleEndpoint();
 
         return app;
     }

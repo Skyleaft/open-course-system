@@ -13,6 +13,7 @@ public class MonoSliceApplicationFactory : WebApplicationFactory<Program>
     {
         Environment.SetEnvironmentVariable("ConnectionStrings__UsersDb", "InMemory:IntegrationTestUsersDb");
         Environment.SetEnvironmentVariable("ConnectionStrings__CatalogDb", "InMemory:IntegrationTestCatalogDb");
+        Environment.SetEnvironmentVariable("ConnectionStrings__OrdersDb", "InMemory:IntegrationTestOrdersDb");
         Environment.SetEnvironmentVariable("Cache__Provider", "Memory");
         Environment.SetEnvironmentVariable("Messaging__Provider", "RabbitMQ");
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
@@ -55,5 +56,31 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
         var content = await response.Content.ReadFromJsonAsync<ApiResponse<PaginatedList<object>>>();
         Assert.NotNull(content);
         Assert.True(content.Success);
+    }
+
+    [Fact]
+    public async Task AuthRegisterAndLogin_ShouldSucceed()
+    {
+        var registerPayload = new
+        {
+            Email = "student1@example.com",
+            UserName = "student1",
+            Password = "Password123!",
+            FullName = "Student One"
+        };
+
+        var regResponse = await _client.PostAsJsonAsync("/api/v1/auth/register", registerPayload);
+        var regRaw = await regResponse.Content.ReadAsStringAsync();
+        Assert.True(regResponse.IsSuccessStatusCode, $"Register failed: {regRaw}");
+
+        var loginPayload = new
+        {
+            UserNameOrEmail = "student1@example.com",
+            Password = "Password123!"
+        };
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", loginPayload);
+        var loginRaw = await loginResponse.Content.ReadAsStringAsync();
+        Assert.True(loginResponse.IsSuccessStatusCode, $"Login failed: {loginRaw}");
     }
 }

@@ -30,7 +30,7 @@ public class RedisEventStreamPublisher : IEventStreamPublisher
 
         var db = _redis.GetDatabase();
         var json = JsonSerializer.Serialize(payload);
-        var messageId = Guid.NewGuid().ToString();
+        var messageId = Guid.CreateVersion7().ToString();
 
         var entries = new List<NameValueEntry>
         {

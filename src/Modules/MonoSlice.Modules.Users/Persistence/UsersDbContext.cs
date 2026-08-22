@@ -7,7 +7,9 @@ namespace MonoSlice.Modules.Users.Persistence;
 
 public sealed class UsersDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>, IUnitOfWork
 {
-    public const string DefaultSchema = "users";
+    public const string DefaultSchema = "identity";
+
+    public DbSet<RefreshToken> RefreshTokens { get; set; } = null!;
 
     public UsersDbContext(DbContextOptions<UsersDbContext> options)
         : base(options)
@@ -25,16 +27,27 @@ public sealed class UsersDbContext : IdentityDbContext<ApplicationUser, Applicat
 
         builder.Entity<ApplicationUser>(b =>
         {
-            b.ToTable("Users");
+            b.ToTable("users");
             b.Property(u => u.FirstName).HasMaxLength(100);
             b.Property(u => u.LastName).HasMaxLength(100);
-            b.Property(u => u.RefreshToken).HasMaxLength(256);
+            b.Property(u => u.RefreshToken).HasMaxLength(500);
+            b.Ignore(u => u.FullName);
         });
 
         builder.Entity<ApplicationRole>(b =>
         {
-            b.ToTable("Roles");
+            b.ToTable("roles");
             b.Property(r => r.Description).HasMaxLength(256);
+        });
+
+        builder.Entity<RefreshToken>(b =>
+        {
+            b.ToTable("refresh_tokens");
+            b.HasKey(r => r.Id);
+            b.Property(r => r.Token).HasMaxLength(500).IsRequired();
+            b.Property(r => r.ReplacedByToken).HasMaxLength(500);
+            b.HasIndex(r => r.UserId);
+            b.HasIndex(r => r.Token);
         });
     }
 
