@@ -19,6 +19,6 @@ public static class IssueCertificateEndpoint
         })
         .WithName("IssueCertificate")
         .WithSummary("Manually issue a course completion certificate.")
-        .RequireAuthorization();
+        .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }

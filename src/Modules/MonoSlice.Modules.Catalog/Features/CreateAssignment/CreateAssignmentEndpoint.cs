@@ -29,7 +29,7 @@ public static class CreateAssignmentEndpoint
             })
             .WithName("CreateCourseAssignment")
             .WithSummary("Create an assignment in a course (Instructor/Admin only)")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }
 

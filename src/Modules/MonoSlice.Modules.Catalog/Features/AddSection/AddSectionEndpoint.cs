@@ -26,7 +26,7 @@ public static class AddSectionEndpoint
             })
             .WithName("AddCourseSection")
             .WithSummary("Add a curriculum section to a course (Instructor/Admin only)")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }
 

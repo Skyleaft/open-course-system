@@ -30,7 +30,7 @@ public static class AddLessonEndpoint
             })
             .WithName("AddSectionLesson")
             .WithSummary("Add a lesson to a course section (Instructor/Admin only)")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }
 

@@ -26,7 +26,7 @@ public static class WarnCandidateEndpoint
             })
             .WithName("WarnCandidate")
             .WithSummary("Proctor sends real-time custom warning modal to candidate")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }
 

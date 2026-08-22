@@ -26,7 +26,7 @@ public static class EnrollCourseEndpoint
             })
             .WithName("EnrollInCourse")
             .WithSummary("Enroll current user into a course")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }
 

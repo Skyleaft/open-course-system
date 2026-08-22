@@ -19,6 +19,6 @@ public static class CreateAnnouncementEndpoint
         })
         .WithName("CreateAnnouncement")
         .WithSummary("Create a platform or course announcement.")
-        .RequireAuthorization();
+        .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }

@@ -26,7 +26,7 @@ public static class SubmitAssignmentEndpoint
             })
             .WithName("SubmitAssignment")
             .WithSummary("Submit assignment solution file before deadline")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }
 

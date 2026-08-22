@@ -28,7 +28,7 @@ public static class SaveAnswerEndpoint
             })
             .WithName("SaveStudentExamAnswer")
             .WithSummary("Save or update student answer for a specific question")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }
 

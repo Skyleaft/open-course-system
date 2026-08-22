@@ -19,6 +19,6 @@ public static class CreateCourseEndpoint
             })
             .WithName("CreateCourse")
             .WithSummary("Create a new course (Instructor/Admin only)")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }

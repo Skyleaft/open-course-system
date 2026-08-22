@@ -33,6 +33,6 @@ public static class PostThreadCommentEndpoint
         })
         .WithName("PostThreadComment")
         .WithSummary("Post a top-level comment or nested reply to a discussion thread.")
-        .RequireAuthorization();
+        .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

@@ -20,6 +20,6 @@ public static class GetOrderEndpoint
             })
             .WithName("GetPaymentOrderById")
             .WithSummary("Get payment order details and status by ID")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

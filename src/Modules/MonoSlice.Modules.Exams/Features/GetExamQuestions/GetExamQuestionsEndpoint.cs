@@ -20,6 +20,6 @@ public static class GetExamQuestionsEndpoint
             })
             .WithName("GetStudentExamQuestions")
             .WithSummary("Get student randomized exam questions with answers stripped")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

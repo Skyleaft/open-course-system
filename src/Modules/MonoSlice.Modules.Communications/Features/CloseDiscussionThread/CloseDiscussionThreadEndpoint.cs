@@ -19,6 +19,6 @@ public static class CloseDiscussionThreadEndpoint
         })
         .WithName("CloseDiscussionThread")
         .WithSummary("Close a discussion thread to prevent further comments.")
-        .RequireAuthorization();
+        .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

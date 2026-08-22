@@ -19,6 +19,6 @@ public static class GetDeadLettersEndpoint
         })
         .WithName("GetAssessmentsDeadLetters")
         .WithSummary("Query failed and poison grading stream messages from DLQ.")
-        .RequireAuthorization();
+        .RequireAuthorization(policy => policy.RequireRole("Admin"));
     }
 }

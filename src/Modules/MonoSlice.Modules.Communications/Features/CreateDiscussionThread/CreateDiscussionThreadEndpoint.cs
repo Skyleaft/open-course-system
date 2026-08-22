@@ -19,6 +19,6 @@ public static class CreateDiscussionThreadEndpoint
         })
         .WithName("CreateDiscussionThread")
         .WithSummary("Start a discussion thread on a course or lesson.")
-        .RequireAuthorization();
+        .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

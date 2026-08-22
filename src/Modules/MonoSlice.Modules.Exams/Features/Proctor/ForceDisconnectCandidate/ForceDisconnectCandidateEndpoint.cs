@@ -26,7 +26,7 @@ public static class ForceDisconnectCandidateEndpoint
             })
             .WithName("ForceDisconnectCandidate")
             .WithSummary("Proctor forcibly terminates and disqualifies exam candidate")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }
 

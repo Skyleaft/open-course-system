@@ -19,6 +19,6 @@ public static class CreateExamEndpoint
             })
             .WithName("CreateExam")
             .WithSummary("Create a new quiz or exam (Instructor/Admin only)")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }

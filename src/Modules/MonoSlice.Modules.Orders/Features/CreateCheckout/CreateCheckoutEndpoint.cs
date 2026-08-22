@@ -19,6 +19,6 @@ public static class CreateCheckoutEndpoint
             })
             .WithName("CreateCheckout")
             .WithSummary("Initiate a course purchase checkout order")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

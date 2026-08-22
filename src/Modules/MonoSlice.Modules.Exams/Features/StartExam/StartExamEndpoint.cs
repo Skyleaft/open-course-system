@@ -20,6 +20,6 @@ public static class StartExamEndpoint
             })
             .WithName("StartExamAttempt")
             .WithSummary("Start an attempt on an exam and retrieve active session token")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

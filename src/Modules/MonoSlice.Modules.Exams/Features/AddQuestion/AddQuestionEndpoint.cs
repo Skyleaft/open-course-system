@@ -21,6 +21,6 @@ public static class AddQuestionEndpoint
             })
             .WithName("AddExamQuestion")
             .WithSummary("Add a question with answer keys to an exam (Instructor/Admin only)")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }

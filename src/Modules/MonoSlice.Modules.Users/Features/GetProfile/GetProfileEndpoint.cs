@@ -22,6 +22,6 @@ public static class GetProfileEndpoint
         .WithSummary("Retrieves the currently authenticated user's profile")
         .Produces<ApiResponse<UserResponseDto>>(StatusCodes.Status200OK)
         .Produces<ApiResponse>(StatusCodes.Status401Unauthorized)
-        .RequireAuthorization();
+        .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

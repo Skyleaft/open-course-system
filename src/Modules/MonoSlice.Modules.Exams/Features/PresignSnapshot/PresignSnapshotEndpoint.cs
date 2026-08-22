@@ -20,6 +20,6 @@ public static class PresignSnapshotEndpoint
             })
             .WithName("PresignExamSnapshot")
             .WithSummary("Generate 2-minute presigned S3 upload URL for anti-cheat proctor snapshots")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

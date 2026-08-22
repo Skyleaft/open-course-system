@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using MonoSlice.Shared.Abstractions.Common;
 using Xunit;
 
@@ -39,6 +40,17 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
     {
         _factory = factory;
         _client = factory.CreateClient();
+    }
+
+    private async Task AssignRoleAsync(string email, string role)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<Microsoft.AspNetCore.Identity.UserManager<MonoSlice.Modules.Users.Domain.ApplicationUser>>();
+        var user = await userManager.FindByEmailAsync(email);
+        if (user is not null)
+        {
+            await userManager.AddToRoleAsync(user, role);
+        }
     }
 
     [Fact]
@@ -151,6 +163,7 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
             FullName = "Course Instructor"
         };
         await _client.PostAsJsonAsync("/api/v1/auth/register", instructorPayload);
+        await AssignRoleAsync("instructor_course@example.com", "Instructor");
 
         var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
         {
@@ -243,6 +256,7 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
             FullName = "Exam Instructor"
         };
         await _client.PostAsJsonAsync("/api/v1/auth/register", instructorPayload);
+        await AssignRoleAsync("instructor_exam@example.com", "Instructor");
 
         var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
         {
@@ -353,6 +367,7 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
             FullName = "Lead Proctor"
         };
         await _client.PostAsJsonAsync("/api/v1/auth/register", proctorPayload);
+        await AssignRoleAsync("proctor_lead@example.com", "Instructor");
 
         var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
         {
@@ -438,6 +453,7 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
             Password = password,
             FullName = "Cert Instructor"
         });
+        await AssignRoleAsync(email, "Instructor");
 
         var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
         {
@@ -499,6 +515,7 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
             Password = password,
             FullName = "Admin DLQ"
         });
+        await AssignRoleAsync(email, "Admin");
 
         var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
         {
@@ -530,6 +547,7 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
             Password = password,
             FullName = "Instructor Ann"
         });
+        await AssignRoleAsync(email, "Instructor");
 
         var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
         {

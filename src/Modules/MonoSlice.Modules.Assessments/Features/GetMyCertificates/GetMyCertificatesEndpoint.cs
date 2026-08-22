@@ -18,6 +18,6 @@ public static class GetMyCertificatesEndpoint
         })
         .WithName("GetMyCertificates")
         .WithSummary("List all certificates issued to the current student.")
-        .RequireAuthorization();
+        .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

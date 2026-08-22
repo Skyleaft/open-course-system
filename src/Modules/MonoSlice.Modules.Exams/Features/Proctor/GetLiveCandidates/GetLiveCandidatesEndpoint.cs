@@ -20,6 +20,6 @@ public static class GetLiveCandidatesEndpoint
             })
             .WithName("GetLiveCandidates")
             .WithSummary("Retrieve real-time list of exam candidates and proctor monitoring metrics")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }

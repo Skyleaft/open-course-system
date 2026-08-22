@@ -20,6 +20,6 @@ public static class PublishExamEndpoint
             })
             .WithName("PublishExam")
             .WithSummary("Publish an exam (Instructor/Admin only)")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }

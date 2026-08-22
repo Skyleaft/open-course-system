@@ -19,6 +19,6 @@ public static class RedriveDeadLetterEndpoint
         })
         .WithName("RedriveAssessmentDeadLetter")
         .WithSummary("Replay and re-process a failed dead letter grading event.")
-        .RequireAuthorization();
+        .RequireAuthorization(policy => policy.RequireRole("Admin"));
     }
 }

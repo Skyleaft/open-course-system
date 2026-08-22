@@ -21,6 +21,6 @@ public static class UpdateCourseEndpoint
             })
             .WithName("UpdateCourse")
             .WithSummary("Update course details (Instructor/Admin only)")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }

@@ -20,6 +20,6 @@ public static class GetExamResultEndpoint
             })
             .WithName("GetExamSubmissionResult")
             .WithSummary("View exam submission score, answers, and explanations")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

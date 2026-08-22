@@ -20,6 +20,6 @@ public static class PublishCourseEndpoint
             })
             .WithName("PublishCourse")
             .WithSummary("Publish a course (Instructor/Admin only)")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }

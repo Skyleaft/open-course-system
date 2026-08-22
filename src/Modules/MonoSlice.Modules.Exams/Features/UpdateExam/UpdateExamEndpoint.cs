@@ -21,6 +21,6 @@ public static class UpdateExamEndpoint
             })
             .WithName("UpdateExam")
             .WithSummary("Update exam parameters (Instructor/Admin only)")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
     }
 }

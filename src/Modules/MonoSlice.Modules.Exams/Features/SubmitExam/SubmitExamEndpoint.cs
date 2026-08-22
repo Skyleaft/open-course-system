@@ -20,6 +20,6 @@ public static class SubmitExamEndpoint
             })
             .WithName("FinishAndSubmitExam")
             .WithSummary("Finalize exam attempt, trigger automated scoring, and publish exam submitted event")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }
