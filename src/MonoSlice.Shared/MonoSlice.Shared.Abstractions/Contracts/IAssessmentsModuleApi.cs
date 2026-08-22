@@ -1,6 +1,36 @@
 namespace MonoSlice.Shared.Abstractions.Contracts;
 
-public record CertificateContractDto(
+public interface IAssessmentsModuleApi
+{
+    Task<IReadOnlyList<GradeRecordDto>> GetStudentGradeRecordsAsync(
+        Guid studentId,
+        Guid courseId,
+        CancellationToken cancellationToken = default);
+
+    Task<CertificateDto?> GetStudentCertificateAsync(
+        Guid studentId,
+        Guid courseId,
+        CancellationToken cancellationToken = default);
+
+    Task<CertificateDto> IssueCertificateAsync(
+        Guid studentId,
+        Guid courseId,
+        decimal finalScore,
+        CancellationToken cancellationToken = default);
+}
+
+public sealed record GradeRecordDto(
+    Guid Id,
+    Guid StudentId,
+    Guid CourseId,
+    string ItemType,
+    Guid ReferenceId,
+    decimal Score,
+    decimal MaxScore,
+    decimal WeightPercentage,
+    DateTime EvaluatedAtUtc);
+
+public sealed record CertificateDto(
     Guid Id,
     string CertificateNumber,
     Guid StudentId,
@@ -9,17 +39,3 @@ public record CertificateContractDto(
     string CertificateHash,
     string Status,
     DateTime IssuedAtUtc);
-
-public interface IAssessmentsModuleApi
-{
-    Task<CertificateContractDto?> GetCertificateByHashAsync(string certificateHash, CancellationToken ct = default);
-    Task<bool> RecordGradeAsync(
-        Guid studentId,
-        Guid courseId,
-        string itemType,
-        Guid referenceId,
-        decimal score,
-        decimal maxScore,
-        decimal weightPercentage,
-        CancellationToken ct = default);
-}

@@ -17,6 +17,7 @@ public class MonoSliceApplicationFactory : WebApplicationFactory<Program>
         Environment.SetEnvironmentVariable("ConnectionStrings__OrdersDb", "InMemory:IntegrationTestOrdersDb");
         Environment.SetEnvironmentVariable("ConnectionStrings__PaymentsDb", "InMemory:IntegrationTestPaymentsDb");
         Environment.SetEnvironmentVariable("ConnectionStrings__ExamsDb", "InMemory:IntegrationTestExamsDb");
+        Environment.SetEnvironmentVariable("ConnectionStrings__AssessmentsDb", "InMemory:IntegrationTestAssessmentsDb");
         Environment.SetEnvironmentVariable("Cache__Provider", "Memory");
         Environment.SetEnvironmentVariable("Messaging__Provider", "RabbitMQ");
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Development");
@@ -30,10 +31,12 @@ public class MonoSliceApplicationFactory : WebApplicationFactory<Program>
 
 public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactory>
 {
+    private readonly MonoSliceApplicationFactory _factory;
     private readonly HttpClient _client;
 
     public EndpointIntegrationTests(MonoSliceApplicationFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
 
@@ -418,5 +421,97 @@ public class EndpointIntegrationTests : IClassFixture<MonoSliceApplicationFactor
         var resultData = await resultResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Exams.Features.GetExamResult.ExamResultDetailsDto>>();
         Assert.NotNull(resultData?.Data);
         Assert.Equal("Disqualified", resultData.Data.Status);
+    }
+
+    [Fact]
+    public async Task CertificateIssuanceAndPublicVerification_ShouldSucceed()
+    {
+        // 1. Authenticate as Admin/Instructor
+        var unique = Guid.CreateVersion7().ToString("N")[..8];
+        var email = $"cert_instructor_{unique}@example.com";
+        var password = "Password123!";
+
+        await _client.PostAsJsonAsync("/api/v1/auth/register", new
+        {
+            Email = email,
+            Password = password,
+            FullName = "Cert Instructor"
+        });
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
+        {
+            UserNameOrEmail = email,
+            Password = password
+        });
+        var loginData = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Users.Features.Login.LoginResponseDto>>();
+        Assert.NotNull(loginData?.Data?.AccessToken);
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", loginData.Data.AccessToken);
+
+        // 2. Issue Certificate manually
+        var studentId = Guid.CreateVersion7();
+        var courseId = Guid.CreateVersion7();
+
+        var issueResponse = await _client.PostAsJsonAsync("/api/v1/certificates/issue", new
+        {
+            StudentId = studentId,
+            CourseId = courseId,
+            FinalScore = 95.50m
+        });
+
+        Assert.True(issueResponse.IsSuccessStatusCode);
+        var issueData = await issueResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Assessments.Features.GetCertificate.CertificateDetailDto>>();
+        Assert.NotNull(issueData?.Data);
+        var certNumber = issueData.Data.CertificateNumber;
+        var certHash = issueData.Data.CertificateHash;
+
+        // 3. Public Verification Endpoint (Anonymous)
+        var unauthenticatedClient = _factory.CreateClient();
+        var verifyResponse = await unauthenticatedClient.GetAsync($"/api/v1/certificates/verify/{certHash}");
+        Assert.True(verifyResponse.IsSuccessStatusCode);
+
+        var verifyData = await verifyResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Assessments.Features.VerifyCertificate.CertificateVerificationDto>>();
+        Assert.NotNull(verifyData?.Data);
+        Assert.True(verifyData.Data.IsValid);
+        Assert.Equal(certNumber, verifyData.Data.CertificateNumber);
+        Assert.Equal(95.50m, verifyData.Data.FinalScore);
+        Assert.Equal("Issued", verifyData.Data.Status);
+
+        // 4. Query Certificate Details by CertificateNumber
+        var getCertResponse = await unauthenticatedClient.GetAsync($"/api/v1/certificates/{certNumber}");
+        Assert.True(getCertResponse.IsSuccessStatusCode);
+        var certDetailData = await getCertResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Assessments.Features.GetCertificate.CertificateDetailDto>>();
+        Assert.NotNull(certDetailData?.Data);
+        Assert.Equal(certHash, certDetailData.Data.CertificateHash);
+    }
+
+    [Fact]
+    public async Task AdminDeadLetterManagement_ShouldSucceed()
+    {
+        // 1. Authenticate as Admin
+        var unique = Guid.CreateVersion7().ToString("N")[..8];
+        var email = $"admin_dlq_{unique}@example.com";
+        var password = "Password123!";
+
+        await _client.PostAsJsonAsync("/api/v1/auth/register", new
+        {
+            Email = email,
+            Password = password,
+            FullName = "Admin DLQ"
+        });
+
+        var loginResponse = await _client.PostAsJsonAsync("/api/v1/auth/login", new
+        {
+            UserNameOrEmail = email,
+            Password = password
+        });
+        var loginData = await loginResponse.Content.ReadFromJsonAsync<ApiResponse<MonoSlice.Modules.Users.Features.Login.LoginResponseDto>>();
+        Assert.NotNull(loginData?.Data?.AccessToken);
+        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", loginData.Data.AccessToken);
+
+        // 2. Query DLQ list
+        var dlqResponse = await _client.GetAsync("/api/v1/admin/assessments/dlq");
+        Assert.True(dlqResponse.IsSuccessStatusCode);
+        var dlqData = await dlqResponse.Content.ReadFromJsonAsync<ApiResponse<List<MonoSlice.Modules.Assessments.Features.Admin.GetDeadLetters.DeadLetterDto>>>();
+        Assert.NotNull(dlqData?.Data);
     }
 }

@@ -2,6 +2,8 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using MonoSlice.Modules.Assessments;
+using MonoSlice.Modules.Assessments.Persistence;
 using MonoSlice.Modules.Catalog;
 using MonoSlice.Modules.Catalog.Persistence;
 using MonoSlice.Modules.Exams;
@@ -36,7 +38,8 @@ builder.Services.AddMonoSliceMapping(
     typeof(UsersModule).Assembly,
     typeof(OrdersModule).Assembly,
     typeof(CatalogModule).Assembly,
-    typeof(ExamsModule).Assembly);
+    typeof(ExamsModule).Assembly,
+    typeof(AssessmentsModule).Assembly);
 
 // Source-Generated Mediator Dispatcher
 builder.Services.AddMediator(options =>
@@ -49,6 +52,7 @@ builder.Services.AddUsersModule(builder.Configuration);
 builder.Services.AddOrdersModule(builder.Configuration);
 builder.Services.AddCatalogModule(builder.Configuration);
 builder.Services.AddExamsModule(builder.Configuration);
+builder.Services.AddAssessmentsModule(builder.Configuration);
 
 // Health Checks
 builder.Services.AddHealthChecks();
@@ -100,6 +104,9 @@ using (var scope = app.Services.CreateScope())
         var examsDb = scope.ServiceProvider.GetRequiredService<ExamsDbContext>();
         await examsDb.Database.EnsureCreatedAsync();
 
+        var assessmentsDb = scope.ServiceProvider.GetRequiredService<AssessmentsDbContext>();
+        await assessmentsDb.Database.EnsureCreatedAsync();
+
         logger.LogInformation("Database schemas ensured successfully.");
     }
     catch (Exception ex)
@@ -137,6 +144,7 @@ app.MapUsersEndpoints();
 app.MapOrdersEndpoints();
 app.MapCatalogEndpoints();
 app.MapExamsEndpoints();
+app.MapAssessmentsEndpoints();
 
 // Realtime SignalR Hubs
 app.MapHub<MonoSlice.Modules.Exams.Hubs.ExamHub>("/hubs/exam");

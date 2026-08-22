@@ -15,9 +15,9 @@
 | **Phase 3** | **Identity & Access Module** | JWT rotation, RBAC, Single-device/session token guard with Redis | `[x]` |
 | **Phase 4** | **Payments Module** | Orders, AccessType verification, webhook HMAC, auto-enrollment events | `[x]` |
 | **Phase 5** | **Courses Module** | Course lifecycle, curriculum builder, lesson storage, assignment workflow | `[x]` |
-| **Phase 6** | **Exams Module (Core Engine)** | Dual-mode quiz, PRNG Fisher-Yates shuffle, one-time token, snapshot presign | `[ ]` |
-| **Phase 7** | **Realtime Anti-Cheat & SignalR Engine** | ExamHub, Redis backplane, violation broadcasts, proctor live stream | `[ ]` |
-| **Phase 8** | **Assessments & Certification Module** | Redis Stream grading consumer, retry/DLQ handling, SHA-256 cert generator | `[ ]` |
+| **Phase 6** | **Exams Module (Core Engine)** | Dual-mode quiz, PRNG Fisher-Yates shuffle, one-time token, snapshot presign | `[x]` |
+| **Phase 7** | **Realtime Anti-Cheat & SignalR Engine** | ExamHub, Redis backplane, violation broadcasts, proctor live stream | `[x]` |
+| **Phase 8** | **Assessments & Certification Module** | Redis Stream grading consumer, retry/DLQ handling, SHA-256 cert generator | `[x]` |
 | **Phase 9** | **Communications Module** | Global/Course announcements, nested discussion threads | `[ ]` |
 | **Phase 10** | **Frontend Client (SvelteKit 2)** | Student portal, exam runner + anti-cheat worker, instructor & proctor apps | `[ ]` |
 | **Phase 11** | **Integration, Testing & Hardening** | Unit/Domain tests, WebApplicationFactory integration tests, load tests | `[ ]` |
@@ -210,33 +210,35 @@
 
 ## Phase 8: Assessments & Certification Module (`assessments` schema)
 
-- [ ] **8.1. Domain & Persistence**
-  - [ ] Implement `GradeRecord` entity (`item_type`: `Quiz`/`Assignment`, `score`, `max_score`, `weight_percentage`, `evaluated_at_utc`).
-  - [ ] Implement `Certificate` entity:
-    - [ ] `CertificateNumber` (Unique formatted identifier).
-    - [ ] `CertificateHash`: Cryptographic SHA-256 hash calculated as:
+- [x] **8.1. Domain & Persistence**
+  - [x] Implement `GradeRecord` entity (`item_type`: `Quiz`/`Assignment`, `score`, `max_score`, `weight_percentage`, `evaluated_at_utc`).
+  - [x] Implement `Certificate` entity:
+    - [x] `CertificateNumber` (Unique formatted identifier).
+    - [x] `CertificateHash`: Cryptographic SHA-256 hash calculated as:
       $$\text{SHA256}(\text{CertNumber} \parallel \text{StudentId} \parallel \text{CourseId} \parallel \text{FinalScore} \parallel \text{IssuedAtUtc})$$
-    - [ ] `Status`: `Issued`, `Revoked`.
-  - [ ] Implement `GradingDeadLetter` entity (`stream_message_id`, `submission_id`, `error_message`, `stack_trace`, `failed_at_utc`, `is_resolved`).
-  - [ ] Implement `AssessmentsDbContext` targeting schema `assessments`.
+    - [x] `Status`: `Issued`, `Revoked`.
+  - [x] Implement `GradingDeadLetter` entity (`stream_message_id`, `submission_id`, `error_message`, `stack_trace`, `failed_at_utc`, `is_resolved`).
+  - [x] Implement `AssessmentsDbContext` targeting schema `assessments`.
 
-- [ ] **8.2. Redis Streams Background Consumer Worker**
-  - [ ] Implement `GradingBackgroundWorker` (IHostedService):
-    - [ ] Read from `stream:grading-queue` with consumer group (`XREADGROUP`).
-    - [ ] Extract OTel trace context from stream message metadata and create linked span.
-    - [ ] Execute automated question scoring: evaluate choice options against correct keys, tally `total_score`.
-    - [ ] Check if `total_score >= passing_score`; if passed, generate digital `Certificate` with SHA-256 hash.
-    - [ ] Acknowledge message with `XACK`.
-  - [ ] Implement Retry & Dead Letter Handling:
-    - [ ] Track retry count in message header or Redis Pending Entries List (PEL).
-    - [ ] On $< 3$ failures: requeue with exponential backoff delay.
-    - [ ] On $\ge 3$ failures: publish to `stream:grading-dlq`, persist to `assessments.grading_dead_letters`, and acknowledge (`XACK`) main stream.
+- [x] **8.2. Redis Streams Background Consumer Worker**
+  - [x] Implement `GradingBackgroundWorker` (IHostedService):
+    - [x] Read from `stream:grading-queue` with consumer group (`XREADGROUP`).
+    - [x] Extract OTel trace context from stream message metadata and create linked span.
+    - [x] Execute automated question scoring: evaluate choice options against correct keys, tally `total_score`.
+    - [x] Check if `total_score >= passing_score`; if passed, generate digital `Certificate` with SHA-256 hash.
+    - [x] Acknowledge message with `XACK`.
+  - [x] Implement Retry & Dead Letter Handling:
+    - [x] Track retry count in message header or Redis Pending Entries List (PEL).
+    - [x] On $< 3$ failures: requeue with exponential backoff delay.
+    - [x] On $\ge 3$ failures: publish to `stream:grading-dlq`, persist to `assessments.grading_dead_letters`, and acknowledge (`XACK`) main stream.
 
-- [ ] **8.3. Certificate & Dead Letter API Slices**
-  - [ ] `GET /api/v1/certificates/verify/{certificateHash}`: Public verification endpoint returning certificate metadata and authenticity status.
-  - [ ] `GET /api/v1/certificates/my-certificates`: List student earned certificates.
-  - [ ] `GET /api/v1/admin/assessments/dlq`: Admin query for dead letter entries.
-  - [ ] `POST /api/v1/admin/assessments/dlq/{id}/re-drive`: Replay and re-process dead letter submission.
+- [x] **8.3. Certificate & Dead Letter API Slices**
+  - [x] `GET /api/v1/certificates/verify/{certificateHash}`: Public verification endpoint returning certificate metadata and authenticity status.
+  - [x] `GET /api/v1/certificates/my-certificates`: List student earned certificates.
+  - [x] `GET /api/v1/certificates/{certificateNumber}`: Get certificate details by certificate number.
+  - [x] `POST /api/v1/certificates/issue`: Manually issue certificate.
+  - [x] `GET /api/v1/admin/assessments/dlq`: Admin query for dead letter entries.
+  - [x] `POST /api/v1/admin/assessments/dlq/{id}/re-drive`: Replay and re-process dead letter submission.
 
 ---
 

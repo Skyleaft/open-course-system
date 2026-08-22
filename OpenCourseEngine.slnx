@@ -7,6 +7,7 @@
     <Project Path="src/Modules/MonoSlice.Modules.Orders/MonoSlice.Modules.Orders.csproj" />
     <Project Path="src/Modules/MonoSlice.Modules.Users/MonoSlice.Modules.Users.csproj" />
     <Project Path="src/Modules/MonoSlice.Modules.Exams/MonoSlice.Modules.Exams.csproj" />
+    <Project Path="src/Modules/MonoSlice.Modules.Assessments/MonoSlice.Modules.Assessments.csproj" />
   </Folder>
   <Folder Name="/src/Shared/">
     <Project Path="src/MonoSlice.Shared/MonoSlice.Shared.Abstractions/MonoSlice.Shared.Abstractions.csproj" />
@@ -18,5 +19,6 @@
     <Project Path="tests/MonoSlice.Modules.Orders.Tests/MonoSlice.Modules.Orders.Tests.csproj" />
     <Project Path="tests/MonoSlice.Modules.Users.Tests/MonoSlice.Modules.Users.Tests.csproj" />
     <Project Path="tests/MonoSlice.Modules.Exams.Tests/MonoSlice.Modules.Exams.Tests.csproj" />
+    <Project Path="tests/MonoSlice.Modules.Assessments.Tests/MonoSlice.Modules.Assessments.Tests.csproj" />
   </Folder>
 </Solution>
