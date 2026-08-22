@@ -10,7 +10,7 @@
 
 | Phase | Category | Description | Status |
 | :--- | :--- | :--- | :---: |
-| **Phase 1** | **Infrastructure & Foundations** | PostgreSQL schemas, Redis, MinIO S3, OpenTelemetry, Docker Compose | `[ ]` |
+| **Phase 1** | **Infrastructure & Foundations** | PostgreSQL schemas, Redis, MinIO S3, OpenTelemetry, Docker Compose | `[x]` |
 | **Phase 2** | **Core Framework & Shared Layer** | VSA pipeline, DDD base abstractions, Mediator, API wrappers, S3 clients | `[ ]` |
 | **Phase 3** | **Identity & Access Module** | JWT rotation, RBAC, Single-device/session token guard with Redis | `[ ]` |
 | **Phase 4** | **Payments Module** | Orders, AccessType verification, webhook HMAC, auto-enrollment events | `[ ]` |
@@ -26,19 +26,19 @@
 
 ## Phase 1: Infrastructure & Orchestration Setup
 
-- [ ] **1.1. Docker Compose Stack Orchestration**
-  - [ ] Configure `postgres:alpine` (Latest) container with healthchecks, persistent volume `postgres_data`, and initialization scripts.
-  - [ ] Configure `redis:alpine` (Latest) container with `--appendonly yes`, authentication password, and healthchecks.
-  - [ ] Configure `minio/minio` server with API on port `9000` and Console UI on port `9001`.
-  - [ ] Configure `minio/mc` initialization container (`minio-init`) to create buckets: `exam-snapshots`, `course-materials`, `assignment-submissions` with private access policies.
-  - [ ] Configure `jaegertracing/all-in-one` with OTLP receiver enabled on port `4317` / UI on `16686`.
-  - [ ] Configure `otel/opentelemetry-collector-contrib` pipeline config routing OTLP traces to Jaeger.
-  - [ ] Wire `.NET 10 Backend Host` and `SvelteKit 2 Frontend` containers in bridge network `lms-network`.
+- [x] **1.1. Docker Compose Stack Orchestration**
+  - [x] Configure `postgres:alpine` (Latest) container with healthchecks, persistent volume `postgres_data`, and initialization scripts.
+  - [x] Configure `redis:alpine` (Latest) container with `--appendonly yes`, authentication password, and healthchecks.
+  - [x] Configure `minio/minio` server with API on port `9000` and Console UI on port `9001`.
+  - [x] Configure `minio/mc` initialization container (`minio-init`) to create buckets: `exam-snapshots`, `course-materials`, `assignment-submissions` with private access policies.
+  - [x] Configure `jaegertracing/all-in-one` with OTLP receiver enabled on port `4317` / UI on `16686`.
+  - [x] Configure `otel/opentelemetry-collector-contrib` pipeline config routing OTLP traces to Jaeger.
+  - [x] Wire `.NET 10 Backend Host` and `SvelteKit 2 Frontend` containers in bridge network `lms-network`.
 
-- [ ] **1.2. PostgreSQL Multi-Schema Database Initialization**
-  - [ ] Create schema migration scripts for multi-schema architecture: `identity`, `payments`, `courses`, `exams`, `assessments`, `communications`.
-  - [ ] Enable PostgreSQL extensions: `uuid-ossp`, `pgcrypto`.
-  - [ ] Configure schema-level access grants and connection string multi-tenant/multi-schema separation.
+- [x] **1.2. PostgreSQL Multi-Schema Database Initialization**
+  - [x] Create schema migration scripts for multi-schema architecture: `identity`, `payments`, `courses`, `exams`, `assessments`, `communications`.
+  - [x] Enable PostgreSQL extensions: `uuid-ossp`, `pgcrypto`.
+  - [x] Configure schema-level access grants and connection string multi-tenant/multi-schema separation.
 
 ---
 
