@@ -20,7 +20,6 @@
     <ProjectReference Include="..\MonoSlice.Shared\MonoSlice.Shared.Abstractions\MonoSlice.Shared.Abstractions.csproj" />
     <ProjectReference Include="..\MonoSlice.Shared\MonoSlice.Shared.Infrastructure\MonoSlice.Shared.Infrastructure.csproj" />
     <ProjectReference Include="..\Modules\MonoSlice.Modules.Users\MonoSlice.Modules.Users.csproj" />
-    <ProjectReference Include="..\Modules\MonoSlice.Modules.Catalog\MonoSlice.Modules.Catalog.csproj" />
     <ProjectReference Include="..\Modules\MonoSlice.Modules.Orders\MonoSlice.Modules.Orders.csproj" />
   </ItemGroup>
 

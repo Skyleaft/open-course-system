@@ -6,88 +6,109 @@ namespace MonoSlice.Modules.Orders.Domain;
 
 public sealed class Order : AggregateRoot<Guid>
 {
-    private readonly List<OrderItem> _items = [];
+    public Guid UserId { get; private set; }
+    public Guid CourseId { get; private set; }
+    public decimal Amount { get; private set; }
+    public string Currency { get; private set; } = "IDR";
+    public OrderStatus Status { get; private set; } = OrderStatus.Pending;
+    public string? ExternalPaymentReference { get; private set; }
+    public DateTime CreatedAtUtc { get; private set; } = DateTime.UtcNow;
+    public DateTime? PaidAtUtc { get; private set; }
 
-    public Guid CustomerId { get; private set; }
-    public OrderStatus Status { get; private set; }
-    public decimal TotalAmount { get; private set; }
-    public string? Notes { get; private set; }
-    public IReadOnlyCollection<OrderItem> Items => _items.AsReadOnly();
-
-    private Order() { } // EF Core
-
-    public Order(Guid customerId, string? notes = null)
-        : base(Guid.CreateVersion7())
+    private Order() : base(Guid.CreateVersion7())
     {
-        if (customerId == Guid.Empty)
-            throw new ArgumentException("Customer ID cannot be empty.", nameof(customerId));
-
-        CustomerId = customerId;
-        Status = OrderStatus.Pending;
-        Notes = notes?.Trim();
-        TotalAmount = 0;
     }
 
-    public void AddItem(Guid productId, string productName, decimal unitPrice, int quantity)
+    public static Order Create(
+        Guid userId,
+        Guid courseId,
+        decimal amount,
+        string currency = "IDR")
     {
-        if (Status != OrderStatus.Pending)
-            throw new BusinessRuleException("Cannot add items to an order that is not in Pending status.");
-
-        var existingItem = _items.FirstOrDefault(i => i.ProductId == productId);
-        if (existingItem is not null)
+        if (userId == Guid.Empty)
         {
-            throw new BusinessRuleException($"Product '{productName}' is already added to this order.");
+            throw new ValidationException("User ID is required.");
         }
 
-        var item = new OrderItem(Guid.CreateVersion7(), Id, productId, productName, unitPrice, quantity);
-        _items.Add(item);
-        RecalculateTotal();
+        if (courseId == Guid.Empty)
+        {
+            throw new ValidationException("Course ID is required.");
+        }
+
+        if (amount <= 0)
+        {
+            throw new BusinessRuleException("Order amount must be greater than zero.");
+        }
+
+        return new Order
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            CourseId = courseId,
+            Amount = amount,
+            Currency = string.IsNullOrWhiteSpace(currency) ? "IDR" : currency.ToUpperInvariant(),
+            Status = OrderStatus.Pending,
+            CreatedAtUtc = DateTime.UtcNow
+        };
     }
 
-    public void MarkAsPlaced()
+    public void MarkAsPaid(string externalPaymentReference)
     {
-        if (_items.Count == 0)
-            throw new BusinessRuleException("Cannot place an order with no items.");
-
-        RaiseDomainEvent(new OrderCreatedEvent(Id, CustomerId, TotalAmount));
-    }
-
-    public void TransitionToProcessing()
-    {
-        if (Status != OrderStatus.Pending)
-            throw new BusinessRuleException($"Cannot transition order from {Status} to {OrderStatus.Processing}.");
-
-        var prev = Status;
-        Status = OrderStatus.Processing;
-        RaiseDomainEvent(new OrderStatusChangedEvent(Id, prev, Status));
-    }
-
-    public void MarkAsCompleted()
-    {
-        if (Status != OrderStatus.Processing && Status != OrderStatus.Pending)
-            throw new BusinessRuleException($"Cannot complete order with status {Status}.");
-
-        var prev = Status;
-        Status = OrderStatus.Completed;
-        RaiseDomainEvent(new OrderStatusChangedEvent(Id, prev, Status));
-    }
-
-    public void Cancel(string reason)
-    {
-        if (Status == OrderStatus.Completed)
-            throw new BusinessRuleException("Completed orders cannot be cancelled.");
-
-        if (Status == OrderStatus.Cancelled)
+        if (Status == OrderStatus.Paid)
+        {
+            // Idempotent operation
             return;
+        }
 
-        var prev = Status;
-        Status = OrderStatus.Cancelled;
-        Notes = string.IsNullOrWhiteSpace(Notes) ? $"Cancelled: {reason}" : $"{Notes} | Cancelled: {reason}";
-        RaiseDomainEvent(new OrderStatusChangedEvent(Id, prev, Status));
+        if (Status != OrderStatus.Pending)
+        {
+            throw new BusinessRuleException($"Cannot transition order from status '{Status}' to 'Paid'.");
+        }
+
+        if (string.IsNullOrWhiteSpace(externalPaymentReference))
+        {
+            throw new ValidationException("External payment reference cannot be empty.");
+        }
+
+        Status = OrderStatus.Paid;
+        ExternalPaymentReference = externalPaymentReference;
+        PaidAtUtc = DateTime.UtcNow;
+
+        RaiseDomainEvent(new OrderPaidDomainEvent(
+            Id,
+            UserId,
+            CourseId,
+            Amount,
+            PaidAtUtc.Value));
     }
 
-    private void RecalculateTotal()
+    public void MarkAsExpired()
     {
-        TotalAmount = _items.Sum(i => i.TotalPrice);
+        if (Status == OrderStatus.Paid)
+        {
+            throw new BusinessRuleException("Cannot expire an already paid order.");
+        }
+
+        if (Status != OrderStatus.Pending)
+        {
+            return;
+        }
+
+        Status = OrderStatus.Expired;
+    }
+
+    public void MarkAsFailed()
+    {
+        if (Status == OrderStatus.Paid)
+        {
+            throw new BusinessRuleException("Cannot mark a paid order as failed.");
+        }
+
+        if (Status != OrderStatus.Pending)
+        {
+            return;
+        }
+
+        Status = OrderStatus.Failed;
     }
 }

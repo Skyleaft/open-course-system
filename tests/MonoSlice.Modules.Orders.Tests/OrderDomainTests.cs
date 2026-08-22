@@ -5,100 +5,102 @@ using Xunit;
 
 namespace MonoSlice.Modules.Orders.Tests;
 
-public sealed class OrderDomainTests
+public class OrderDomainTests
 {
     [Fact]
-    public void Order_Creation_Sets_Pending_Status_And_Zero_Total()
+    public void Create_ShouldInitializeWithGuidV7AndPendingStatus()
     {
-        // Arrange
-        var customerId = Guid.CreateVersion7();
+        var userId = Guid.CreateVersion7();
+        var courseId = Guid.CreateVersion7();
+        var amount = 150000m;
 
-        // Act
-        var order = new Order(customerId, "Test note");
+        var order = Order.Create(userId, courseId, amount, "IDR");
 
-        // Assert
-        Assert.Equal(customerId, order.CustomerId);
+        Assert.NotEqual(Guid.Empty, order.Id);
+        Assert.Equal(userId, order.UserId);
+        Assert.Equal(courseId, order.CourseId);
+        Assert.Equal(amount, order.Amount);
+        Assert.Equal("IDR", order.Currency);
         Assert.Equal(OrderStatus.Pending, order.Status);
-        Assert.Equal(0, order.TotalAmount);
-        Assert.Equal("Test note", order.Notes);
-        Assert.Empty(order.Items);
+        Assert.Null(order.PaidAtUtc);
+        Assert.Null(order.ExternalPaymentReference);
     }
 
     [Fact]
-    public void AddItem_Calculates_Total_Correctly()
+    public void Create_ShouldThrowException_WhenAmountIsZeroOrNegative()
     {
-        // Arrange
-        var order = new Order(Guid.CreateVersion7());
-        var prod1 = Guid.CreateVersion7();
-        var prod2 = Guid.CreateVersion7();
+        var userId = Guid.CreateVersion7();
+        var courseId = Guid.CreateVersion7();
 
-        // Act
-        order.AddItem(prod1, "Laptop", 1000m, 2);
-        order.AddItem(prod2, "Mouse", 50m, 3);
+        Assert.Throws<BusinessRuleException>(() =>
+            Order.Create(userId, courseId, 0m));
 
-        // Assert
-        Assert.Equal(2, order.Items.Count);
-        Assert.Equal(2150m, order.TotalAmount); // (1000 * 2) + (50 * 3) = 2150
+        Assert.Throws<BusinessRuleException>(() =>
+            Order.Create(userId, courseId, -50000m));
     }
 
     [Fact]
-    public void MarkAsPlaced_Raises_OrderCreatedEvent()
+    public void MarkAsPaid_ShouldTransitionToPaid_AndRaiseDomainEvent()
     {
-        // Arrange
-        var order = new Order(Guid.CreateVersion7());
-        order.AddItem(Guid.CreateVersion7(), "Keyboard", 100m, 1);
+        var order = Order.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), 200000m);
+        var extRef = "PAY-12345";
 
-        // Act
-        order.MarkAsPlaced();
+        order.MarkAsPaid(extRef);
 
-        // Assert
-        var domainEvent = Assert.Single(order.DomainEvents);
-        var orderCreated = Assert.IsType<OrderCreatedEvent>(domainEvent);
-        Assert.Equal(order.Id, orderCreated.OrderId);
-        Assert.Equal(100m, orderCreated.TotalAmount);
+        Assert.Equal(OrderStatus.Paid, order.Status);
+        Assert.Equal(extRef, order.ExternalPaymentReference);
+        Assert.NotNull(order.PaidAtUtc);
+
+        var domainEvents = order.DomainEvents;
+        Assert.Single(domainEvents);
+        var paidEvent = Assert.IsType<OrderPaidDomainEvent>(domainEvents[0]);
+        Assert.Equal(order.Id, paidEvent.OrderId);
+        Assert.Equal(order.UserId, paidEvent.UserId);
+        Assert.Equal(order.CourseId, paidEvent.CourseId);
+        Assert.Equal(order.Amount, paidEvent.Amount);
     }
 
     [Fact]
-    public void Order_Status_Transitions_Correctly()
+    public void MarkAsPaid_ShouldBeIdempotent_WhenAlreadyPaid()
     {
-        // Arrange
-        var order = new Order(Guid.CreateVersion7());
-        order.AddItem(Guid.CreateVersion7(), "Monitor", 300m, 1);
+        var order = Order.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), 200000m);
+        order.MarkAsPaid("REF-1");
+        order.ClearDomainEvents();
 
-        // Act & Assert Transition to Processing
-        order.TransitionToProcessing();
-        Assert.Equal(OrderStatus.Processing, order.Status);
+        // Second call
+        order.MarkAsPaid("REF-2");
 
-        // Act & Assert Transition to Completed
-        order.MarkAsCompleted();
-        Assert.Equal(OrderStatus.Completed, order.Status);
+        Assert.Equal(OrderStatus.Paid, order.Status);
+        Assert.Equal("REF-1", order.ExternalPaymentReference);
+        Assert.Empty(order.DomainEvents);
     }
 
     [Fact]
-    public void Cancel_Pending_Order_Updates_Status_To_Cancelled()
+    public void MarkAsExpired_ShouldTransitionToExpired()
     {
-        // Arrange
-        var order = new Order(Guid.CreateVersion7());
-        order.AddItem(Guid.CreateVersion7(), "Desk", 250m, 1);
+        var order = Order.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), 100000m);
 
-        // Act
-        order.Cancel("Customer requested cancellation");
+        order.MarkAsExpired();
 
-        // Assert
-        Assert.Equal(OrderStatus.Cancelled, order.Status);
-        Assert.Contains("Cancelled: Customer requested cancellation", order.Notes);
+        Assert.Equal(OrderStatus.Expired, order.Status);
     }
 
     [Fact]
-    public void Cannot_Cancel_Completed_Order()
+    public void MarkAsFailed_ShouldTransitionToFailed()
     {
-        // Arrange
-        var order = new Order(Guid.CreateVersion7());
-        order.AddItem(Guid.CreateVersion7(), "Chair", 150m, 1);
-        order.TransitionToProcessing();
-        order.MarkAsCompleted();
+        var order = Order.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), 100000m);
 
-        // Act & Assert
-        Assert.Throws<BusinessRuleException>(() => order.Cancel("Too late"));
+        order.MarkAsFailed();
+
+        Assert.Equal(OrderStatus.Failed, order.Status);
+    }
+
+    [Fact]
+    public void MarkAsPaid_ShouldThrowException_WhenOrderIsFailedOrExpired()
+    {
+        var order = Order.Create(Guid.CreateVersion7(), Guid.CreateVersion7(), 100000m);
+        order.MarkAsFailed();
+
+        Assert.Throws<BusinessRuleException>(() => order.MarkAsPaid("REF-X"));
     }
 }

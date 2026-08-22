@@ -2,25 +2,24 @@ using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using MonoSlice.Modules.Orders.Features.CreateOrder;
-using MonoSlice.Shared.Abstractions.Common;
 
 namespace MonoSlice.Modules.Orders.Features.GetOrder;
 
 public static class GetOrderEndpoint
 {
-    public static IEndpointRouteBuilder MapGetOrderEndpoint(this IEndpointRouteBuilder app)
+    public static void MapGetOrderEndpoint(this IEndpointRouteBuilder endpoints)
     {
-        app.MapGet("/{id:guid}", async (Guid id, IMediator mediator, CancellationToken ct) =>
-        {
-            var result = await mediator.Send(new GetOrderQuery(id), ct);
-            return Results.Ok(result);
-        })
-        .WithName("GetOrder")
-        .WithSummary("Get order by ID")
-        .Produces<ApiResponse<OrderDto>>(StatusCodes.Status200OK)
-        .Produces<ApiResponse>(StatusCodes.Status404NotFound);
-
-        return app;
+        endpoints.MapGet("/orders/{id:guid}", async (
+                Guid id,
+                IMediator mediator,
+                CancellationToken ct) =>
+            {
+                var query = new GetOrderQuery(id);
+                var response = await mediator.Send(query, ct);
+                return Results.Json(response, statusCode: response.StatusCode);
+            })
+            .WithName("GetPaymentOrderById")
+            .WithSummary("Get payment order details and status by ID")
+            .RequireAuthorization();
     }
 }

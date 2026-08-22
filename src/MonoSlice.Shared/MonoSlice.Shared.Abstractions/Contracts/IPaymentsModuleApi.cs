@@ -15,4 +15,5 @@ public interface IPaymentsModuleApi
 {
     Task<OrderContractDto?> GetOrderByIdAsync(Guid orderId, CancellationToken ct = default);
     Task<bool> IsOrderPaidAsync(Guid orderId, CancellationToken ct = default);
+    Task<bool> HasUserPurchasedCourseAsync(Guid userId, Guid courseId, CancellationToken ct = default);
 }

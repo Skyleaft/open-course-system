@@ -13,7 +13,7 @@
 | **Phase 1** | **Infrastructure & Foundations** | PostgreSQL schemas, Redis, MinIO S3, OpenTelemetry, Docker Compose | `[x]` |
 | **Phase 2** | **Core Framework & Shared Layer** | VSA pipeline, DDD base abstractions, Mediator, API wrappers, S3 clients | `[x]` |
 | **Phase 3** | **Identity & Access Module** | JWT rotation, RBAC, Single-device/session token guard with Redis | `[x]` |
-| **Phase 4** | **Payments Module** | Orders, AccessType verification, webhook HMAC, auto-enrollment events | `[ ]` |
+| **Phase 4** | **Payments Module** | Orders, AccessType verification, webhook HMAC, auto-enrollment events | `[x]` |
 | **Phase 5** | **Courses Module** | Course lifecycle, curriculum builder, lesson storage, assignment workflow | `[ ]` |
 | **Phase 6** | **Exams Module (Core Engine)** | Dual-mode quiz, PRNG Fisher-Yates shuffle, one-time token, snapshot presign | `[ ]` |
 | **Phase 7** | **Realtime Anti-Cheat & SignalR Engine** | ExamHub, Redis backplane, violation broadcasts, proctor live stream | `[ ]` |
@@ -86,20 +86,21 @@
 
 ## Phase 4: Payments & Checkout Module (`payments` schema)
 
-- [ ] **4.1. Domain & Persistence**
-  - [ ] Implement `Order` aggregate:
-    - [ ] Invariants: Course must be `OpenPaid`, `Amount > 0`, state machine (`Pending` $\rightarrow$ `Paid` / `Expired` / `Failed`).
-    - [ ] Unique index on `external_payment_reference`.
-  - [ ] Implement `OrderPaidDomainEvent` raised on status transition to `Paid`.
-  - [ ] Implement `PaymentsDbContext` targeting schema `payments`.
+- [x] **4.1. Domain & Persistence**
+  - [x] Implement `Order` aggregate:
+    - [x] Invariants: Course must be `OpenPaid`, `Amount > 0`, state machine (`Pending` $\rightarrow$ `Paid` / `Expired` / `Failed`).
+    - [x] Unique index on `external_payment_reference`.
+  - [x] Implement `OrderPaidDomainEvent` raised on status transition to `Paid`.
+  - [x] Implement `PaymentsDbContext` targeting schema `payments`.
 
-- [ ] **4.2. Feature Slices**
-  - [ ] `POST /api/v1/payments/checkout`: Create new course purchase order for `OpenPaid` course.
-  - [ ] `POST /api/v1/payments/webhook`: Webhook handler with HMAC-SHA256 signature validation and idempotency verification.
-  - [ ] `GET /api/v1/payments/orders/{id}`: Query order status and payment details.
+- [x] **4.2. Feature Slices**
+  - [x] `POST /api/v1/payments/checkout`: Create new course purchase order for `OpenPaid` course.
+  - [x] `POST /api/v1/payments/webhook`: Webhook handler with HMAC-SHA256 signature validation and idempotency verification.
+  - [x] `GET /api/v1/payments/orders/{id}`: Query order status and payment details.
 
-- [ ] **4.3. Event-Driven Auto-Enrollment Integration**
-  - [ ] Implement `OrderPaidDomainEventHandler`: Publishes `OrderPaidIntegrationEvent` or invokes `ICoursesModuleApi.EnrollStudentAsync`.
+- [x] **4.3. Event-Driven Auto-Enrollment Integration**
+  - [x] Implement `OrderPaidDomainEventHandler`: Publishes `OrderPaidIntegrationEvent` and invokes `ICoursesModuleApi.EnrollStudentAsync`.
+  - [x] Implement `IPaymentsModuleApi` (`GetOrderByIdAsync`, `IsOrderPaidAsync`, `HasUserPurchasedCourseAsync`).
 
 ---
 
