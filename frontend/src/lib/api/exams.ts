@@ -1,15 +1,142 @@
 import { apiClient } from './client.ts';
-import type { QuizExam, QuizQuestion, QuizSubmission, StudentAnswer } from './types.ts';
+import type {
+	PaginatedList,
+	QuizExam,
+	ExamSummaryDto,
+	ListExamsParams,
+	QuizQuestion,
+	QuizSubmission,
+	StudentAnswer,
+	QuestionType
+} from './types.ts';
 
 export const examsApi = {
-	async getExamsByCourse(courseId: string, customFetch?: typeof fetch): Promise<QuizExam[]> {
-		return apiClient.get<QuizExam[]>(`/api/v1/exams?courseId=${courseId}`, undefined, customFetch);
+	async listExams(params?: ListExamsParams, customFetch?: typeof fetch): Promise<PaginatedList<QuizExam>> {
+		const searchParams = new URLSearchParams();
+		if (params?.courseId) searchParams.set('courseId', params.courseId);
+		if (params?.mode) searchParams.set('mode', params.mode);
+		if (params?.isPublished !== undefined && params.isPublished !== null) {
+			searchParams.set('isPublished', String(params.isPublished));
+		}
+		const search = params?.searchTerm || params?.search;
+		if (search && search.trim()) {
+			searchParams.set('search', search.trim());
+		}
+		const pageIndex = params?.pageIndex ?? 1;
+		const pageSize = params?.pageSize ?? 20;
+		searchParams.set('pageIndex', String(pageIndex));
+		searchParams.set('pageSize', String(pageSize));
+
+		const queryStr = searchParams.toString();
+		const endpoint = `/api/v1/exams${queryStr ? `?${queryStr}` : ''}`;
+		return apiClient.get<PaginatedList<QuizExam>>(endpoint, undefined, customFetch);
+	},
+
+	async getExamsByCourse(courseId: string, customFetch?: typeof fetch): Promise<PaginatedList<QuizExam>> {
+		return this.listExams({ courseId }, customFetch);
 	},
 
 	async getExamById(id: string, customFetch?: typeof fetch): Promise<QuizExam> {
 		return apiClient.get<QuizExam>(`/api/v1/exams/${id}`, undefined, customFetch);
 	},
 
+	async createExam(data: {
+		courseId?: string;
+		title: string;
+		description?: string;
+		mode: string;
+		durationMinutes: number;
+		passingScore: number;
+		maxAllowedViolations?: number;
+		maxAttempts?: number;
+		availableFromUtc?: string;
+		availableToUtc?: string;
+		shuffleQuestions?: boolean;
+		shuffleOptions?: boolean;
+	}): Promise<{ id: string }> {
+		return apiClient.post<{ id: string }>('/api/v1/exams', data);
+	},
+
+	async updateExam(id: string, data: {
+		courseId?: string;
+		title: string;
+		description?: string;
+		mode: string;
+		durationMinutes: number;
+		passingScore: number;
+		maxAllowedViolations?: number;
+		maxAttempts?: number;
+		availableFromUtc?: string;
+		availableToUtc?: string;
+		shuffleQuestions?: boolean;
+		shuffleOptions?: boolean;
+	}): Promise<QuizExam> {
+		return apiClient.put<QuizExam>(`/api/v1/exams/${id}`, data);
+	},
+
+	async deleteExam(id: string): Promise<boolean> {
+		return apiClient.delete<boolean>(`/api/v1/exams/${id}`);
+	},
+
+	async publishExam(id: string): Promise<void> {
+		return apiClient.post(`/api/v1/exams/${id}/publish`);
+	},
+
+	// Question CRUD
+	async addQuestion(examId: string, data: {
+		questionText: string;
+		type: QuestionType | string;
+		points: number;
+		explanation?: string;
+		options?: Array<{ id?: string; text: string; isCorrect: boolean }>;
+	}): Promise<QuizQuestion> {
+		return apiClient.post<QuizQuestion>(`/api/v1/exams/${examId}/questions`, data);
+	},
+
+	async addQuestions(
+		quizId: string,
+		questions: Array<{
+			text: string;
+			type: string;
+			points: number;
+			orderIndex: number;
+			options: Array<{ id?: string; text: string; isCorrect: boolean }>;
+			explanation?: string;
+		}>
+	): Promise<{ count: number }> {
+		let count = 0;
+		for (const q of questions) {
+			await this.addQuestion(quizId, {
+				questionText: q.text,
+				type: q.type,
+				points: q.points,
+				explanation: q.explanation,
+				options: q.options
+			});
+			count++;
+		}
+		return { count };
+	},
+
+	async getQuestion(questionId: string, customFetch?: typeof fetch): Promise<QuizQuestion> {
+		return apiClient.get<QuizQuestion>(`/api/v1/exams/questions/${questionId}`, undefined, customFetch);
+	},
+
+	async updateQuestion(questionId: string, data: {
+		questionText: string;
+		type: QuestionType | string;
+		points: number;
+		explanation?: string;
+		options?: Array<{ id?: string; text: string; isCorrect: boolean }>;
+	}): Promise<QuizQuestion> {
+		return apiClient.put<QuizQuestion>(`/api/v1/exams/questions/${questionId}`, data);
+	},
+
+	async deleteQuestion(questionId: string): Promise<boolean> {
+		return apiClient.delete<boolean>(`/api/v1/exams/questions/${questionId}`);
+	},
+
+	// Exam Execution & Proctoring
 	async startExam(quizId: string): Promise<{
 		submissionId: string;
 		activeSessionToken: string;
@@ -82,34 +209,5 @@ export const examsApi = {
 		}>;
 	}> {
 		return apiClient.get(`/api/v1/exams/submissions/${submissionId}/result`, undefined, customFetch);
-	},
-
-	async createExam(data: {
-		courseId: string;
-		title: string;
-		mode: string;
-		durationMinutes: number;
-		passingScore: number;
-		maxAllowedViolations: number;
-	}): Promise<{ id: string }> {
-		return apiClient.post<{ id: string }>('/api/v1/exams', data);
-	},
-
-	async addQuestions(
-		quizId: string,
-		questions: Array<{
-			text: string;
-			type: string;
-			points: number;
-			orderIndex: number;
-			options: Array<{ id?: string; text: string; isCorrect: boolean }>;
-			explanation?: string;
-		}>
-	): Promise<{ count: number }> {
-		return apiClient.post<{ count: number }>(`/api/v1/exams/${quizId}/questions`, { questions });
-	},
-
-	async publishExam(quizId: string): Promise<void> {
-		return apiClient.post(`/api/v1/exams/${quizId}/publish`);
 	}
 };

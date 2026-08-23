@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { Sun, Moon, LogOut, User as UserIcon, BookOpen, GraduationCap, ShieldAlert, Sparkles, Menu } from '@lucide/svelte';
-	import { browser } from '$app/env';
+
+	const browser = typeof window !== 'undefined';
 
 	interface Props {
 		onToggleSidebar?: () => void;
@@ -98,13 +99,13 @@
 					<div tabindex="0" role="button" class="btn btn-ghost btn-sm gap-2 rounded-xl border border-white/10 bg-base-100/40 px-2 py-1">
 						<div class="avatar placeholder">
 							<div class="gradient-accent h-7 w-7 rounded-lg text-white font-bold text-xs flex items-center justify-center">
-								<span>{authStore.user.fullName?.charAt(0).toUpperCase() || 'U'}</span>
+								<span>{(authStore.user.fullName || authStore.user.firstName || authStore.user.email || 'U').charAt(0).toUpperCase()}</span>
 							</div>
 						</div>
 						<div class="hidden flex-col items-start text-left sm:flex">
-							<span class="text-xs font-semibold leading-tight">{authStore.user.fullName}</span>
+							<span class="text-xs font-semibold leading-tight">{authStore.user.fullName || authStore.user.firstName || authStore.user.email}</span>
 							<span class="text-[10px] text-base-content/60 leading-tight">
-								{authStore.user.roles?.[0] || 'Student'}
+								{authStore.user.roles?.[0] || authStore.user.role || 'Student'}
 							</span>
 						</div>
 					</div>

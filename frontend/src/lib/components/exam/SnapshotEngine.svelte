@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { examsApi } from '#lib/api/exams.ts';
 	import type { ExamHubClient } from '#lib/signalr/exam-hub.ts';
-	import { browser } from '$app/env';
 	import { onMount, onDestroy } from 'svelte';
+
+	const browser = typeof window !== 'undefined';
 
 	interface Props {
 		submissionId: string;

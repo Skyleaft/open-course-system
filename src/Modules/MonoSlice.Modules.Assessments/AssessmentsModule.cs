@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MonoSlice.Modules.Assessments.Contracts;
+using MonoSlice.Modules.Assessments.EventHandlers;
 using MonoSlice.Modules.Assessments.Features.Admin.GetDeadLetters;
 using MonoSlice.Modules.Assessments.Features.Admin.RedriveDeadLetter;
 using MonoSlice.Modules.Assessments.Features.GetCertificate;
@@ -14,6 +15,8 @@ using MonoSlice.Modules.Assessments.Features.VerifyCertificate;
 using MonoSlice.Modules.Assessments.Persistence;
 using MonoSlice.Modules.Assessments.Workers;
 using MonoSlice.Shared.Abstractions.Contracts;
+using MonoSlice.Shared.Abstractions.Messaging;
+using MonoSlice.Shared.Infrastructure.Messaging;
 
 namespace MonoSlice.Modules.Assessments;
 
@@ -53,11 +56,17 @@ public static class AssessmentsModule
         // Register background worker for stream processing
         services.AddHostedService<GradingBackgroundWorker>();
 
+        // Register integration event handlers
+        services.AddTransient<IIntegrationEventHandler<ExamDeletedIntegrationEvent>, ExamDeletedIntegrationEventHandler>();
+
         return services;
     }
 
     public static IEndpointRouteBuilder MapAssessmentsEndpoints(this IEndpointRouteBuilder app)
     {
+        var dispatcher = app.ServiceProvider.GetService<IIntegrationEventDispatcher>();
+        dispatcher?.RegisterEvent<ExamDeletedIntegrationEvent>();
+
         var certsGroup = app.MapGroup("/api/v1/certificates")
             .WithTags("Certificates");
 

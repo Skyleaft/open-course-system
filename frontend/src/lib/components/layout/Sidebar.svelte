@@ -11,7 +11,8 @@
 		Layers,
 		PlusCircle,
 		ShieldCheck,
-		FileCheck2
+		FileCheck2,
+		HelpCircle
 	} from '@lucide/svelte';
 
 	interface Props {
@@ -140,6 +141,17 @@
 							>
 								<FileCheck2 class="h-4 w-4" />
 								Exam Authoring
+							</a>
+						</li>
+						<li>
+							<a
+								href="/instructor/questions"
+								class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors {isActive('/instructor/questions')
+									? 'bg-secondary/15 text-secondary font-semibold border border-secondary/20'
+									: 'text-base-content/80 hover:bg-base-100/40 hover:text-base-content'}"
+							>
+								<HelpCircle class="h-4 w-4" />
+								Question Banks
 							</a>
 						</li>
 					</ul>

@@ -1,11 +1,12 @@
 import type { User, UserRole } from '#lib/api/types.ts';
 import { authApi } from '#lib/api/auth.ts';
 import { apiClient } from '#lib/api/client.ts';
-import { browser } from '$app/env';
+
+const browser = typeof window !== 'undefined';
 
 export function getDefaultRouteForUser(user: User | null): string {
 	if (!user) return '/dashboard';
-	const roles = user.roles || [];
+	const roles = user.roles || (user.role ? [user.role] : []);
 	if (roles.includes('Proctor')) return '/proctor/exams';
 	if (roles.includes('Instructor')) return '/instructor/courses';
 	if (roles.includes('Admin')) return '/dashboard';
@@ -17,10 +18,18 @@ class AuthStore {
 	isLoading = $state<boolean>(true);
 
 	isAuthenticated = $derived(this.user !== null);
-	isStudent = $derived(this.user?.roles?.includes('Student') ?? false);
-	isInstructor = $derived(this.user?.roles?.includes('Instructor') ?? false);
-	isProctor = $derived(this.user?.roles?.includes('Proctor') ?? false);
-	isAdmin = $derived(this.user?.roles?.includes('Admin') ?? false);
+	isStudent = $derived(
+		this.user?.roles?.includes('Student') || this.user?.role === 'Student' || false
+	);
+	isInstructor = $derived(
+		this.user?.roles?.includes('Instructor') || this.user?.role === 'Instructor' || false
+	);
+	isProctor = $derived(
+		this.user?.roles?.includes('Proctor') || this.user?.role === 'Proctor' || false
+	);
+	isAdmin = $derived(
+		this.user?.roles?.includes('Admin') || this.user?.role === 'Admin' || false
+	);
 	defaultRoute = $derived(getDefaultRouteForUser(this.user));
 
 	constructor() {
@@ -32,12 +41,15 @@ class AuthStore {
 	async initialize(customFetch?: typeof fetch) {
 		this.isLoading = true;
 		try {
-			if (apiClient.getAccessToken() || !browser) {
-				this.user = await authApi.getMe(customFetch);
+			const token = apiClient.getAccessToken();
+			if (token || !browser) {
+				const res = await authApi.getMe(customFetch);
+				const userObj = (res as any)?.user || res;
+				this.user = userObj && (userObj.id || userObj.email) ? userObj : null;
 			} else {
 				this.user = null;
 			}
-		} catch {
+		} catch (err) {
 			this.user = null;
 		} finally {
 			this.isLoading = false;

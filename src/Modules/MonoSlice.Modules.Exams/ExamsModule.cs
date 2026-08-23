@@ -7,9 +7,13 @@ using Microsoft.Extensions.DependencyInjection;
 using MonoSlice.Modules.Exams.Contracts;
 using MonoSlice.Modules.Exams.Features.AddQuestion;
 using MonoSlice.Modules.Exams.Features.CreateExam;
+using MonoSlice.Modules.Exams.Features.DeleteExam;
+using MonoSlice.Modules.Exams.Features.DeleteQuestion;
 using MonoSlice.Modules.Exams.Features.GetExam;
 using MonoSlice.Modules.Exams.Features.GetExamQuestions;
 using MonoSlice.Modules.Exams.Features.GetExamResult;
+using MonoSlice.Modules.Exams.Features.GetQuestion;
+using MonoSlice.Modules.Exams.Features.ListExams;
 using MonoSlice.Modules.Exams.Features.PresignSnapshot;
 using MonoSlice.Modules.Exams.Features.Proctor.ForceDisconnectCandidate;
 using MonoSlice.Modules.Exams.Features.Proctor.GetLiveCandidates;
@@ -19,6 +23,7 @@ using MonoSlice.Modules.Exams.Features.SaveAnswer;
 using MonoSlice.Modules.Exams.Features.StartExam;
 using MonoSlice.Modules.Exams.Features.SubmitExam;
 using MonoSlice.Modules.Exams.Features.UpdateExam;
+using MonoSlice.Modules.Exams.Features.UpdateQuestion;
 using MonoSlice.Modules.Exams.Domain.Services;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Contracts;
@@ -75,10 +80,15 @@ public static class ExamsModule
         var examsV1Group = app.MapGroup("/api/v1/exams")
             .WithTags("Exams");
 
+        examsV1Group.MapListExamsEndpoint();
         examsV1Group.MapCreateExamEndpoint();
         examsV1Group.MapUpdateExamEndpoint();
+        examsV1Group.MapDeleteExamEndpoint();
         examsV1Group.MapPublishExamEndpoint();
         examsV1Group.MapAddQuestionEndpoint();
+        examsV1Group.MapGetQuestionEndpoint();
+        examsV1Group.MapUpdateQuestionEndpoint();
+        examsV1Group.MapDeleteQuestionEndpoint();
         examsV1Group.MapGetExamEndpoint();
         examsV1Group.MapStartExamEndpoint();
         examsV1Group.MapGetExamQuestionsEndpoint();

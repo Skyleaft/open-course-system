@@ -24,7 +24,7 @@
 		try {
 			const res = await authApi.login({ userNameOrEmail, password });
 			authStore.setUser(res.user);
-			toast.success(`Welcome back, ${res.user.fullName}!`);
+			toast.success(`Welcome back, ${res.user.fullName || res.user.firstName || 'User'}!`);
 
 			const returnUrl = page.url.searchParams.get('returnUrl') || page.url.searchParams.get('redirect');
 			if (returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('/login') && !returnUrl.startsWith('/register')) {

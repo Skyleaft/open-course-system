@@ -59,22 +59,23 @@
 
 	<!-- Question Prompt Text (KaTeX / Markdown rendered) -->
 	<div class="prose prose-invert max-w-none text-base font-medium text-base-content leading-relaxed">
-		<RichRenderer content={question.text} />
+		<RichRenderer content={question.text || question.questionText || ''} />
 	</div>
 
 	<!-- Options or Essay Input Area -->
 	<div class="space-y-3 pt-2">
 		{#if question.type === 'SingleChoice' || question.type === 'MultipleChoice' || question.type === 'TrueFalse'}
-			{#each question.options || [] as option (option.id)}
-				{@const isSelected = selectedOptionIds.includes(option.id)}
+			{#each question.options || [] as option, optIdx (option.id || optIdx)}
+				{@const optId = option.id || String(optIdx)}
+				{@const isSelected = selectedOptionIds.includes(optId)}
 				<div
 					class="glass-card flex items-center gap-3.5 rounded-2xl border p-4 transition-all duration-200 cursor-pointer {isSelected
 						? 'border-primary/50 bg-primary/15 shadow-md'
 						: 'border-white/5 hover:border-white/15 hover:bg-base-100/40'}"
-					onclick={() => onToggleOption(option.id, isSingleSelection)}
+					onclick={() => onToggleOption(optId, isSingleSelection)}
 					role="button"
 					tabindex="0"
-					onkeydown={(e) => e.key === 'Enter' && onToggleOption(option.id, isSingleSelection)}
+					onkeydown={(e) => e.key === 'Enter' && onToggleOption(optId, isSingleSelection)}
 				>
 					{#if isSingleSelection}
 						{#if isSelected}

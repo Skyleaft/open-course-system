@@ -1,5 +1,6 @@
 import type { ApiResponse, ApiErrorResponse } from './types.ts';
-import { browser } from '$app/env';
+
+const browser = typeof window !== 'undefined';
 
 const API_BASE_URL = import.meta.env.PUBLIC_API_URL || 'http://localhost:8080';
 

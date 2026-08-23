@@ -1,118 +1,85 @@
 <script lang="ts">
 	import { examsApi } from '#lib/api/exams.ts';
+	import { coursesApi } from '#lib/api/courses.ts';
+	import type { Course } from '#lib/api/types.ts';
 	import GlassCard from '#lib/components/ui/GlassCard.svelte';
 	import RichEditor from '#lib/components/editor/RichEditor.svelte';
 	import { toast } from '#lib/stores/toast.svelte.ts';
 	import { goto } from '$app/navigation';
-	import { ArrowLeft, Plus, Trash2, CheckCircle2, Save, Sparkles } from '@lucide/svelte';
+	import {
+		ArrowLeft,
+		Plus,
+		CheckCircle2,
+		Save,
+		Sparkles,
+		Clock,
+		ShieldAlert,
+		BookOpen,
+		Shuffle
+	} from '@lucide/svelte';
+	import { onMount } from 'svelte';
 
 	let title = $state('');
-	let mode = $state('RealExam');
+	let description = $state('');
+	let mode = $state<'RealExam' | 'Simulation'>('RealExam');
 	let durationMinutes = $state(60);
 	let passingScore = $state(75);
 	let maxAllowedViolations = $state(3);
+	let selectedCourseId = $state<string>('');
+	let shuffleQuestions = $state(true);
+	let shuffleOptions = $state(true);
 	let isSubmitting = $state(false);
 
-	// Questions Bank
-	interface DraftQuestion {
-		text: string;
-		type: 'SingleChoice' | 'MultipleChoice' | 'TrueFalse' | 'Essay';
-		points: number;
-		options: Array<{ text: string; isCorrect: boolean }>;
-		explanation: string;
-	}
+	let courses = $state<Course[]>([]);
+	let isCoursesLoading = $state(true);
 
-	let questions = $state<DraftQuestion[]>([
-		{
-			text: '',
-			type: 'SingleChoice',
-			points: 5,
-			options: [
-				{ text: 'Option A', isCorrect: true },
-				{ text: 'Option B', isCorrect: false },
-				{ text: 'Option C', isCorrect: false },
-				{ text: 'Option D', isCorrect: false }
-			],
-			explanation: ''
+	onMount(async () => {
+		try {
+			const res = await coursesApi.getCourses({ pageSize: 50 });
+			courses = res.items || [];
+		} catch (err) {
+			// Optional courses
+		} finally {
+			isCoursesLoading = false;
 		}
-	]);
-
-	function addQuestion() {
-		questions = [
-			...questions,
-			{
-				text: '',
-				type: 'SingleChoice',
-				points: 5,
-				options: [
-					{ text: 'Option 1', isCorrect: true },
-					{ text: 'Option 2', isCorrect: false }
-				],
-				explanation: ''
-			}
-		];
-	}
-
-	function removeQuestion(index: number) {
-		questions = questions.filter((_, i) => i !== index);
-	}
-
-	function addOption(qIdx: number) {
-		questions[qIdx].options = [
-			...questions[qIdx].options,
-			{ text: `Option ${questions[qIdx].options.length + 1}`, isCorrect: false }
-		];
-	}
-
-	function removeOption(qIdx: number, optIdx: number) {
-		questions[qIdx].options = questions[qIdx].options.filter((_, i) => i !== optIdx);
-	}
+	});
 
 	async function handleSaveExam(e: Event) {
 		e.preventDefault();
-		if (!title) {
-			toast.warning('Please enter an exam title.');
+		if (!title.trim()) {
+			toast.warning('Please enter an examination title.');
 			return;
 		}
 
 		isSubmitting = true;
 		try {
-			// 1. Create exam entity
 			const examRes = await examsApi.createExam({
-				courseId: 'c-1',
-				title,
+				title: title.trim(),
+				description: description.trim() || undefined,
+				courseId: selectedCourseId || undefined,
 				mode,
 				durationMinutes: Number(durationMinutes),
 				passingScore: Number(passingScore),
-				maxAllowedViolations: mode === 'RealExam' ? Number(maxAllowedViolations) : 0
+				maxAllowedViolations: mode === 'RealExam' ? Number(maxAllowedViolations) : 0,
+				shuffleQuestions,
+				shuffleOptions
 			});
 
-			// 2. Add question bank
-			if (examRes?.id && questions.length > 0) {
-				await examsApi.addQuestions(
-					examRes.id,
-					questions.map((q, idx) => ({
-						text: q.text || 'Sample Question Prompt',
-						type: q.type,
-						points: Number(q.points),
-						orderIndex: idx + 1,
-						options: q.options,
-						explanation: q.explanation || undefined
-					}))
-				);
+			toast.success('Exam authored successfully! Opening Question Studio...');
+			if (examRes?.id) {
+				goto(`/instructor/exams/${examRes.id}/edit`);
+			} else {
+				goto('/instructor/exams');
 			}
-
-			toast.success('Exam and question bank authored successfully!');
-			goto('/instructor/exams');
 		} catch (err: any) {
-			toast.error(err?.message || 'Failed to author exam.');
+			toast.error(err?.message || 'Failed to author examination.');
 		} finally {
 			isSubmitting = false;
 		}
 	}
 </script>
 
-<div class="max-w-4xl mx-auto space-y-6">
+<div class="max-w-3xl mx-auto space-y-6">
 	<a
 		href="/instructor/exams"
 		class="inline-flex items-center gap-1.5 text-xs font-semibold text-base-content/60 hover:text-primary transition-colors"
@@ -125,218 +92,191 @@
 	<div class="glass-panel rounded-3xl border border-white/10 p-8 shadow-2xl space-y-2">
 		<div class="inline-flex items-center gap-1.5 rounded-lg bg-secondary/10 border border-secondary/20 px-3 py-1 text-xs font-semibold text-secondary">
 			<Sparkles class="h-3.5 w-3.5" />
-			Exam & Question Authoring
+			Exam Authoring Studio
 		</div>
 		<h1 class="text-3xl font-extrabold text-base-content tracking-tight">
 			Create Examination
 		</h1>
 		<p class="text-xs text-base-content/70">
-			Configure examination parameters and build questions using the Edra rich editor.
+			Configure anti-cheat proctoring parameters, grading thresholds, and associate with courses.
 		</p>
 	</div>
 
 	<!-- Parameters Form -->
-	<GlassCard>
+	<GlassCard class="p-8 space-y-6">
 		<form onsubmit={handleSaveExam} class="space-y-6">
-			<div class="space-y-4">
-				<h3 class="text-sm font-bold uppercase tracking-wider text-base-content/60 border-b border-white/10 pb-2">
-					1. Exam Parameters
-				</h3>
+			<!-- Title -->
+			<div class="space-y-2">
+				<label class="text-xs font-bold uppercase tracking-wider text-base-content/80 block" for="ex-title">
+					Exam Title <span class="text-error">*</span>
+				</label>
+				<input
+					id="ex-title"
+					type="text"
+					class="input input-bordered w-full rounded-2xl h-12 bg-base-100/70 border-base-content/20 text-base-content font-semibold focus:border-primary"
+					placeholder="e.g. Distributed Consensus & Raft Protocol Final"
+					bind:value={title}
+					required
+				/>
+			</div>
 
+			<!-- Course Linkage -->
+			<div class="space-y-2">
+				<label class="text-xs font-bold uppercase tracking-wider text-base-content/80 block" for="ex-course">
+					Associated Course (Optional)
+				</label>
+				<select
+					id="ex-course"
+					class="select select-bordered w-full rounded-2xl h-12 bg-base-100/70 border-base-content/20 text-sm font-medium"
+					bind:value={selectedCourseId}
+				>
+					<option value="">-- Standalone Examination (No Course Link) --</option>
+					{#each courses as course}
+						<option value={course.id}>{course.title}</option>
+					{/each}
+				</select>
+			</div>
+
+			<!-- Mode Selection -->
+			<div class="space-y-3">
+				<label class="text-xs font-bold uppercase tracking-wider text-base-content/80 block">
+					Examination Mode <span class="text-error">*</span>
+				</label>
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+					<button
+						type="button"
+						class="p-4 rounded-2xl border text-left transition-all {mode === 'RealExam'
+							? 'border-primary bg-primary/10 ring-2 ring-primary/20 shadow-md'
+							: 'border-base-content/15 bg-base-100/40 hover:bg-base-100/70'}"
+						onclick={() => (mode = 'RealExam')}
+					>
+						<div class="flex items-center justify-between mb-2">
+							<span class="badge badge-primary badge-sm font-semibold">Proctored</span>
+							<ShieldAlert class="h-4 w-4 text-primary" />
+						</div>
+						<h4 class="font-bold text-sm text-base-content mb-1">Real Examination</h4>
+						<p class="text-[11px] text-base-content/65">
+							Webcam snapshots, tab-switch penalties, and strict disqualification limits.
+						</p>
+					</button>
+
+					<button
+						type="button"
+						class="p-4 rounded-2xl border text-left transition-all {mode === 'Simulation'
+							? 'border-secondary bg-secondary/10 ring-2 ring-secondary/20 shadow-md'
+							: 'border-base-content/15 bg-base-100/40 hover:bg-base-100/70'}"
+						onclick={() => (mode = 'Simulation')}
+					>
+						<div class="flex items-center justify-between mb-2">
+							<span class="badge badge-secondary badge-sm font-semibold">Self-Paced</span>
+							<Clock class="h-4 w-4 text-secondary" />
+						</div>
+						<h4 class="font-bold text-sm text-base-content mb-1">Practice Simulation</h4>
+						<p class="text-[11px] text-base-content/65">
+							Practice test environment for candidate learning without active proctoring.
+						</p>
+					</button>
+				</div>
+			</div>
+
+			<!-- Numerical Parameters -->
+			<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 				<div class="space-y-1.5">
-					<label class="text-xs font-semibold" for="ex-title">Exam Title</label>
+					<label class="text-xs font-bold uppercase tracking-wider text-base-content/80 block" for="ex-dur">
+						Duration (Minutes) <span class="text-error">*</span>
+					</label>
 					<input
-						id="ex-title"
-						type="text"
-						class="glass-input input input-sm h-11 w-full rounded-xl text-sm"
-						placeholder="e.g. Distributed Consensus Final Examination"
-						bind:value={title}
+						id="ex-dur"
+						type="number"
+						min="1"
+						class="input input-bordered w-full rounded-2xl h-11 bg-base-100/70 border-base-content/20 text-sm font-semibold"
+						bind:value={durationMinutes}
 						required
 					/>
 				</div>
 
-				<div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-					<div class="space-y-1.5">
-						<label class="text-xs font-semibold" for="ex-mode">Mode</label>
-						<select id="ex-mode" class="glass-input select select-sm h-11 w-full rounded-xl text-sm" bind:value={mode}>
-							<option value="RealExam">RealExam (Proctored & Strict)</option>
-							<option value="Simulation">Simulation (Practice & Keys)</option>
-						</select>
-					</div>
-
-					<div class="space-y-1.5">
-						<label class="text-xs font-semibold" for="ex-dur">Duration (mins)</label>
-						<input
-							id="ex-dur"
-							type="number"
-							min="5"
-							class="glass-input input input-sm h-11 w-full rounded-xl text-sm"
-							bind:value={durationMinutes}
-						/>
-					</div>
-
-					<div class="space-y-1.5">
-						<label class="text-xs font-semibold" for="ex-pass">Passing Score (%)</label>
-						<input
-							id="ex-pass"
-							type="number"
-							min="1"
-							max="100"
-							class="glass-input input input-sm h-11 w-full rounded-xl text-sm"
-							bind:value={passingScore}
-						/>
-					</div>
+				<div class="space-y-1.5">
+					<label class="text-xs font-bold uppercase tracking-wider text-base-content/80 block" for="ex-pass">
+						Passing Score (%) <span class="text-error">*</span>
+					</label>
+					<input
+						id="ex-pass"
+						type="number"
+						min="0"
+						max="100"
+						class="input input-bordered w-full rounded-2xl h-11 bg-base-100/70 border-base-content/20 text-sm font-semibold"
+						bind:value={passingScore}
+						required
+					/>
 				</div>
 
 				{#if mode === 'RealExam'}
-					<div class="space-y-1.5 sm:w-1/3">
-						<label class="text-xs font-semibold" for="ex-viol">Max Allowed Violations</label>
+					<div class="space-y-1.5">
+						<label class="text-xs font-bold uppercase tracking-wider text-base-content/80 block" for="ex-viol">
+							Max Violations <span class="text-error">*</span>
+						</label>
 						<input
 							id="ex-viol"
 							type="number"
 							min="1"
-							class="glass-input input input-sm h-11 w-full rounded-xl text-sm"
+							class="input input-bordered w-full rounded-2xl h-11 bg-base-100/70 border-base-content/20 text-sm font-semibold"
 							bind:value={maxAllowedViolations}
+							required
 						/>
 					</div>
 				{/if}
 			</div>
 
-			<!-- Question Bank Builder -->
-			<div class="space-y-6 pt-4 border-t border-white/10">
-				<div class="flex items-center justify-between">
-					<h3 class="text-sm font-bold uppercase tracking-wider text-base-content/60">
-						2. Question Bank ({questions.length})
-					</h3>
-					<button
-						type="button"
-						class="btn btn-secondary gradient-accent btn-xs rounded-xl text-white font-semibold border-0 gap-1"
-						onclick={addQuestion}
-					>
-						<Plus class="h-3.5 w-3.5" />
-						Add Question
-					</button>
-				</div>
-
-				{#each questions as q, qIdx (qIdx)}
-					<div class="glass-card rounded-2xl border border-white/10 p-6 space-y-4">
-						<div class="flex items-center justify-between border-b border-white/10 pb-3">
-							<div class="flex items-center gap-2">
-								<span class="gradient-accent flex h-6 w-6 items-center justify-center rounded-lg text-xs font-bold text-white">
-									{qIdx + 1}
-								</span>
-								<select
-									class="glass-input select select-xs rounded-lg text-xs font-semibold"
-									bind:value={q.type}
-								>
-									<option value="SingleChoice">Single Choice</option>
-									<option value="MultipleChoice">Multiple Choice</option>
-									<option value="TrueFalse">True / False</option>
-									<option value="Essay">Essay</option>
-								</select>
-							</div>
-
-							<div class="flex items-center gap-3">
-								<div class="flex items-center gap-1 text-xs">
-									<span class="text-base-content/60">Points:</span>
-									<input
-										type="number"
-										min="1"
-										class="glass-input input input-xs w-14 rounded-lg text-center text-xs"
-										bind:value={q.points}
-									/>
-								</div>
-
-								{#if questions.length > 1}
-									<button
-										type="button"
-										class="btn btn-ghost btn-circle btn-xs text-error hover:bg-error/10"
-										onclick={() => removeQuestion(qIdx)}
-									>
-										<Trash2 class="h-3.5 w-3.5" />
-									</button>
-								{/if}
-							</div>
-						</div>
-
-						<!-- Question Prompt with Edra -->
-						<div class="space-y-1.5">
-							<label class="text-xs font-semibold text-base-content/70">Question Prompt (Edra Editor / LaTeX Math)</label>
-							<RichEditor
-								placeholder="Enter question text with LaTeX formulas or code blocks..."
-								minHeight="140px"
-								onUpdate={(json) => (q.text = json)}
-							/>
-						</div>
-
-						<!-- Options Editor (for choice questions) -->
-						{#if q.type !== 'Essay'}
-							<div class="space-y-2 pt-2">
-								<div class="flex items-center justify-between text-xs font-semibold text-base-content/70">
-									<span>Answer Options (Mark correct answers)</span>
-									<button
-										type="button"
-										class="text-xs text-primary hover:underline"
-										onclick={() => addOption(qIdx)}
-									>
-										+ Add Option
-									</button>
-								</div>
-
-								{#each q.options as opt, oIdx (oIdx)}
-									<div class="flex items-center gap-2">
-										<input
-											type="checkbox"
-											class="checkbox checkbox-success checkbox-xs rounded-sm"
-											bind:checked={opt.isCorrect}
-											title="Mark as correct answer"
-										/>
-										<input
-											type="text"
-											class="glass-input input input-xs h-8 flex-1 rounded-lg text-xs"
-											placeholder="Option text..."
-											bind:value={opt.text}
-										/>
-										{#if q.options.length > 2}
-											<button
-												type="button"
-												class="btn btn-ghost btn-xs text-base-content/40 hover:text-error"
-												onclick={() => removeOption(qIdx, oIdx)}
-											>
-												&times;
-											</button>
-										{/if}
-									</div>
-								{/each}
-							</div>
-						{/if}
-
-						<!-- Explanation -->
-						<div class="space-y-1">
-							<label class="text-xs font-semibold text-base-content/60">Explanation for Review (Optional)</label>
-							<input
-								type="text"
-								class="glass-input input input-xs h-8 w-full rounded-lg text-xs"
-								placeholder="Explain why this answer is correct..."
-								bind:value={q.explanation}
-							/>
-						</div>
+			<!-- Shuffle Toggles -->
+			<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+				<label class="flex items-center justify-between p-3 rounded-2xl bg-base-100/40 border border-white/5 cursor-pointer">
+					<div class="flex items-center gap-2 text-xs font-semibold">
+						<Shuffle class="h-4 w-4 text-primary" />
+						<span>Shuffle Questions per Candidate</span>
 					</div>
-				{/each}
+					<input type="checkbox" class="toggle toggle-primary toggle-sm" bind:checked={shuffleQuestions} />
+				</label>
+
+				<label class="flex items-center justify-between p-3 rounded-2xl bg-base-100/40 border border-white/5 cursor-pointer">
+					<div class="flex items-center gap-2 text-xs font-semibold">
+						<Shuffle class="h-4 w-4 text-secondary" />
+						<span>Shuffle Options Choices</span>
+					</div>
+					<input type="checkbox" class="toggle toggle-secondary toggle-sm" bind:checked={shuffleOptions} />
+				</label>
 			</div>
 
+			<!-- Description with Edra Editor -->
+			<div class="space-y-2">
+				<div class="flex items-center justify-between">
+					<label class="text-xs font-bold uppercase tracking-wider text-base-content/80 block">
+						Exam Instructions & Overview
+					</label>
+					<span class="badge badge-neutral badge-xs font-mono text-[10px]">Edra Editor</span>
+				</div>
+				<RichEditor
+					content={description}
+					minHeight="140px"
+					placeholder="Describe guidelines, instructions, or allowed resources..."
+					onUpdate={(json) => {
+						description = json;
+					}}
+				/>
+			</div>
+
+			<!-- Submit Button -->
 			<div class="pt-4 border-t border-white/10 flex justify-end">
 				<button
 					type="submit"
-					class="btn btn-secondary gradient-accent rounded-xl text-white font-bold border-0 shadow-lg gap-2 h-11 px-6"
+					class="btn btn-secondary gradient-accent rounded-xl text-white font-bold border-0 shadow-lg px-8 gap-2"
 					disabled={isSubmitting}
 				>
 					{#if isSubmitting}
 						<span class="loading loading-spinner loading-xs"></span>
 					{:else}
 						<Save class="h-4 w-4" />
-						Save & Publish Exam
 					{/if}
+					Create Exam & Open Question Studio
 				</button>
 			</div>
 		</form>

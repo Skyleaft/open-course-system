@@ -1,90 +1,44 @@
-// Core API Envelope and Data Types
+// Shared Domain Enums & Types
 
-export interface ApiResponse<T> {
-	data?: T;
-	success?: boolean;
-	isSuccess?: boolean;
-	status?: number;
-	detail?: string;
-	title?: string;
-	code?: string;
-	type?: string;
-	errors?: Record<string, string[]>;
-	error?: {
-		code: string;
-		message: string;
-		details?: Record<string, string[]>;
-	};
-}
-
-export interface ApiErrorResponse {
-	code: string;
-	message: string;
-	details?: Record<string, string[]>;
-}
-
-export type UserRole = 'Student' | 'Instructor' | 'Admin' | 'Proctor' | string;
+export type UserRole = 'Student' | 'Instructor' | 'Admin' | 'Proctor';
 
 export interface UserInfoDto {
 	id: string;
-	userName: string;
 	email: string;
-	fullName: string;
-	picture?: string | null;
-	roles: string[];
+	fullName?: string;
+	firstName?: string;
+	lastName?: string;
+	role?: UserRole;
+	roles?: string[];
+	avatarUrl?: string;
+	createdAtUtc?: string;
 }
+
+export type User = UserInfoDto;
+export type UserProfile = UserInfoDto;
 
 export interface UserResponseDto {
-	id: string;
-	userName: string;
-	email: string;
-	fullName: string;
-	firstName?: string | null;
-	lastName?: string | null;
-	picture?: string | null;
-	roles: string[];
-	createdAt?: string;
-}
-
-export interface User {
-	id: string;
-	userName?: string;
-	email: string;
-	fullName: string;
-	firstName?: string | null;
-	lastName?: string | null;
-	picture?: string | null;
-	roles: string[];
-	lastSeen?: string;
-	isActive?: boolean;
-	createdAt?: string;
+	user: UserInfoDto;
 }
 
 export interface LoginResponseDto {
 	accessToken: string;
 	refreshToken: string;
-	expiresAt: string;
+	expiresInSeconds: number;
 	user: UserInfoDto;
 }
 
 export interface RefreshTokenResponseDto {
 	accessToken: string;
 	refreshToken: string;
-	expiresAt: string;
+	expiresInSeconds: number;
 }
 
-// Backward compatibility alias
-export type AuthResponse = LoginResponseDto;
-
-// Pagination
-export interface PaginatedList<T> {
-	items: T[];
-	pageNumber: number;
-	pageSize: number;
-	totalCount: number;
-	totalPages: number;
-	hasPreviousPage: boolean;
-	hasNextPage: boolean;
+export interface AuthResponse {
+	accessToken: string;
+	refreshToken: string;
+	expiresInSeconds: number;
+	user: UserProfile;
 }
 
 // Course Types
@@ -93,35 +47,36 @@ export type LessonType = 'Text' | 'Video' | 'PdfDocument' | 'DownloadableFile';
 
 export interface CourseFilterParams {
 	category?: string;
-	accessType?: CourseAccessType | string;
+	accessType?: string;
+	isPublished?: boolean;
 	search?: string;
 	searchTerm?: string;
 	instructorId?: string;
 	minPrice?: number;
 	maxPrice?: number;
-	isPublished?: boolean;
-	sortBy?: 'title' | 'price' | 'createdAt' | 'updatedAt' | string;
-	sortOrder?: 'asc' | 'desc' | 'ascending' | 'descending' | string;
-	page?: number;
+	sortBy?: string;
+	sortOrder?: string;
 	pageIndex?: number;
 	pageNumber?: number;
+	page?: number;
 	pageSize?: number;
 }
 
 export interface Lesson {
 	id: string;
-	sectionId?: string;
+	sectionId: string;
 	title: string;
-	type: LessonType | string;
+	type: LessonType;
 	contentUrl?: string | null;
 	textContent?: string | null;
 	durationMinutes: number;
 	orderIndex: number;
+	createdAtUtc?: string;
 }
 
 export interface CourseSection {
 	id: string;
-	courseId?: string;
+	courseId: string;
 	title: string;
 	orderIndex: number;
 	lessons: Lesson[];
@@ -129,7 +84,7 @@ export interface CourseSection {
 
 export interface Assignment {
 	id: string;
-	courseId?: string;
+	courseId: string;
 	title: string;
 	instruction: string;
 	deadlineUtc: string;
@@ -193,7 +148,6 @@ export interface SubmissionResultDto {
 	submittedAtUtc: string;
 }
 
-
 // Exam Types
 export type QuizMode = 'Simulation' | 'RealExam';
 export type QuestionType = 'SingleChoice' | 'MultipleChoice' | 'Essay' | 'TrueFalse';
@@ -207,8 +161,10 @@ export interface QuestionOption {
 
 export interface QuizQuestion {
 	id: string;
-	quizId: string;
-	text: string;
+	examId?: string;
+	quizId?: string;
+	questionText?: string;
+	text?: string;
 	type: QuestionType;
 	points: number;
 	orderIndex: number;
@@ -222,17 +178,50 @@ export interface StudentAnswer {
 	essayText?: string;
 }
 
-export interface QuizExam {
+export interface ListExamsParams {
+	courseId?: string;
+	mode?: QuizMode | string;
+	isPublished?: boolean;
+	search?: string;
+	searchTerm?: string;
+	pageIndex?: number;
+	pageSize?: number;
+}
+
+export interface ExamSummaryDto {
 	id: string;
-	courseId: string;
+	courseId?: string | null;
+	instructorId: string;
 	title: string;
-	mode: QuizMode;
+	description?: string | null;
+	mode: QuizMode | string;
 	durationMinutes: number;
 	passingScore: number;
 	maxAllowedViolations: number;
-	settings?: Record<string, any>;
 	isPublished: boolean;
+	questionsCount: number;
+	createdAtUtc: string;
+}
+
+export interface QuizExam {
+	id: string;
+	courseId?: string | null;
+	instructorId?: string;
+	title: string;
+	description?: string | null;
+	mode: QuizMode | string;
+	durationMinutes: number;
+	passingScore: number;
+	maxAllowedViolations: number;
+	maxAttempts?: number;
+	availableFromUtc?: string | null;
+	availableToUtc?: string | null;
+	isPublished: boolean;
+	shuffleQuestions?: boolean;
+	shuffleOptions?: boolean;
 	questionsCount?: number;
+	questions?: QuizQuestion[];
+	createdAtUtc?: string;
 }
 
 export interface QuizSubmission {
@@ -273,46 +262,100 @@ export interface GradeRecord {
 	courseId: string;
 	itemType: 'Quiz' | 'Assignment';
 	referenceId: string;
+	title?: string;
 	score: number;
 	maxScore: number;
 	weightPercentage: number;
 	evaluatedAtUtc: string;
-	title?: string;
+}
+
+export interface DeadLetterJob {
+	id: string;
+	streamMessageId: string;
+	errorMessage: string;
+	failedAtUtc: string;
+	isResolved: boolean;
+	retryCount: number;
 }
 
 // Communications
 export interface Announcement {
 	id: string;
-	courseId?: string | null;
-	authorId: string;
+	courseId?: string;
+	instructorId?: string;
+	authorId?: string;
 	authorName?: string;
 	title: string;
 	content: string;
-	isPinned: boolean;
+	targetScope?: 'CourseOnly' | 'GlobalAll';
+	isPinned?: boolean;
 	createdAtUtc: string;
-}
-
-export interface ThreadComment {
-	id: string;
-	threadId: string;
-	authorId: string;
-	authorName?: string;
-	parentCommentId?: string | null;
-	content: string;
-	createdAtUtc: string;
-	replies?: ThreadComment[];
 }
 
 export interface DiscussionThread {
 	id: string;
 	courseId: string;
-	lessonId?: string | null;
 	authorId: string;
-	authorName?: string;
 	title: string;
 	content: string;
+	isPinned: boolean;
 	isClosed: boolean;
 	createdAtUtc: string;
-	commentsCount?: number;
-	comments?: ThreadComment[];
+	authorName?: string;
+	comments?: DiscussionComment[];
+}
+
+export interface DiscussionComment {
+	id: string;
+	threadId: string;
+	authorId: string;
+	content: string;
+	isInstructorEndorsed: boolean;
+	createdAtUtc: string;
+	authorName?: string;
+}
+
+export type ThreadComment = DiscussionComment;
+
+// Orders & Checkout
+export type OrderStatus = 'Pending' | 'Paid' | 'Cancelled' | 'Expired';
+
+export interface Order {
+	id: string;
+	userId: string;
+	courseId: string;
+	courseTitle: string;
+	amount: number;
+	currency: string;
+	status: OrderStatus;
+	snapToken?: string;
+	redirectUrl?: string;
+	createdAtUtc: string;
+	paidAtUtc?: string;
+}
+
+// Common Responses
+export interface ApiResponse<T> {
+	success: boolean;
+	data: T;
+	message?: string;
+	errors?: string[];
+	statusCode: number;
+}
+
+export interface ApiErrorResponse {
+	success: boolean;
+	message: string;
+	errors?: string[];
+	statusCode: number;
+}
+
+export interface PaginatedList<T> {
+	items: T[];
+	totalCount: number;
+	pageIndex: number;
+	pageSize: number;
+	totalPages: number;
+	hasPreviousPage: boolean;
+	hasNextPage: boolean;
 }

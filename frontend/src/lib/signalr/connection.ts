@@ -1,6 +1,7 @@
 import * as signalR from '@microsoft/signalr';
 import { apiClient } from '#lib/api/client.ts';
-import { browser } from '$app/env';
+
+const browser = typeof window !== 'undefined';
 
 const HUB_BASE_URL = import.meta.env.PUBLIC_SIGNALR_URL || 'http://localhost:8080/hubs';
 
