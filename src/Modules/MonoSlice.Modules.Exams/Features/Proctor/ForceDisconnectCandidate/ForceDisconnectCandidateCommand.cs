@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Exams.Features.Proctor.ForceDisconnectCandidate;
 
-public sealed record ForceDisconnectCandidateCommand : ICommand<ApiResponse>
+public sealed partial class ForceDisconnectCandidateCommand : ICommand<ApiResponse>
 {
     public Guid SubmissionId { get; init; }
 

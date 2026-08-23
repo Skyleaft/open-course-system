@@ -14,7 +14,7 @@ public static class SubmitExamEndpoint
                 IMediator mediator,
                 CancellationToken ct) =>
             {
-                var command = new SubmitExamCommand(submissionId);
+                var command = new SubmitExamCommand { SubmissionId = submissionId };
                 var response = await mediator.Send(command, ct);
                 return Results.Json(response, statusCode: response.StatusCode);
             })

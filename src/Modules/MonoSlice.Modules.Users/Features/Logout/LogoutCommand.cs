@@ -3,7 +3,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Users.Features.Logout;
 
-public sealed record LogoutCommand : ICommand<ApiResponse>
+public sealed partial class LogoutCommand : ICommand<ApiResponse>
 {
     public Guid? UserId { get; init; }
 }

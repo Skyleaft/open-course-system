@@ -14,7 +14,7 @@ public static class PublishCourseEndpoint
                 IMediator mediator,
                 CancellationToken ct) =>
             {
-                var command = new PublishCourseCommand(id, Publish: true);
+                var command = new PublishCourseCommand { Id = id, Publish = true };
                 var response = await mediator.Send(command, ct);
                 return Results.Json(response, statusCode: response.StatusCode);
             })

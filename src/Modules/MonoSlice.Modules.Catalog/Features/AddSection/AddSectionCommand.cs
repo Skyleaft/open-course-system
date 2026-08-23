@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Catalog.Features.AddSection;
 
-public sealed record AddSectionCommand : ICommand<ApiResponse<SectionResultDto>>
+public sealed partial class AddSectionCommand : ICommand<ApiResponse<SectionResultDto>>
 {
     public Guid CourseId { get; init; }
 

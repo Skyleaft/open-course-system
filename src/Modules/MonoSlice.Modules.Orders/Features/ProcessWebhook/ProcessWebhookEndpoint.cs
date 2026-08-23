@@ -18,9 +18,13 @@ public static class ProcessWebhookEndpoint
                 var signatureHeader = context.Request.Headers["X-Signature"].FirstOrDefault() ??
                                       context.Request.Headers["X-Webhook-Signature"].FirstOrDefault();
 
-                var enrichedCommand = command with
+                var enrichedCommand = new ProcessWebhookCommand
                 {
-                    Signature = !string.IsNullOrWhiteSpace(command.Signature) ? command.Signature : signatureHeader
+                    OrderId = command.OrderId,
+                    ExternalPaymentReference = command.ExternalPaymentReference,
+                    PaymentStatus = command.PaymentStatus,
+                    Signature = !string.IsNullOrWhiteSpace(command.Signature) ? command.Signature : signatureHeader,
+                    RawPayload = command.RawPayload
                 };
 
                 var response = await mediator.Send(enrichedCommand, ct);

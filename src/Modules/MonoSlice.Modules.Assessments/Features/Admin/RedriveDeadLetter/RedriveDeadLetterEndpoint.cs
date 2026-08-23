@@ -14,7 +14,7 @@ public static class RedriveDeadLetterEndpoint
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            var result = await sender.Send(new RedriveDeadLetterCommand(id), cancellationToken);
+            var result = await sender.Send(new RedriveDeadLetterCommand { Id = id }, cancellationToken);
             return Results.Ok(result);
         })
         .WithName("RedriveAssessmentDeadLetter")

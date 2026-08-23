@@ -161,7 +161,7 @@ public class CommunicationsCommandHandlerTests
         _currentUser.Roles.Returns(["Student"]);
 
         var handler = new CloseDiscussionThreadCommandHandler(_dbContext, _currentUser);
-        var result = await handler.Handle(new CloseDiscussionThreadCommand(thread.Id), CancellationToken.None);
+        var result = await handler.Handle(new CloseDiscussionThreadCommand { ThreadId = thread.Id }, CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.NotNull(result.Data);

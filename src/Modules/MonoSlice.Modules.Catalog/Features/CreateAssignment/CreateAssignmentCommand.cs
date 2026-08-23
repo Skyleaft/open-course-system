@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Catalog.Features.CreateAssignment;
 
-public sealed record CreateAssignmentCommand : ICommand<ApiResponse<AssignmentResultDto>>
+public sealed partial class CreateAssignmentCommand : ICommand<ApiResponse<AssignmentResultDto>>
 {
     public Guid CourseId { get; init; }
 

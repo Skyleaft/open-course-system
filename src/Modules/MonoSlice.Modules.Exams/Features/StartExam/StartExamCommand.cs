@@ -3,7 +3,10 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Exams.Features.StartExam;
 
-public sealed record StartExamCommand(Guid ExamId) : ICommand<ApiResponse<ExamAttemptDto>>;
+public sealed partial class StartExamCommand : ICommand<ApiResponse<ExamAttemptDto>>
+{
+    public Guid ExamId { get; init; }
+}
 
 public sealed record ExamAttemptDto(
     Guid SubmissionId,

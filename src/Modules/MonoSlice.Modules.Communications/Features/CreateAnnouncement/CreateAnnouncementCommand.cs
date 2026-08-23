@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Communications.Features.CreateAnnouncement;
 
-public sealed record CreateAnnouncementCommand : ICommand<ApiResponse<AnnouncementDto>>
+public sealed partial class CreateAnnouncementCommand : ICommand<ApiResponse<AnnouncementDto>>
 {
     public Guid? CourseId { get; init; }
 

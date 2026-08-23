@@ -14,7 +14,7 @@ public static class CloseDiscussionThreadEndpoint
             ISender sender,
             CancellationToken cancellationToken) =>
         {
-            var result = await sender.Send(new CloseDiscussionThreadCommand(id), cancellationToken);
+            var result = await sender.Send(new CloseDiscussionThreadCommand { ThreadId = id }, cancellationToken);
             return Results.Ok(result);
         })
         .WithName("CloseDiscussionThread")

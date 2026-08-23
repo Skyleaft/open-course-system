@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Users.Features.Register;
 
-public sealed record RegisterCommand : ICommand<ApiResponse<UserResponseDto>>
+public sealed partial class RegisterCommand : ICommand<ApiResponse<UserResponseDto>>
 {
     [Required]
     [EmailAddress]

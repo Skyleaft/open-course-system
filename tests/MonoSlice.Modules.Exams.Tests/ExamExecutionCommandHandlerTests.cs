@@ -69,7 +69,7 @@ public class ExamExecutionCommandHandlerTests
 
         // 2. Start Exam
         var startHandler = new StartExamCommandHandler(_dbContext, _currentUser, _cacheService, _serviceProvider);
-        var startResult = await startHandler.Handle(new StartExamCommand(exam.Id), CancellationToken.None);
+        var startResult = await startHandler.Handle(new StartExamCommand { ExamId = exam.Id }, CancellationToken.None);
 
         Assert.True(startResult.Success);
         Assert.NotNull(startResult.Data);
@@ -105,7 +105,7 @@ public class ExamExecutionCommandHandlerTests
 
         // 4. Submit Exam
         var submitHandler = new SubmitExamCommandHandler(_finalizerService, _currentUser);
-        var submitResult = await submitHandler.Handle(new SubmitExamCommand(submissionId), CancellationToken.None);
+        var submitResult = await submitHandler.Handle(new SubmitExamCommand { SubmissionId = submissionId }, CancellationToken.None);
 
         Assert.True(submitResult.Success);
         Assert.NotNull(submitResult.Data);

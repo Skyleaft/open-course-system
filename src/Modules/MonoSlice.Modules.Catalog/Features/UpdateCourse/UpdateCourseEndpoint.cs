@@ -15,7 +15,16 @@ public static class UpdateCourseEndpoint
                 IMediator mediator,
                 CancellationToken ct) =>
             {
-                var enrichedCommand = command with { Id = id };
+                var enrichedCommand = new UpdateCourseCommand
+                {
+                    Id = id,
+                    Title = command.Title,
+                    Description = command.Description,
+                    AccessType = command.AccessType,
+                    Price = command.Price,
+                    EnrollmentKey = command.EnrollmentKey,
+                    ThumbnailUrl = command.ThumbnailUrl
+                };
                 var response = await mediator.Send(enrichedCommand, ct);
                 return Results.Json(response, statusCode: response.StatusCode);
             })

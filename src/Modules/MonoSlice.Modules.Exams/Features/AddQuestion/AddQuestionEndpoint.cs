@@ -15,7 +15,15 @@ public static class AddQuestionEndpoint
                 IMediator mediator,
                 CancellationToken ct) =>
             {
-                var enriched = command with { ExamId = id };
+                var enriched = new AddQuestionCommand
+                {
+                    ExamId = id,
+                    QuestionText = command.QuestionText,
+                    Type = command.Type,
+                    Points = command.Points,
+                    Explanation = command.Explanation,
+                    Options = command.Options
+                };
                 var response = await mediator.Send(enriched, ct);
                 return Results.Json(response, statusCode: response.StatusCode);
             })

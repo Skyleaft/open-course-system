@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Users.Features.RefreshToken;
 
-public sealed record RefreshTokenCommand : ICommand<ApiResponse<RefreshTokenResponseDto>>
+public sealed partial class RefreshTokenCommand : ICommand<ApiResponse<RefreshTokenResponseDto>>
 {
     [Required]
     public string AccessToken { get; init; } = string.Empty;

@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Orders.Features.CreateCheckout;
 
-public sealed record CreateCheckoutCommand : ICommand<ApiResponse<CheckoutResponseDto>>
+public sealed partial class CreateCheckoutCommand : ICommand<ApiResponse<CheckoutResponseDto>>
 {
     [Required]
     public Guid CourseId { get; init; }

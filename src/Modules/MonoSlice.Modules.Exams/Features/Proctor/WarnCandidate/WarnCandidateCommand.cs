@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Exams.Features.Proctor.WarnCandidate;
 
-public sealed record WarnCandidateCommand : ICommand<ApiResponse>
+public sealed partial class WarnCandidateCommand : ICommand<ApiResponse>
 {
     public Guid SubmissionId { get; init; }
 

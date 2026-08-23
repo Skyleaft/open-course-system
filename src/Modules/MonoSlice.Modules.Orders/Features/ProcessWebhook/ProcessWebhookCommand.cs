@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Orders.Features.ProcessWebhook;
 
-public sealed record ProcessWebhookCommand : ICommand<ApiResponse<WebhookResponseDto>>
+public sealed partial class ProcessWebhookCommand : ICommand<ApiResponse<WebhookResponseDto>>
 {
     [Required]
     public Guid OrderId { get; init; }

@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Users.Features.AssignRole;
 
-public sealed record AssignRoleCommand : ICommand<ApiResponse>
+public sealed partial class AssignRoleCommand : ICommand<ApiResponse>
 {
     [Required]
     public Guid UserId { get; init; }

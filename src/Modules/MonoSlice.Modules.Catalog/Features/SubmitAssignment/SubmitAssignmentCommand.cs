@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Catalog.Features.SubmitAssignment;
 
-public sealed record SubmitAssignmentCommand : ICommand<ApiResponse<SubmissionResultDto>>
+public sealed partial class SubmitAssignmentCommand : ICommand<ApiResponse<SubmissionResultDto>>
 {
     public Guid AssignmentId { get; init; }
 

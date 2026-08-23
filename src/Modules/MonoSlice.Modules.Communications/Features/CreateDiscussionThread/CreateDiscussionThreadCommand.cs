@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Communications.Features.CreateDiscussionThread;
 
-public sealed record CreateDiscussionThreadCommand : ICommand<ApiResponse<DiscussionThreadSummaryDto>>
+public sealed partial class CreateDiscussionThreadCommand : ICommand<ApiResponse<DiscussionThreadSummaryDto>>
 {
     [Required]
     public Guid CourseId { get; init; }

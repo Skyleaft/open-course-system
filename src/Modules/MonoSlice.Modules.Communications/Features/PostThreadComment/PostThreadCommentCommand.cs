@@ -5,7 +5,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Communications.Features.PostThreadComment;
 
-public sealed record PostThreadCommentCommand : ICommand<ApiResponse<ThreadCommentDto>>
+public sealed partial class PostThreadCommentCommand : ICommand<ApiResponse<ThreadCommentDto>>
 {
     public Guid ThreadId { get; init; }
 

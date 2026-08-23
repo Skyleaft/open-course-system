@@ -14,7 +14,7 @@ public static class StartExamEndpoint
                 IMediator mediator,
                 CancellationToken ct) =>
             {
-                var command = new StartExamCommand(id);
+                var command = new StartExamCommand { ExamId = id };
                 var response = await mediator.Send(command, ct);
                 return Results.Json(response, statusCode: response.StatusCode);
             })

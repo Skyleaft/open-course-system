@@ -3,7 +3,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Exams.Features.SaveAnswer;
 
-public sealed record SaveAnswerCommand : ICommand<ApiResponse>
+public sealed partial class SaveAnswerCommand : ICommand<ApiResponse>
 {
     public Guid SubmissionId { get; init; }
     public Guid QuestionId { get; init; }

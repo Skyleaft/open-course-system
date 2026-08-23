@@ -5,7 +5,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Exams.Features.CreateExam;
 
-public sealed record CreateExamCommand : ICommand<ApiResponse<ExamDetailDto>>
+public sealed partial class CreateExamCommand : ICommand<ApiResponse<ExamDetailDto>>
 {
     public Guid? CourseId { get; init; }
 

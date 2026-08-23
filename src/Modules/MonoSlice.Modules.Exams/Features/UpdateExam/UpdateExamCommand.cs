@@ -6,7 +6,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Exams.Features.UpdateExam;
 
-public sealed record UpdateExamCommand : ICommand<ApiResponse<ExamDetailDto>>
+public sealed partial class UpdateExamCommand : ICommand<ApiResponse<ExamDetailDto>>
 {
     public Guid Id { get; init; }
 

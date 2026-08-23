@@ -3,7 +3,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Catalog.Features.EnrollCourse;
 
-public sealed record EnrollCourseCommand : ICommand<ApiResponse<EnrollmentResultDto>>
+public sealed partial class EnrollCourseCommand : ICommand<ApiResponse<EnrollmentResultDto>>
 {
     public Guid CourseId { get; init; }
     public string? EnrollmentKey { get; init; }

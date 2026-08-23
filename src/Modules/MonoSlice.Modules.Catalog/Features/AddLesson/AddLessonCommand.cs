@@ -5,7 +5,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Catalog.Features.AddLesson;
 
-public sealed record AddLessonCommand : ICommand<ApiResponse<LessonResultDto>>
+public sealed partial class AddLessonCommand : ICommand<ApiResponse<LessonResultDto>>
 {
     public Guid SectionId { get; init; }
 

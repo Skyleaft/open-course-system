@@ -5,7 +5,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Assessments.Features.IssueCertificate;
 
-public sealed record IssueCertificateCommand : ICommand<ApiResponse<CertificateDetailDto>>
+public sealed partial class IssueCertificateCommand : ICommand<ApiResponse<CertificateDetailDto>>
 {
     [Required]
     public Guid StudentId { get; init; }

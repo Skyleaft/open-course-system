@@ -15,7 +15,22 @@ public static class UpdateExamEndpoint
                 IMediator mediator,
                 CancellationToken ct) =>
             {
-                var enrichedCommand = command with { Id = id };
+                var enrichedCommand = new UpdateExamCommand
+                {
+                    Id = id,
+                    CourseId = command.CourseId,
+                    Title = command.Title,
+                    Description = command.Description,
+                    Mode = command.Mode,
+                    DurationMinutes = command.DurationMinutes,
+                    PassingScore = command.PassingScore,
+                    MaxAllowedViolations = command.MaxAllowedViolations,
+                    MaxAttempts = command.MaxAttempts,
+                    AvailableFromUtc = command.AvailableFromUtc,
+                    AvailableToUtc = command.AvailableToUtc,
+                    ShuffleQuestions = command.ShuffleQuestions,
+                    ShuffleOptions = command.ShuffleOptions
+                };
                 var response = await mediator.Send(enrichedCommand, ct);
                 return Results.Json(response, statusCode: response.StatusCode);
             })

@@ -5,7 +5,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Catalog.Features.CreateCourse;
 
-public sealed record CreateCourseCommand : ICommand<ApiResponse<CourseDetailDto>>
+public sealed partial class CreateCourseCommand : ICommand<ApiResponse<CourseDetailDto>>
 {
     [Required]
     [MaxLength(255)]

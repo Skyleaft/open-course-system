@@ -3,4 +3,8 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Exams.Features.PublishExam;
 
-public sealed record PublishExamCommand(Guid Id, bool Publish = true) : ICommand<ApiResponse>;
+public sealed partial class PublishExamCommand : ICommand<ApiResponse>
+{
+    public Guid Id { get; init; }
+    public bool Publish { get; init; } = true;
+}

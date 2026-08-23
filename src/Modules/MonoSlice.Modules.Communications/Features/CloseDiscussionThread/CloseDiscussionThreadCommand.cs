@@ -4,4 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Communications.Features.CloseDiscussionThread;
 
-public sealed record CloseDiscussionThreadCommand(Guid ThreadId) : ICommand<ApiResponse<DiscussionThreadSummaryDto>>;
+public sealed partial class CloseDiscussionThreadCommand : ICommand<ApiResponse<DiscussionThreadSummaryDto>>
+{
+    public Guid ThreadId { get; init; }
+}

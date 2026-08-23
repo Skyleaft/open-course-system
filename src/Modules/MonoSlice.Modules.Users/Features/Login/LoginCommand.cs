@@ -4,7 +4,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 
 namespace MonoSlice.Modules.Users.Features.Login;
 
-public sealed record LoginCommand : ICommand<ApiResponse<LoginResponseDto>>
+public sealed partial class LoginCommand : ICommand<ApiResponse<LoginResponseDto>>
 {
     [Required]
     public string UserNameOrEmail { get; init; } = string.Empty;

@@ -113,7 +113,7 @@ public class AssessmentsCommandHandlerTests
         await _dbContext.SaveChangesAsync();
 
         var handler = new RedriveDeadLetterCommandHandler(_dbContext, _eventPublisher, _currentUser);
-        var result = await handler.Handle(new RedriveDeadLetterCommand(deadLetter.Id), CancellationToken.None);
+        var result = await handler.Handle(new RedriveDeadLetterCommand { Id = deadLetter.Id }, CancellationToken.None);
 
         Assert.True(result.Success);
         var updated = await _dbContext.GradingDeadLetters.FindAsync(deadLetter.Id);
