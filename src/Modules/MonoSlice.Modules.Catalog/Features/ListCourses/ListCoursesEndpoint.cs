@@ -17,8 +17,8 @@ public static class ListCoursesEndpoint
                 var response = await mediator.Send(query, ct);
                 return Results.Json(response, statusCode: response.StatusCode);
             })
-            .WithName("ListPublishedCourses")
-            .WithSummary("List published courses with search and pagination")
+            .WithName("ListCourses")
+            .WithSummary("List courses with advanced filter, sorting, and pagination")
             .AllowAnonymous();
     }
 }

@@ -5,6 +5,7 @@
 	import GlassCard from '#lib/components/ui/GlassCard.svelte';
 	import SyllabusTree from '#lib/components/course/SyllabusTree.svelte';
 	import EnrollmentFlow from '#lib/components/course/EnrollmentFlow.svelte';
+	import RichRenderer from '#lib/components/editor/RichRenderer.svelte';
 	import { BookOpen, Layers, Clock, ArrowLeft, Sparkles, CheckCircle2 } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 
@@ -49,9 +50,15 @@
 						{course.title}
 					</h1>
 
-					<p class="text-sm text-base-content/70 leading-relaxed max-w-2xl">
-						{course.description || 'In-depth comprehensive curriculum designed to build practical and theoretical expertise.'}
-					</p>
+					{#if course.description}
+						<div class="max-w-2xl text-sm text-base-content/80 leading-relaxed">
+							<RichRenderer content={course.description} />
+						</div>
+					{:else}
+						<p class="text-sm text-base-content/70 leading-relaxed max-w-2xl">
+							In-depth comprehensive curriculum designed to build practical and theoretical expertise.
+						</p>
+					{/if}
 
 					<div class="flex flex-wrap gap-4 pt-2 text-xs text-base-content/75">
 						<div class="flex items-center gap-1.5">

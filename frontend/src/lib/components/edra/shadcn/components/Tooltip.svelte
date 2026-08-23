@@ -1,5 +1,4 @@
 <script lang="ts">
-	import * as Tooltip from '$lib/components/ui/tooltip/index.js';
 	import type { Snippet } from 'svelte';
 
 	interface Props {
@@ -9,18 +8,9 @@
 	}
 
 	const { tooltip, children, shortCut }: Props = $props();
+	const titleText = $derived(`${tooltip}${shortCut ? ` (${shortCut})` : ''}`);
 </script>
 
-<Tooltip.Provider delayDuration={100}>
-	<Tooltip.Root>
-		<Tooltip.Trigger>
-			{@render children()}
-		</Tooltip.Trigger>
-		<Tooltip.Content>
-			<span>{tooltip}</span>
-			{#if shortCut}
-				<span class="rounded bg-background p-0.5 text-primary">{shortCut}</span>
-			{/if}
-		</Tooltip.Content>
-	</Tooltip.Root>
-</Tooltip.Provider>
+<span title={titleText} class="inline-flex items-center">
+	{@render children()}
+</span>

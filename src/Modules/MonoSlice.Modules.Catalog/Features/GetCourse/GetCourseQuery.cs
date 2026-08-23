@@ -29,7 +29,8 @@ public sealed record LessonDto(
     Guid Id,
     string Title,
     string Type,
-    string ContentUrl,
+    string? ContentUrl,
+    string? TextContent,
     int DurationMinutes,
     int OrderIndex);
 

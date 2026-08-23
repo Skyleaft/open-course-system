@@ -236,7 +236,6 @@ namespace MonoSlice.Modules.Catalog.Persistence.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("ContentUrl")
-                        .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
@@ -256,6 +255,9 @@ namespace MonoSlice.Modules.Catalog.Persistence.Migrations
 
                     b.Property<Guid>("SectionId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("TextContent")
+                        .HasColumnType("text");
 
                     b.Property<string>("Title")
                         .IsRequired()

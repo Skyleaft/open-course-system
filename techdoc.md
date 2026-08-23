@@ -39,7 +39,7 @@ Software Architecture & Technical Specification DocumentProject: LMS & Online Ex
 2. Bounded Contexts & Module Responsibility
 - **Identity (`identity` schema)**: Autentikasi JWT, refresh token rotation, OAuth2 (Google Register & Login via `POST /api/v1/auth/google`), manajemen akun & `LastSeen`, serta otorisasi berbasis Role (`Student`, `Instructor`, `Admin`, `Proctor`) dengan single active session guard.
 - **Payments (`payments` schema)**: Pembuatan order kursus, integrasi payment gateway webhook, validasi tanda tangan (HMAC), dan idempotensi transaksi.
-- **Courses (`courses` schema)**: Manajemen siklus hidup kursus, kontrol akses (OpenFree, OpenPaid, PrivateWithKey), struktur silabus (Sections, Lessons: PDF/Video/File), serta Assignments & Submissions.
+- **Courses (`courses` schema)**: Manajemen siklus hidup kursus, kontrol akses (OpenFree, OpenPaid, PrivateWithKey), struktur silabus (Sections, Lessons: Text/PDF/Video/File), serta Assignments & Submissions.
 - **Exams (`exams` schema)**: Dual-mode quiz engine (Simulation vs RealExam), bank soal, randomisasi urutan soal berbasis PRNG seed, penerbitan One-Time Exam Token, validasi batas proctoring, dan presigning upload snapshot webcam ke MinIO.
 - **Assessments (`assessments` schema)**: Pemrosesan evaluasi nilai asinkron dari Redis Streams, kalkulasi passing score, dead letter stream logging, serta penerbitan sertifikat digital ber-hash SHA-256.
 - **Communications (`communications` schema)**: Pengumuman kursus (Announcements), forum diskusi bertingkat (Discussion Threads & Nested Comments).
@@ -53,7 +53,7 @@ Software Architecture & Technical Specification DocumentProject: LMS & Online Ex
   - ExternalPaymentReference: String? (Unique index)
   - CreatedAtUtc: DateTime
   - PaidAtUtc: DateTime?
-3.2 Module: CoursesAggregate Root 1: CourseRoot: CourseChild Entities: CourseSection, Lesson, AssignmentInvariants:Tipe akses kursus (AccessType):OpenFree: Terbuka tanpa syarat, user dapat langsung meng-enroll dirinya.OpenPaid: Membutuhkan verifikasi pembayaran sukses dari modul Payments.PrivateWithKey: Wajib menyertakan enrollment key rahasia yang dicocokkan menggunakan hash BCrypt.Lesson bertipe Video, PdfDocument, atau DownloadableFile hanya menyimpan path/URL storage MinIO dan tidak menyimpan file binary pada database.[Course Aggregate Root]
+3.2 Module: CoursesAggregate Root 1: CourseRoot: CourseChild Entities: CourseSection, Lesson, AssignmentInvariants:Tipe akses kursus (AccessType):OpenFree: Terbuka tanpa syarat, user dapat langsung meng-enroll dirinya.OpenPaid: Membutuhkan verifikasi pembayaran sukses dari modul Payments.PrivateWithKey: Wajib menyertakan enrollment key rahasia yang dicocokkan menggunakan hash BCrypt.Lesson bertipe Text (default) menyimpan konten rich-text (Edra Tiptap JSON schema) pada TextContent dengan ContentUrl opsional. Lesson bertipe Video, PdfDocument, atau DownloadableFile menyimpan path/URL storage MinIO pada ContentUrl dan tidak menyimpan file binary pada database.[Course Aggregate Root]
   - Id: UUID
   - Title: String
   - Description: String
@@ -68,8 +68,9 @@ Software Architecture & Technical Specification DocumentProject: LMS & Online Ex
         └── Lesson (Entity) [0..*]
               - Id: UUID
               - Title: String
-              - Type: LessonType (Video, PdfDocument, DownloadableFile)
-              - ContentUrl: String
+              - Type: LessonType (Text, Video, PdfDocument, DownloadableFile)
+              - ContentUrl: String?
+              - TextContent: String?
               - DurationMinutes: Int
               - OrderIndex: Int
   └── Assignment (Entity) [0..*]
@@ -151,8 +152,9 @@ CREATE TABLE courses.lessons (
     id UUID PRIMARY KEY,
     section_id UUID NOT NULL REFERENCES courses.course_sections(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
-    type VARCHAR(50) NOT NULL, -- Video, PdfDocument, DownloadableFile
-    content_url TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL, -- Text, Video, PdfDocument, DownloadableFile
+    content_url TEXT,
+    text_content TEXT,
     duration_minutes INT NOT NULL DEFAULT 0,
     order_index INT NOT NULL
 );

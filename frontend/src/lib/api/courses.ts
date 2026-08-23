@@ -1,74 +1,155 @@
 import { apiClient } from './client.ts';
-import type { Course, CourseSection, Lesson, Assignment } from './types.ts';
+import type {
+	Course,
+	CourseSection,
+	Lesson,
+	Assignment,
+	PaginatedList,
+	EnrollmentResultDto,
+	SectionResultDto,
+	LessonResultDto,
+	AssignmentResultDto,
+	SubmissionResultDto,
+	CourseAccessType,
+	LessonType,
+	CourseFilterParams
+} from './types.ts';
 
 export const coursesApi = {
 	async getCourses(
-		params?: { category?: string; accessType?: string; search?: string; page?: number; pageSize?: number },
+		params?: CourseFilterParams,
 		customFetch?: typeof fetch
-	): Promise<{ items: Course[]; totalCount: number; page: number; pageSize: number }> {
+	): Promise<PaginatedList<Course>> {
 		const query = new URLSearchParams();
-		if (params?.category) query.set('category', params.category);
-		if (params?.accessType) query.set('accessType', params.accessType);
-		if (params?.search) query.set('search', params.search);
-		if (params?.page) query.set('page', params.page.toString());
-		if (params?.pageSize) query.set('pageSize', params.pageSize.toString());
+		const accessType = params?.accessType;
+		if (accessType && accessType !== 'All') query.set('AccessType', accessType);
+
+		const search = params?.searchTerm || params?.search;
+		if (search && search.trim()) query.set('SearchTerm', search.trim());
+
+		if (params?.instructorId) query.set('InstructorId', params.instructorId);
+		if (params?.minPrice !== undefined && params.minPrice !== null) query.set('MinPrice', params.minPrice.toString());
+		if (params?.maxPrice !== undefined && params.maxPrice !== null) query.set('MaxPrice', params.maxPrice.toString());
+		if (params?.isPublished !== undefined && params.isPublished !== null) query.set('IsPublished', params.isPublished.toString());
+		if (params?.sortBy) query.set('SortBy', params.sortBy);
+		if (params?.sortOrder) query.set('SortOrder', params.sortOrder);
+
+		const pageIndex = params?.pageIndex || params?.pageNumber || params?.page || 1;
+		query.set('PageIndex', pageIndex.toString());
+
+		const pageSize = params?.pageSize || 10;
+		query.set('PageSize', pageSize.toString());
 
 		const qs = query.toString() ? `?${query.toString()}` : '';
-		return apiClient.get(`/api/v1/courses${qs}`, undefined, customFetch);
+		return apiClient.get<PaginatedList<Course>>(`/api/v1/courses${qs}`, undefined, customFetch);
 	},
 
 	async getCourseById(id: string, customFetch?: typeof fetch): Promise<Course> {
 		return apiClient.get<Course>(`/api/v1/courses/${id}`, undefined, customFetch);
 	},
 
-	async enroll(courseId: string, enrollmentKey?: string): Promise<{ enrollmentId: string }> {
-		return apiClient.post<{ enrollmentId: string }>(`/api/v1/courses/${courseId}/enroll`, {
-			enrollmentKey
+	async enroll(courseId: string, enrollmentKey?: string): Promise<EnrollmentResultDto> {
+		return apiClient.post<EnrollmentResultDto>(`/api/v1/courses/${courseId}/enroll`, {
+			enrollmentKey: enrollmentKey || undefined
 		});
 	},
 
 	async createCourse(data: {
 		title: string;
-		description: string;
-		accessType: string;
+		description?: string;
+		accessType: CourseAccessType | string;
 		price: number;
 		enrollmentKey?: string;
-	}): Promise<{ id: string }> {
-		return apiClient.post<{ id: string }>('/api/v1/courses', data);
+		thumbnailUrl?: string;
+	}): Promise<Course> {
+		return apiClient.post<Course>('/api/v1/courses', data);
 	},
 
 	async updateCourse(
 		id: string,
 		data: {
 			title: string;
-			description: string;
-			accessType: string;
+			description?: string;
+			accessType: CourseAccessType | string;
 			price: number;
 			enrollmentKey?: string;
+			thumbnailUrl?: string;
 		}
-	): Promise<void> {
-		return apiClient.put(`/api/v1/courses/${id}`, data);
+	): Promise<Course> {
+		return apiClient.put<Course>(`/api/v1/courses/${id}`, data);
 	},
 
-	async publishCourse(id: string): Promise<void> {
-		return apiClient.post(`/api/v1/courses/${id}/publish`);
+	async publishCourse(id: string): Promise<{ id: string; isPublished: boolean }> {
+		return apiClient.post<{ id: string; isPublished: boolean }>(`/api/v1/courses/${id}/publish`);
 	},
 
-	async addSection(courseId: string, data: { title: string; orderIndex: number }): Promise<{ id: string }> {
-		return apiClient.post<{ id: string }>(`/api/v1/courses/${courseId}/sections`, data);
+	async addSection(courseId: string, data: { title: string }): Promise<SectionResultDto> {
+		return apiClient.post<SectionResultDto>(`/api/v1/courses/${courseId}/sections`, {
+			title: data.title
+		});
 	},
 
 	async addLesson(
 		sectionId: string,
 		data: {
 			title: string;
-			type: string;
-			contentUrl: string;
-			durationMinutes: number;
-			orderIndex: number;
+			type?: LessonType | string;
+			contentUrl?: string | null;
+			textContent?: string | null;
+			durationMinutes?: number;
 		}
-	): Promise<{ id: string }> {
-		return apiClient.post<{ id: string }>(`/api/v1/courses/sections/${sectionId}/lessons`, data);
+	): Promise<LessonResultDto> {
+		return apiClient.post<LessonResultDto>(`/api/v1/courses/sections/${sectionId}/lessons`, {
+			title: data.title,
+			type: data.type || 'Text',
+			contentUrl: data.contentUrl || undefined,
+			textContent: data.textContent || undefined,
+			durationMinutes: data.durationMinutes ?? 0
+		});
+	},
+
+	async deleteCourse(id: string): Promise<void> {
+		return apiClient.delete<void>(`/api/v1/courses/${id}`);
+	},
+
+	async updateSection(
+		sectionId: string,
+		data: { title: string; orderIndex?: number }
+	): Promise<SectionResultDto> {
+		return apiClient.put<SectionResultDto>(`/api/v1/courses/sections/${sectionId}`, data);
+	},
+
+	async deleteSection(sectionId: string): Promise<void> {
+		return apiClient.delete<void>(`/api/v1/courses/sections/${sectionId}`);
+	},
+
+	async getLesson(lessonId: string): Promise<LessonResultDto> {
+		return apiClient.get<LessonResultDto>(`/api/v1/courses/lessons/${lessonId}`);
+	},
+
+	async updateLesson(
+		lessonId: string,
+		data: {
+			title: string;
+			type?: LessonType | string;
+			contentUrl?: string | null;
+			textContent?: string | null;
+			durationMinutes?: number;
+			orderIndex?: number;
+		}
+	): Promise<LessonResultDto> {
+		return apiClient.put<LessonResultDto>(`/api/v1/courses/lessons/${lessonId}`, {
+			title: data.title,
+			type: data.type || 'Text',
+			contentUrl: data.contentUrl || undefined,
+			textContent: data.textContent || undefined,
+			durationMinutes: data.durationMinutes ?? 0,
+			orderIndex: data.orderIndex
+		});
+	},
+
+	async deleteLesson(lessonId: string): Promise<void> {
+		return apiClient.delete<void>(`/api/v1/courses/lessons/${lessonId}`);
 	},
 
 	async addAssignment(
@@ -79,17 +160,34 @@ export const coursesApi = {
 			deadlineUtc: string;
 			maxScore: number;
 		}
-	): Promise<{ id: string }> {
-		return apiClient.post<{ id: string }>(`/api/v1/courses/${courseId}/assignments`, data);
+	): Promise<AssignmentResultDto> {
+		return apiClient.post<AssignmentResultDto>(`/api/v1/courses/${courseId}/assignments`, data);
+	},
+
+	async createAssignment(
+		courseId: string,
+		data: {
+			title: string;
+			instruction: string;
+			deadlineUtc: string;
+			maxScore: number;
+		}
+	): Promise<AssignmentResultDto> {
+		return this.addAssignment(courseId, data);
 	},
 
 	async submitAssignment(
 		assignmentId: string,
 		data: {
-			fileAttachmentUrl: string;
+			fileUrl?: string;
+			fileAttachmentUrl?: string;
 			studentNotes?: string;
 		}
-	): Promise<{ id: string }> {
-		return apiClient.post<{ id: string }>(`/api/v1/courses/assignments/${assignmentId}/submit`, data);
+	): Promise<SubmissionResultDto> {
+		const fileUrl = data.fileUrl || data.fileAttachmentUrl || '';
+		return apiClient.post<SubmissionResultDto>(`/api/v1/courses/assignments/${assignmentId}/submit`, {
+			fileUrl
+		});
 	}
 };
+

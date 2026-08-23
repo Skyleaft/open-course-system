@@ -9,7 +9,7 @@
 
 	let { course }: Props = $props();
 
-	const accessTypeConfig = {
+	const accessTypeConfig: Record<string, { label: string; class: string; icon: any }> = {
 		OpenFree: {
 			label: 'Free',
 			class: 'badge-success text-success-content',
@@ -28,6 +28,28 @@
 	};
 
 	let badge = $derived(accessTypeConfig[course.accessType] || accessTypeConfig.OpenFree);
+
+	let plainDescription = $derived.by(() => {
+		const raw = course.description;
+		if (!raw) return 'Comprehensive modular curriculum.';
+		if (raw.startsWith('{')) {
+			try {
+				const parsed = JSON.parse(raw);
+				const extractText = (node: any): string => {
+					if (node.text) return node.text;
+					if (node.content && Array.isArray(node.content)) {
+						return node.content.map(extractText).join(' ');
+					}
+					return '';
+				};
+				const text = extractText(parsed).trim();
+				if (text) return text;
+			} catch {
+				// fallback
+			}
+		}
+		return raw;
+	});
 </script>
 
 <GlassCard hover={true} class="flex flex-col justify-between h-full p-5">
@@ -52,7 +74,7 @@
 				{course.title}
 			</h3>
 			<p class="text-xs text-base-content/65 line-clamp-2 leading-relaxed">
-				{course.description || 'Comprehensive modular curriculum.'}
+				{plainDescription}
 			</p>
 		</div>
 	</div>

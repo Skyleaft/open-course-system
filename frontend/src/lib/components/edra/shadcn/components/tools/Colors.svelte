@@ -22,15 +22,11 @@
 <DropdownMenu.Root bind:open>
 	<Tooltip tooltip="Quick Colors">
 		<DropdownMenu.Trigger
-			class={buttonVariants({
-				variant: 'ghost',
-				size: 'icon',
-				class: cn('gap-0.5')
-			})}
+			class="btn btn-ghost btn-xs size-7 rounded-lg text-base-content/80 hover:text-base-content hover:bg-base-content/10 flex items-center justify-center gap-0.5 p-0"
 			style={`color: ${$editorState.currentColor || ''}; background-color: ${$editorState.currentHighlight || ''};`}
 		>
-			<span>A</span>
-			<ChevronDown class="size-2! text-muted-foreground" />
+			<span class="font-bold text-xs">A</span>
+			<ChevronDown class="size-2 text-base-content/60" />
 		</DropdownMenu.Trigger>
 	</Tooltip>
 	<DropdownMenu.Content

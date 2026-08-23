@@ -38,7 +38,8 @@ public sealed class AddLessonCommandHandler : ICommandHandler<AddLessonCommand, 
             command.Title,
             command.Type,
             command.ContentUrl,
-            command.DurationMinutes);
+            command.DurationMinutes,
+            command.TextContent);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -50,6 +51,7 @@ public sealed class AddLessonCommandHandler : ICommandHandler<AddLessonCommand, 
             lesson.Title,
             lesson.Type.ToString(),
             lesson.ContentUrl,
+            lesson.TextContent,
             lesson.DurationMinutes,
             lesson.OrderIndex);
 

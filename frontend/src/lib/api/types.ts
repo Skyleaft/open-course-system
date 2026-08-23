@@ -76,23 +76,52 @@ export interface RefreshTokenResponseDto {
 // Backward compatibility alias
 export type AuthResponse = LoginResponseDto;
 
+// Pagination
+export interface PaginatedList<T> {
+	items: T[];
+	pageNumber: number;
+	pageSize: number;
+	totalCount: number;
+	totalPages: number;
+	hasPreviousPage: boolean;
+	hasNextPage: boolean;
+}
+
 // Course Types
 export type CourseAccessType = 'OpenFree' | 'OpenPaid' | 'PrivateWithKey';
-export type LessonType = 'Video' | 'PdfDocument' | 'DownloadableFile';
+export type LessonType = 'Text' | 'Video' | 'PdfDocument' | 'DownloadableFile';
+
+export interface CourseFilterParams {
+	category?: string;
+	accessType?: CourseAccessType | string;
+	search?: string;
+	searchTerm?: string;
+	instructorId?: string;
+	minPrice?: number;
+	maxPrice?: number;
+	isPublished?: boolean;
+	sortBy?: 'title' | 'price' | 'createdAt' | 'updatedAt' | string;
+	sortOrder?: 'asc' | 'desc' | 'ascending' | 'descending' | string;
+	page?: number;
+	pageIndex?: number;
+	pageNumber?: number;
+	pageSize?: number;
+}
 
 export interface Lesson {
 	id: string;
-	sectionId: string;
+	sectionId?: string;
 	title: string;
-	type: LessonType;
-	contentUrl: string;
+	type: LessonType | string;
+	contentUrl?: string | null;
+	textContent?: string | null;
 	durationMinutes: number;
 	orderIndex: number;
 }
 
 export interface CourseSection {
 	id: string;
-	courseId: string;
+	courseId?: string;
 	title: string;
 	orderIndex: number;
 	lessons: Lesson[];
@@ -100,7 +129,7 @@ export interface CourseSection {
 
 export interface Assignment {
 	id: string;
-	courseId: string;
+	courseId?: string;
 	title: string;
 	instruction: string;
 	deadlineUtc: string;
@@ -109,15 +138,61 @@ export interface Assignment {
 
 export interface Course {
 	id: string;
+	instructorId?: string;
 	title: string;
-	description: string;
-	accessType: CourseAccessType;
+	description?: string;
+	accessType: CourseAccessType | string;
 	price: number;
 	isPublished: boolean;
+	thumbnailUrl?: string | null;
+	createdAtUtc?: string;
 	sections?: CourseSection[];
 	assignments?: Assignment[];
 	isEnrolled?: boolean;
 }
+
+export interface EnrollmentResultDto {
+	enrollmentId: string;
+	userId: string;
+	courseId: string;
+	enrolledAtUtc: string;
+}
+
+export interface SectionResultDto {
+	id: string;
+	courseId: string;
+	title: string;
+	orderIndex: number;
+}
+
+export interface LessonResultDto {
+	id: string;
+	sectionId: string;
+	title: string;
+	type: string;
+	contentUrl?: string | null;
+	textContent?: string | null;
+	durationMinutes: number;
+	orderIndex: number;
+}
+
+export interface AssignmentResultDto {
+	id: string;
+	courseId: string;
+	title: string;
+	instruction: string;
+	deadlineUtc: string;
+	maxScore: number;
+}
+
+export interface SubmissionResultDto {
+	submissionId: string;
+	assignmentId: string;
+	studentId: string;
+	fileUrl: string;
+	submittedAtUtc: string;
+}
+
 
 // Exam Types
 export type QuizMode = 'Simulation' | 'RealExam';

@@ -1,6 +1,15 @@
 <script lang="ts">
 	import type { Lesson } from '#lib/api/types.ts';
-	import { PlayCircle, FileText, Download, AlertCircle, ExternalLink } from '@lucide/svelte';
+	import RichRenderer from '#lib/components/editor/RichRenderer.svelte';
+	import {
+		PlayCircle,
+		FileText,
+		Download,
+		AlertCircle,
+		ExternalLink,
+		BookOpen,
+		AlignLeft
+	} from '@lucide/svelte';
 
 	interface Props {
 		lesson: Lesson;
@@ -51,23 +60,54 @@
 				<h3 class="text-lg font-bold text-base-content">{lesson.title}</h3>
 				<p class="text-xs text-base-content/60">Download the supplementary materials for this lesson.</p>
 			</div>
-			<a
-				href={lesson.contentUrl}
-				download
-				target="_blank"
-				rel="noopener noreferrer"
-				class="btn btn-primary gradient-accent rounded-xl text-white font-semibold border-0 shadow-md gap-2"
-			>
-				<Download class="h-4 w-4" />
-				Download Material
-			</a>
+			{#if lesson.contentUrl}
+				<a
+					href={lesson.contentUrl}
+					download
+					target="_blank"
+					rel="noopener noreferrer"
+					class="btn btn-primary gradient-accent rounded-xl text-white font-semibold border-0 shadow-md gap-2"
+				>
+					<Download class="h-4 w-4" />
+					Download Material
+				</a>
+			{/if}
+		</div>
+	{:else}
+		<!-- Default / Text Lesson: Rich Reading Surface -->
+		<div class="p-8 space-y-6">
+			{#if lesson.textContent}
+				<div class="prose max-w-none">
+					<RichRenderer content={lesson.textContent} />
+				</div>
+			{:else}
+				<div class="flex flex-col items-center justify-center py-12 text-center space-y-2">
+					<AlignLeft class="h-10 w-10 text-base-content/30" />
+					<p class="text-xs text-base-content/50">No text content written for this lesson yet.</p>
+				</div>
+			{/if}
+
+			{#if lesson.contentUrl}
+				<div class="pt-4 border-t border-white/10 flex items-center justify-between">
+					<span class="text-xs text-base-content/60">Attached Reference Resource</span>
+					<a
+						href={lesson.contentUrl}
+						target="_blank"
+						rel="noopener noreferrer"
+						class="btn btn-sm btn-ghost text-xs text-primary hover:bg-primary/10 gap-1.5 rounded-xl font-semibold"
+					>
+						<ExternalLink class="h-3.5 w-3.5" />
+						Open Resource
+					</a>
+				</div>
+			{/if}
 		</div>
 	{/if}
 
 	<!-- Lesson Title & Metadata Bar -->
 	<div class="p-6 border-t border-white/10 space-y-2">
 		<div class="flex items-center gap-2">
-			<span class="badge badge-primary badge-xs uppercase font-bold">{lesson.type}</span>
+			<span class="badge badge-primary badge-xs uppercase font-bold">{lesson.type || 'Text'}</span>
 			{#if lesson.durationMinutes > 0}
 				<span class="text-xs text-base-content/60">{lesson.durationMinutes} minutes</span>
 			{/if}

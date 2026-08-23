@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { CourseSection, Lesson } from '#lib/api/types.ts';
-	import { PlayCircle, FileText, Download, ChevronRight, Clock } from '@lucide/svelte';
+	import { PlayCircle, FileText, Download, ChevronRight, Clock, AlignLeft } from '@lucide/svelte';
 
 	interface Props {
 		sections: CourseSection[];
@@ -16,7 +16,8 @@
 		onSelectLesson
 	}: Props = $props();
 
-	const lessonIcons = {
+	const lessonIcons: Record<string, any> = {
+		Text: AlignLeft,
 		Video: PlayCircle,
 		PdfDocument: FileText,
 		DownloadableFile: Download

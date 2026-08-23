@@ -29,7 +29,7 @@
 	});
 </script>
 
-<div class="prose prose-invert max-w-none text-base-content {className}">
+<div class="prose dark:prose-invert max-w-none text-base-content leading-relaxed {className}">
 	{#if editor}
 		<Edra {editor}>
 			<Edra.Content />

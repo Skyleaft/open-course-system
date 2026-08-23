@@ -30,10 +30,38 @@ public sealed class CourseSection : Entity<Guid>
         };
     }
 
-    public Lesson AddLesson(string title, LessonType type, string contentUrl, int durationMinutes)
+    public void Update(string title, int? orderIndex = null)
     {
-        var lesson = Lesson.Create(Id, title, type, contentUrl, durationMinutes, _lessons.Count + 1);
+        if (string.IsNullOrWhiteSpace(title))
+        {
+            throw new ValidationException("Section title cannot be empty.");
+        }
+
+        Title = title.Trim();
+        if (orderIndex.HasValue)
+        {
+            OrderIndex = orderIndex.Value;
+        }
+    }
+
+    public Lesson AddLesson(
+        string title,
+        LessonType type = LessonType.Text,
+        string? contentUrl = null,
+        int durationMinutes = 0,
+        string? textContent = null)
+    {
+        var lesson = Lesson.Create(Id, title, type, contentUrl, durationMinutes, textContent, _lessons.Count + 1);
         _lessons.Add(lesson);
         return lesson;
+    }
+
+    public void RemoveLesson(Guid lessonId)
+    {
+        var lesson = _lessons.FirstOrDefault(l => l.Id == lessonId);
+        if (lesson is not null)
+        {
+            _lessons.Remove(lesson);
+        }
     }
 }

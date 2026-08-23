@@ -54,16 +54,16 @@
 	});
 </script>
 
-<div class="glass-card relative overflow-hidden rounded-xl border border-white/10 p-2 shadow-inner" style="min-height: {minHeight};">
+<div class="glass-card relative overflow-hidden rounded-2xl border border-base-content/15 shadow-sm bg-base-100/60 transition-all focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
 	{#if editor}
 		<Edra {editor}>
 			{#if !readonly}
-				<div class="glass-panel sticky top-0 z-10 -mx-2 -mt-2 mb-3 border-b border-white/10 px-2 py-1.5 backdrop-blur-md">
+				<div class="sticky top-0 z-10 border-b border-base-content/10 px-2 py-1.5 backdrop-blur-xl bg-base-200/60 rounded-t-2xl">
 					<Edra.Toolbar />
 				</div>
 			{/if}
 
-			<div class="prose prose-invert max-w-none px-3 py-2 focus:outline-none">
+			<div class="prose dark:prose-invert max-w-none px-4 py-3 focus:outline-none text-base-content text-sm leading-relaxed" style="min-height: {minHeight};">
 				<Edra.Content />
 				{#if !readonly}
 					<Edra.BubbleMenu />

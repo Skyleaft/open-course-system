@@ -22,6 +22,7 @@ public static class AddLessonEndpoint
                     Title = request.Title,
                     Type = request.Type,
                     ContentUrl = request.ContentUrl,
+                    TextContent = request.TextContent,
                     DurationMinutes = request.DurationMinutes
                 };
 
@@ -37,5 +38,6 @@ public static class AddLessonEndpoint
 public sealed record AddLessonRequest(
     string Title,
     LessonType Type,
-    string ContentUrl,
+    string? ContentUrl,
+    string? TextContent,
     int DurationMinutes);

@@ -56,9 +56,9 @@
 </script>
 
 <DropdownMenu.Root>
-	<DropdownMenu.Trigger class={buttonVariants({ variant: 'ghost', size: 'icon' })}>
-		<Download />
-		<ChevronDown class="size-2! text-muted-foreground" />
+	<DropdownMenu.Trigger class="btn btn-ghost btn-xs size-7 rounded-lg text-base-content/80 hover:text-base-content hover:bg-base-content/10 flex items-center justify-center gap-0.5 p-0">
+		<Download class="size-3.5" />
+		<ChevronDown class="size-2 text-base-content/60" />
 	</DropdownMenu.Trigger>
 	<DropdownMenu.Portal>
 		<DropdownMenu.Content>

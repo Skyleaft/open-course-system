@@ -60,6 +60,7 @@ public sealed class GetCourseQueryHandler : IQueryHandler<GetCourseQuery, ApiRes
                     l.Title,
                     l.Type.ToString(),
                     l.ContentUrl,
+                    l.TextContent,
                     l.DurationMinutes,
                     l.OrderIndex)).ToList()
             )).ToList();

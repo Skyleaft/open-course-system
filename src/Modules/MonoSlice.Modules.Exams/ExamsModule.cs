@@ -22,6 +22,8 @@ using MonoSlice.Modules.Exams.Features.UpdateExam;
 using MonoSlice.Modules.Exams.Domain.Services;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Contracts;
+using MonoSlice.Shared.Abstractions.Messaging;
+using MonoSlice.Shared.Infrastructure.Messaging;
 
 namespace MonoSlice.Modules.Exams;
 
@@ -59,11 +61,17 @@ public static class ExamsModule
         services.AddScoped<IExamFinalizerService, MonoSlice.Modules.Exams.Domain.Services.ExamFinalizerService>();
         services.AddScoped<IExamsModuleApi, ExamsModuleApi>();
 
+        // Register integration event handlers
+        services.AddTransient<IIntegrationEventHandler<CourseDeletedIntegrationEvent>, EventHandlers.CourseDeletedIntegrationEventHandler>();
+
         return services;
     }
 
     public static IEndpointRouteBuilder MapExamsEndpoints(this IEndpointRouteBuilder app)
     {
+        var dispatcher = app.ServiceProvider.GetService<IIntegrationEventDispatcher>();
+        dispatcher?.RegisterEvent<CourseDeletedIntegrationEvent>();
+
         var examsV1Group = app.MapGroup("/api/v1/exams")
             .WithTags("Exams");
 

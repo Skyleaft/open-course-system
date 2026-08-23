@@ -15,6 +15,8 @@ using MonoSlice.Modules.Communications.Features.GetDiscussionThreads;
 using MonoSlice.Modules.Communications.Features.PostThreadComment;
 using MonoSlice.Modules.Communications.Persistence;
 using MonoSlice.Shared.Abstractions.Contracts;
+using MonoSlice.Shared.Abstractions.Messaging;
+using MonoSlice.Shared.Infrastructure.Messaging;
 
 namespace MonoSlice.Modules.Communications;
 
@@ -50,11 +52,17 @@ public static class CommunicationsModule
         // Register module contract API
         services.AddScoped<ICommunicationsModuleApi, CommunicationsModuleApi>();
 
+        // Register integration event handlers
+        services.AddTransient<IIntegrationEventHandler<CourseDeletedIntegrationEvent>, EventHandlers.CourseDeletedIntegrationEventHandler>();
+
         return services;
     }
 
     public static IEndpointRouteBuilder MapCommunicationsEndpoints(this IEndpointRouteBuilder app)
     {
+        var dispatcher = app.ServiceProvider.GetService<IIntegrationEventDispatcher>();
+        dispatcher?.RegisterEvent<CourseDeletedIntegrationEvent>();
+
         var commsGroup = app.MapGroup("/api/v1/communications")
             .WithTags("Communications");
 

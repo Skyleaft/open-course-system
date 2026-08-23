@@ -91,7 +91,8 @@ public sealed class CoursesDbContext : DbContext
                 .HasMaxLength(50)
                 .IsRequired();
 
-            builder.Property(l => l.ContentUrl).HasMaxLength(1000).IsRequired();
+            builder.Property(l => l.ContentUrl).HasMaxLength(1000).IsRequired(false);
+            builder.Property(l => l.TextContent);
             builder.Property(l => l.DurationMinutes).HasDefaultValue(0);
             builder.Property(l => l.OrderIndex).IsRequired();
             builder.Property(l => l.CreatedAtUtc).IsRequired();
