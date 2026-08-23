@@ -3,6 +3,15 @@ import { authApi } from '#lib/api/auth.ts';
 import { apiClient } from '#lib/api/client.ts';
 import { browser } from '$app/env';
 
+export function getDefaultRouteForUser(user: User | null): string {
+	if (!user) return '/dashboard';
+	const roles = user.roles || [];
+	if (roles.includes('Proctor')) return '/proctor/exams';
+	if (roles.includes('Instructor')) return '/instructor/courses';
+	if (roles.includes('Admin')) return '/dashboard';
+	return '/dashboard'; // Student default
+}
+
 class AuthStore {
 	user = $state<User | null>(null);
 	isLoading = $state<boolean>(true);
@@ -12,6 +21,7 @@ class AuthStore {
 	isInstructor = $derived(this.user?.roles?.includes('Instructor') ?? false);
 	isProctor = $derived(this.user?.roles?.includes('Proctor') ?? false);
 	isAdmin = $derived(this.user?.roles?.includes('Admin') ?? false);
+	defaultRoute = $derived(getDefaultRouteForUser(this.user));
 
 	constructor() {
 		if (browser) {
@@ -45,3 +55,4 @@ class AuthStore {
 }
 
 export const authStore = new AuthStore();
+

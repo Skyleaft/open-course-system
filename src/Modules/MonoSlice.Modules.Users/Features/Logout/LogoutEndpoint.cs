@@ -21,6 +21,6 @@ public static class LogoutEndpoint
             })
             .WithName("Logout")
             .WithSummary("Revoke active user session and logout")
-            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin", "Proctor"));
     }
 }

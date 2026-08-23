@@ -53,6 +53,6 @@ public static class LoginEndpoint
         })
         .WithName("LogoutUser")
         .WithSummary("Logs out the current user")
-        .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
+        .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin", "Proctor"));
     }
 }

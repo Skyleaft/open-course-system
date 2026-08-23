@@ -85,9 +85,11 @@ class ApiClient {
 					return false;
 				}
 
-				const result: ApiResponse<{ accessToken: string; refreshToken: string; expiresAt: string }> = await response.json();
-				if (result.isSuccess && result.data?.accessToken) {
-					this.setTokens(result.data.accessToken, result.data.refreshToken);
+				const result: ApiResponse<{ accessToken: string; refreshToken: string; expiresAt: string }> & { success?: boolean; isSuccess?: boolean } = await response.json();
+				const isSuccess = response.ok && (result.success !== undefined ? result.success : result.isSuccess !== undefined ? result.isSuccess : true);
+				const tokenData = result.data || (result as any);
+				if (isSuccess && tokenData?.accessToken) {
+					this.setTokens(tokenData.accessToken, tokenData.refreshToken);
 					return true;
 				}
 
@@ -143,14 +145,29 @@ class ApiClient {
 
 		const contentType = response.headers.get('content-type');
 		if (contentType && contentType.includes('application/json')) {
-			const result: ApiResponse<T> = await response.json();
+			const result: any = await response.json();
+			const isSuccess =
+				response.ok &&
+				(result.success !== undefined
+					? result.success
+					: result.isSuccess !== undefined
+						? result.isSuccess
+						: true);
 
-			if (!response.ok || !result.isSuccess) {
-				const err = result.error || { code: 'HTTP_ERROR', message: response.statusText };
-				throw new ApiError(err.code, err.message, err.details, response.status);
+			if (!isSuccess) {
+				const code = result.code || result.error?.code || 'HTTP_ERROR';
+				const message =
+					result.detail ||
+					result.message ||
+					result.title ||
+					result.error?.message ||
+					response.statusText ||
+					'An error occurred';
+				const details = result.errors || result.error?.details;
+				throw new ApiError(code, message, details, response.status);
 			}
 
-			return result.data as T;
+			return (result.data !== undefined ? result.data : result) as T;
 		}
 
 		if (!response.ok) {

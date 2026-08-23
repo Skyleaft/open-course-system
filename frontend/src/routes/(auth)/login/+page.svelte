@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { authApi } from '#lib/api/auth.ts';
-	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { authStore, getDefaultRouteForUser } from '#lib/stores/auth.svelte.ts';
 	import { toast } from '#lib/stores/toast.svelte.ts';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { User, Lock, ArrowRight, AlertCircle } from '@lucide/svelte';
 
 	let userNameOrEmail = $state('');
@@ -24,7 +25,13 @@
 			const res = await authApi.login({ userNameOrEmail, password });
 			authStore.setUser(res.user);
 			toast.success(`Welcome back, ${res.user.fullName}!`);
-			goto('/dashboard');
+
+			const returnUrl = page.url.searchParams.get('returnUrl') || page.url.searchParams.get('redirect');
+			if (returnUrl && returnUrl.startsWith('/') && !returnUrl.startsWith('/login') && !returnUrl.startsWith('/register')) {
+				goto(returnUrl);
+			} else {
+				goto(getDefaultRouteForUser(res.user));
+			}
 		} catch (err: any) {
 			errorMessage = err?.message || 'Invalid email, username, or password.';
 		} finally {

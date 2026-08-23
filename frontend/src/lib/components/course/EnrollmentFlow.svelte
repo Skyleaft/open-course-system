@@ -2,6 +2,7 @@
 	import type { Course } from '#lib/api/types.ts';
 	import { coursesApi } from '#lib/api/courses.ts';
 	import { paymentsApi } from '#lib/api/payments.ts';
+	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { toast } from '#lib/stores/toast.svelte.ts';
 	import GlassModal from '#lib/components/ui/GlassModal.svelte';
 	import { Key, DollarSign, CheckCircle2, ArrowRight } from '@lucide/svelte';
@@ -21,6 +22,12 @@
 	let currentOrderId = $state<string | null>(null);
 
 	async function handleEnrollClick() {
+		if (!authStore.isAuthenticated) {
+			toast.info('Please sign in to enroll in this course.');
+			goto(`/login?returnUrl=${encodeURIComponent('/courses/' + course.id)}`);
+			return;
+		}
+
 		if (course.accessType === 'OpenFree') {
 			await executeFreeEnroll();
 		} else if (course.accessType === 'PrivateWithKey') {
