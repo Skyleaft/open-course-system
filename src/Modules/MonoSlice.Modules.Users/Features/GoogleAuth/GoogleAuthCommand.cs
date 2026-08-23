@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using Sannr;
 using MonoSlice.Modules.Users.Features.Login;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;

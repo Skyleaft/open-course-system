@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using Sannr;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
 
@@ -9,6 +9,6 @@ public sealed partial class ForceDisconnectCandidateCommand : ICommand<ApiRespon
     public Guid SubmissionId { get; init; }
 
     [Required]
-    [MaxLength(500)]
+    [StringLength(500)]
     public string Reason { get; init; } = "Disqualified by Proctor";
 }

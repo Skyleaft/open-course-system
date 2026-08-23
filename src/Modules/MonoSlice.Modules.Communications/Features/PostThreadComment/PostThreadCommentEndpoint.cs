@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using Sannr;
 using Mediator;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -7,9 +7,13 @@ using Microsoft.AspNetCore.Routing;
 
 namespace MonoSlice.Modules.Communications.Features.PostThreadComment;
 
-public sealed record PostCommentRequest(
-    Guid? ParentCommentId,
-    [Required] string Content);
+public sealed partial class PostCommentRequest
+{
+    public Guid? ParentCommentId { get; init; }
+
+    [Required]
+    public string Content { get; init; } = string.Empty;
+}
 
 public static class PostThreadCommentEndpoint
 {

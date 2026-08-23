@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using Sannr;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
 
@@ -13,7 +13,7 @@ public sealed partial class RegisterCommand : ICommand<ApiResponse<UserResponseD
     public string? UserName { get; init; }
 
     [Required]
-    [MinLength(6)]
+    [StringLength(100, MinimumLength = 6)]
     public string Password { get; init; } = string.Empty;
 
     public string? FullName { get; init; }

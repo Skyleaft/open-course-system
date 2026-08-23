@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using Sannr;
 using MonoSlice.Modules.Catalog.Domain;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
@@ -10,7 +10,7 @@ public sealed partial class AddLessonCommand : ICommand<ApiResponse<LessonResult
     public Guid SectionId { get; init; }
 
     [Required]
-    [MaxLength(255)]
+    [StringLength(255)]
     public string Title { get; init; } = string.Empty;
 
     public LessonType Type { get; init; } = LessonType.Video;

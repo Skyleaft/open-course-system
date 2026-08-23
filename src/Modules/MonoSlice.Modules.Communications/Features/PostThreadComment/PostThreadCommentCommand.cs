@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using Sannr;
 using MonoSlice.Modules.Communications.Features.GetDiscussionThread;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;

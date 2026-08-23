@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using Sannr;
 using MonoSlice.Modules.Exams.Domain;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
@@ -10,7 +10,7 @@ public sealed partial class CreateExamCommand : ICommand<ApiResponse<ExamDetailD
     public Guid? CourseId { get; init; }
 
     [Required]
-    [MaxLength(255)]
+    [StringLength(255)]
     public string Title { get; init; } = string.Empty;
 
     public string? Description { get; init; }

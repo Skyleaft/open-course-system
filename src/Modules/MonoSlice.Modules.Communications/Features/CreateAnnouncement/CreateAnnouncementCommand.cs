@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using Sannr;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
 
@@ -9,7 +9,7 @@ public sealed partial class CreateAnnouncementCommand : ICommand<ApiResponse<Ann
     public Guid? CourseId { get; init; }
 
     [Required]
-    [MaxLength(255)]
+    [StringLength(255)]
     public string Title { get; init; } = string.Empty;
 
     [Required]

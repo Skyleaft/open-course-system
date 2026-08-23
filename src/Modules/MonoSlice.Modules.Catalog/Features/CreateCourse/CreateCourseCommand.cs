@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using Sannr;
 using MonoSlice.Modules.Catalog.Domain;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
@@ -8,7 +8,7 @@ namespace MonoSlice.Modules.Catalog.Features.CreateCourse;
 public sealed partial class CreateCourseCommand : ICommand<ApiResponse<CourseDetailDto>>
 {
     [Required]
-    [MaxLength(255)]
+    [StringLength(255)]
     public string Title { get; init; } = string.Empty;
 
     public string? Description { get; init; }
