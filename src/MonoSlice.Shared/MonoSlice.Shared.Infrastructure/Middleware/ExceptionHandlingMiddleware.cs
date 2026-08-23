@@ -12,6 +12,9 @@ using MonoSlice.Shared.Infrastructure.Serialization;
 
 namespace MonoSlice.Shared.Infrastructure.Middleware;
 
+/// <summary>
+/// Global exception handling middleware implementing RFC 7807 / RFC 9457 Problem Details.
+/// </summary>
 public sealed class ExceptionHandlingMiddleware
 {
     private readonly RequestDelegate _next;
@@ -40,88 +43,142 @@ public sealed class ExceptionHandlingMiddleware
         var env = context.RequestServices.GetService<IHostEnvironment>();
         var isDevelopment = env?.IsDevelopment() ?? false;
         var traceId = Activity.Current?.Id ?? context.TraceIdentifier;
+        var instance = context.Request.Path.Value ?? "/";
 
-        var (statusCode, response) = exception switch
+        var (statusCode, title, type, code, detail, errors) = exception switch
         {
             BadHttpRequestException badHttp => (
-                HttpStatusCode.BadRequest,
-                ApiResponse.Fail(badHttp.InnerException is JsonException jsonEx
+                400,
+                "Bad Request",
+                ProblemTypes.BadRequest,
+                "BadHttpRequest",
+                badHttp.InnerException is JsonException jsonEx
                     ? $"Malformed request payload: {jsonEx.Message}"
-                    : badHttp.Message, statusCode: 400)),
+                    : badHttp.Message,
+                (IReadOnlyDictionary<string, string[]>?)null),
 
             JsonException jsonException => (
-                HttpStatusCode.BadRequest,
-                ApiResponse.Fail($"Invalid JSON payload: {jsonException.Message}", statusCode: 400)),
+                400,
+                "Invalid JSON Payload",
+                ProblemTypes.BadRequest,
+                "InvalidJson",
+                $"Invalid JSON payload: {jsonException.Message}",
+                null),
 
             FormatException formatException => (
-                HttpStatusCode.BadRequest,
-                ApiResponse.Fail($"Invalid parameter format: {formatException.Message}", statusCode: 400)),
+                400,
+                "Invalid Parameter Format",
+                ProblemTypes.BadRequest,
+                "InvalidFormat",
+                $"Invalid parameter format: {formatException.Message}",
+                null),
 
             ValidationException validation => (
-                HttpStatusCode.BadRequest,
-                ApiResponse.Fail(validation.Message, validation.Errors, statusCode: 400)),
+                validation.StatusCode,
+                validation.Title,
+                validation.Type ?? ProblemTypes.ValidationError,
+                validation.Code,
+                validation.Message,
+                (IReadOnlyDictionary<string, string[]>?)validation.Errors),
 
-            NotFoundException notFound => (
-                HttpStatusCode.NotFound,
-                ApiResponse.Fail(notFound.Message, statusCode: 404)),
-
-            BusinessRuleException business => (
-                HttpStatusCode.UnprocessableEntity,
-                ApiResponse.Fail(business.Message, statusCode: 422)),
-
-            ForbiddenException forbidden => (
-                HttpStatusCode.Forbidden,
-                ApiResponse.Fail(forbidden.Message, statusCode: 403)),
+            AppException appEx => (
+                appEx.StatusCode,
+                appEx.Title,
+                appEx.Type ?? ApiResponse.GetDefaultType(appEx.StatusCode),
+                appEx.Code,
+                appEx.Message,
+                appEx.ValidationErrors),
 
             UnauthorizedAccessException unauthorized => (
-                HttpStatusCode.Unauthorized,
-                ApiResponse.Fail(unauthorized.Message, statusCode: 401)),
+                401,
+                "Unauthorized",
+                ProblemTypes.Unauthorized,
+                "Auth.Unauthorized",
+                unauthorized.Message,
+                null),
 
             DbUpdateConcurrencyException => (
-                HttpStatusCode.Conflict,
-                ApiResponse.Fail("A concurrency conflict occurred. The resource was modified or deleted by another operation.", statusCode: 409)),
+                409,
+                "Concurrency Conflict",
+                ProblemTypes.Conflict,
+                "Database.ConcurrencyConflict",
+                "A concurrency conflict occurred. The resource was modified or deleted by another operation.",
+                null),
 
             DbUpdateException dbEx => (
-                HttpStatusCode.Conflict,
-                ApiResponse.Fail(isDevelopment ? $"Database update error: {dbEx.InnerException?.Message ?? dbEx.Message}" : "A database constraint violation occurred.", statusCode: 409)),
+                409,
+                "Database Conflict",
+                ProblemTypes.Conflict,
+                "Database.ConstraintViolation",
+                isDevelopment
+                    ? $"Database update error: {dbEx.InnerException?.Message ?? dbEx.Message}"
+                    : "A database constraint violation occurred.",
+                null),
 
             TimeoutException or TaskCanceledException when !context.RequestAborted.IsCancellationRequested => (
-                HttpStatusCode.RequestTimeout,
-                ApiResponse.Fail("The requested operation timed out.", statusCode: 408)),
+                408,
+                "Request Timeout",
+                ProblemTypes.InternalServerError,
+                "Request.Timeout",
+                "The requested operation timed out.",
+                null),
 
             OperationCanceledException when context.RequestAborted.IsCancellationRequested => (
-                (HttpStatusCode)499, // Client Closed Request
-                ApiResponse.Fail("The client cancelled the request.", statusCode: 499)),
+                499, // Client Closed Request
+                "Client Closed Request",
+                "about:blank",
+                "Client.ClosedRequest",
+                "The client cancelled the request.",
+                null),
 
             NotImplementedException => (
-                HttpStatusCode.NotImplemented,
-                ApiResponse.Fail("The requested feature is not implemented.", statusCode: 501)),
+                501,
+                "Not Implemented",
+                ProblemTypes.InternalServerError,
+                "Server.NotImplemented",
+                "The requested feature is not implemented.",
+                null),
 
             _ => (
-                HttpStatusCode.InternalServerError,
-                ApiResponse.Fail(isDevelopment
+                500,
+                "Internal Server Error",
+                ProblemTypes.InternalServerError,
+                "Server.InternalError",
+                isDevelopment
                     ? $"An unexpected error occurred: [{exception.GetType().Name}] {exception.Message} | StackTrace: {exception.StackTrace}"
-                    : "An unexpected error occurred. Please try again later.", statusCode: 500))
+                    : "An unexpected error occurred. Please try again later.",
+                null)
         };
 
-        response.TraceId = traceId;
-
-        var httpStatusCode = (int)statusCode;
-        if (httpStatusCode >= 500)
+        var response = new ApiResponse
         {
-            _logger.LogError(exception, "[{TraceId}] HTTP {Method} {Path} failed with {StatusCode}: {Message}",
-                traceId, context.Request.Method, context.Request.Path, httpStatusCode, exception.Message);
+            Success = false,
+            Status = statusCode,
+            Title = title,
+            Detail = detail,
+            Type = type,
+            Instance = instance,
+            Code = code,
+            Errors = errors,
+            TraceId = traceId
+        };
+
+        if (statusCode >= 500)
+        {
+            _logger.LogError(exception, "[{TraceId}] HTTP {Method} {Path} failed with {StatusCode} ({Code}): {Message}",
+                traceId, context.Request.Method, context.Request.Path, statusCode, code, detail);
         }
         else
         {
-            _logger.LogWarning("[{TraceId}] Handled client exception [{StatusCode}] on HTTP {Method} {Path}: {Message}",
-                traceId, httpStatusCode, context.Request.Method, context.Request.Path, exception.Message);
+            _logger.LogWarning("[{TraceId}] Handled client exception [{StatusCode}] ({Code}) on HTTP {Method} {Path}: {Message}",
+                traceId, statusCode, code, context.Request.Method, context.Request.Path, detail);
         }
 
-        context.Response.ContentType = "application/json; charset=utf-8";
-        context.Response.StatusCode = httpStatusCode;
+        context.Response.ContentType = "application/problem+json; charset=utf-8";
+        context.Response.StatusCode = statusCode;
 
         await context.Response.WriteAsync(JsonSerializer.Serialize(response, SharedJsonSerializerContext.DefaultOptions));
     }
 }
+
 

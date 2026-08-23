@@ -47,24 +47,6 @@ public class SharedInfrastructureTests
     }
 
     [Fact]
-    public void ApiErrorResponse_Validation_ShouldStructureErrorsCorrectly()
-    {
-        var errors = new Dictionary<string, string[]>
-        {
-            ["Email"] = ["Email is required.", "Invalid email format."],
-            ["Password"] = ["Password too short."]
-        };
-
-        var response = ApiErrorResponse.Validation(errors);
-
-        Assert.False(response.Success);
-        Assert.Equal("VALIDATION_ERROR", response.Code);
-        Assert.Equal(400, response.StatusCode);
-        Assert.Equal(3, response.Errors?.Count);
-        Assert.Equal(2, response.ValidationErrors?.Count);
-    }
-
-    [Fact]
     public async Task InMemoryDistributedLock_ShouldAcquireAndRelease()
     {
         var lockService = new InMemoryDistributedLock();

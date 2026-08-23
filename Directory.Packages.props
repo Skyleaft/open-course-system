@@ -5,6 +5,7 @@
   <ItemGroup Label="Mediator">
     <PackageVersion Include="Mediator.Abstractions" Version="3.0.2" />
     <PackageVersion Include="Mediator.SourceGenerator" Version="3.0.2" />
+    <PackageVersion Include="Sannr" Version="1.6.0" />
   </ItemGroup>
   <ItemGroup Label="EF Core">
     <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
