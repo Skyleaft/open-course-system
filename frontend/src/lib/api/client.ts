@@ -18,28 +18,41 @@ export class ApiError extends Error {
 class ApiClient {
 	private baseUrl: string;
 	private accessToken: string | null = null;
+	private refreshToken: string | null = null;
 	private refreshPromise: Promise<boolean> | null = null;
 
 	constructor(baseUrl: string = API_BASE_URL) {
 		this.baseUrl = baseUrl;
 		if (browser) {
 			this.accessToken = localStorage.getItem('access_token');
+			this.refreshToken = localStorage.getItem('refresh_token');
 		}
 	}
 
-	setTokens(accessToken: string | null) {
+	setTokens(accessToken: string | null, refreshToken: string | null = null) {
 		this.accessToken = accessToken;
+		this.refreshToken = refreshToken;
 		if (browser) {
 			if (accessToken) {
 				localStorage.setItem('access_token', accessToken);
 			} else {
 				localStorage.removeItem('access_token');
 			}
+
+			if (refreshToken) {
+				localStorage.setItem('refresh_token', refreshToken);
+			} else if (refreshToken === null && accessToken === null) {
+				localStorage.removeItem('refresh_token');
+			}
 		}
 	}
 
 	getAccessToken(): string | null {
 		return this.accessToken;
+	}
+
+	getRefreshToken(): string | null {
+		return this.refreshToken;
 	}
 
 	private async handleRefreshToken(): Promise<boolean> {
@@ -49,27 +62,39 @@ class ApiClient {
 
 		this.refreshPromise = (async () => {
 			try {
-				const response = await fetch(`${this.baseUrl}/api/v1/auth/refresh-token`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					credentials: 'include' // sends HttpOnly refresh token cookie
-				});
+				const currentAccessToken = this.accessToken;
+				const currentRefreshToken = this.refreshToken;
 
-				if (!response.ok) {
-					this.setTokens(null);
+				if (!currentAccessToken || !currentRefreshToken) {
+					this.setTokens(null, null);
 					return false;
 				}
 
-				const result: ApiResponse<{ accessToken: string }> = await response.json();
+				const response = await fetch(`${this.baseUrl}/api/v1/auth/refresh-token`, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						accessToken: currentAccessToken,
+						refreshToken: currentRefreshToken
+					}),
+					credentials: 'include' // sends HttpOnly refresh token cookie if enabled
+				});
+
+				if (!response.ok) {
+					this.setTokens(null, null);
+					return false;
+				}
+
+				const result: ApiResponse<{ accessToken: string; refreshToken: string; expiresAt: string }> = await response.json();
 				if (result.isSuccess && result.data?.accessToken) {
-					this.setTokens(result.data.accessToken);
+					this.setTokens(result.data.accessToken, result.data.refreshToken);
 					return true;
 				}
 
-				this.setTokens(null);
+				this.setTokens(null, null);
 				return false;
 			} catch {
-				this.setTokens(null);
+				this.setTokens(null, null);
 				return false;
 			} finally {
 				this.refreshPromise = null;

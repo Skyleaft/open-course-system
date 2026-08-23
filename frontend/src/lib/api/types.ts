@@ -16,27 +16,58 @@ export interface ApiErrorResponse {
 	details?: Record<string, string[]>;
 }
 
-export type UserRole = 'Student' | 'Instructor' | 'Admin' | 'Proctor';
+export type UserRole = 'Student' | 'Instructor' | 'Admin' | 'Proctor' | string;
+
+export interface UserInfoDto {
+	id: string;
+	userName: string;
+	email: string;
+	fullName: string;
+	picture?: string | null;
+	roles: string[];
+}
+
+export interface UserResponseDto {
+	id: string;
+	userName: string;
+	email: string;
+	fullName: string;
+	firstName?: string | null;
+	lastName?: string | null;
+	picture?: string | null;
+	roles: string[];
+	createdAt?: string;
+}
 
 export interface User {
 	id: string;
+	userName?: string;
 	email: string;
 	fullName: string;
-	roles: UserRole[];
+	firstName?: string | null;
+	lastName?: string | null;
+	picture?: string | null;
+	roles: string[];
 	lastSeen?: string;
-	isActive: boolean;
+	isActive?: boolean;
+	createdAt?: string;
 }
 
-export interface AuthTokens {
+export interface LoginResponseDto {
 	accessToken: string;
 	refreshToken: string;
-	expiresIn: number;
+	expiresAt: string;
+	user: UserInfoDto;
 }
 
-export interface AuthResponse {
-	user: User;
-	tokens: AuthTokens;
+export interface RefreshTokenResponseDto {
+	accessToken: string;
+	refreshToken: string;
+	expiresAt: string;
 }
+
+// Backward compatibility alias
+export type AuthResponse = LoginResponseDto;
 
 // Course Types
 export type CourseAccessType = 'OpenFree' | 'OpenPaid' | 'PrivateWithKey';
