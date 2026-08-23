@@ -2,9 +2,10 @@
 	import { authApi } from '#lib/api/auth.ts';
 	import { toast } from '#lib/stores/toast.svelte.ts';
 	import { goto } from '$app/navigation';
-	import { Mail, Lock, User, ArrowRight, AlertCircle } from '@lucide/svelte';
+	import { Mail, Lock, User, AtSign, ArrowRight, AlertCircle } from '@lucide/svelte';
 
 	let fullName = $state('');
+	let userName = $state('');
 	let email = $state('');
 	let password = $state('');
 	let confirmPassword = $state('');
@@ -28,7 +29,7 @@
 		errorMessage = null;
 
 		try {
-			await authApi.register({ fullName, email, password });
+			await authApi.register({ fullName, userName, email, password });
 			toast.success('Registration successful! Please sign in with your credentials.');
 			goto('/login');
 		} catch (err: any) {
@@ -65,6 +66,23 @@
 					class="glass-input input input-sm h-11 w-full rounded-xl pl-9 text-sm focus:outline-none"
 					placeholder="Jane Doe"
 					bind:value={fullName}
+					required
+				/>
+			</div>
+		</div>
+
+		<div class="space-y-1.5">
+			<label class="text-xs font-semibold text-base-content/80" for="userName">Username</label>
+			<div class="relative">
+				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base-content/40">
+					<AtSign class="h-4 w-4" />
+				</div>
+				<input
+					id="userName"
+					type="text"
+					class="glass-input input input-sm h-11 w-full rounded-xl pl-9 text-sm focus:outline-none"
+					placeholder="janedoe"
+					bind:value={userName}
 					required
 				/>
 			</div>

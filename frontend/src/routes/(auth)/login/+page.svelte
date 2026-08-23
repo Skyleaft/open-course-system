@@ -3,17 +3,17 @@
 	import { authStore } from '#lib/stores/auth.svelte.ts';
 	import { toast } from '#lib/stores/toast.svelte.ts';
 	import { goto } from '$app/navigation';
-	import { Mail, Lock, ArrowRight, AlertCircle } from '@lucide/svelte';
+	import { User, Lock, ArrowRight, AlertCircle } from '@lucide/svelte';
 
-	let email = $state('');
+	let userNameOrEmail = $state('');
 	let password = $state('');
 	let isLoading = $state(false);
 	let errorMessage = $state<string | null>(null);
 
 	async function handleLogin(e: Event) {
 		e.preventDefault();
-		if (!email || !password) {
-			errorMessage = 'Please enter both email and password.';
+		if (!userNameOrEmail || !password) {
+			errorMessage = 'Please enter both email/username and password.';
 			return;
 		}
 
@@ -21,12 +21,12 @@
 		errorMessage = null;
 
 		try {
-			const res = await authApi.login({ email, password });
+			const res = await authApi.login({ userNameOrEmail, password });
 			authStore.setUser(res.user);
 			toast.success(`Welcome back, ${res.user.fullName}!`);
 			goto('/dashboard');
 		} catch (err: any) {
-			errorMessage = err?.message || 'Invalid email or password.';
+			errorMessage = err?.message || 'Invalid email, username, or password.';
 		} finally {
 			isLoading = false;
 		}
@@ -48,17 +48,17 @@
 
 	<form onsubmit={handleLogin} class="space-y-4">
 		<div class="space-y-1.5">
-			<label class="text-xs font-semibold text-base-content/80" for="email">Email Address</label>
+			<label class="text-xs font-semibold text-base-content/80" for="userNameOrEmail">Email or Username</label>
 			<div class="relative">
 				<div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-base-content/40">
-					<Mail class="h-4 w-4" />
+					<User class="h-4 w-4" />
 				</div>
 				<input
-					id="email"
-					type="email"
+					id="userNameOrEmail"
+					type="text"
 					class="glass-input input input-sm h-11 w-full rounded-xl pl-9 text-sm focus:outline-none"
-					placeholder="student@example.com"
-					bind:value={email}
+					placeholder="student@example.com or username"
+					bind:value={userNameOrEmail}
 					required
 				/>
 			</div>
