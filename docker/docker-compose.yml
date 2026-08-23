@@ -155,7 +155,7 @@ services:
       - lms-network
 
   # =========================================================================
-  # 6. FRONTEND APPLICATION (SvelteKit 2)
+  # 6. FRONTEND APPLICATION (SvelteKit V3 RC)
   # =========================================================================
   frontend:
     build:

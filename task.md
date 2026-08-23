@@ -19,7 +19,7 @@
 | **Phase 7** | **Realtime Anti-Cheat & SignalR Engine** | ExamHub, Redis backplane, violation broadcasts, proctor live stream | `[x]` |
 | **Phase 8** | **Assessments & Certification Module** | Redis Stream grading consumer, retry/DLQ handling, SHA-256 cert generator | `[x]` |
 | **Phase 9** | **Communications Module** | Global/Course announcements, nested discussion threads | `[x]` |
-| **Phase 10** | **Frontend Client (SvelteKit V3 RC)** | Student portal, exam runner + anti-cheat worker, instructor & proctor apps | `[ ]` |
+| **Phase 10** | **Frontend Client (SvelteKit V3 RC)** | Student portal, exam runner + anti-cheat worker, instructor & proctor apps | `[x]` |
 | **Phase 11** | **Integration, Testing & Hardening** | Unit/Domain tests, WebApplicationFactory integration tests, load tests | `[ ]` |
 
 ---
@@ -262,100 +262,100 @@
 
 ## Phase 10: Frontend Client Application (SvelteKit V3 RC, daisyUI 5 & Edra)
 
-- [ ] **10.1. Project Initialization & Design System Foundations**
-  - [ ] Initialize SvelteKit V3 RC project in `frontend/` with TypeScript and Svelte 5 runes support.
-  - [ ] Configure `vite.config.ts` (consolidated config) with `#lib` subpath alias and `$app/tsconfig`.
-  - [ ] Install and configure Tailwind CSS 4 with daisyUI 5 plugin (`dark` default and `light` themes).
-  - [ ] Implement Glassmorphism design system in `src/app.css` (`glass-panel`, `glass-card`, `glass-navbar`, `glass-sidebar`, `glass-modal`, `gradient-accent`).
-  - [ ] Configure Google Fonts (Inter) and JetBrains Mono typography tokens.
-  - [ ] Integrate Edra rich text editor (Tiptap + Svelte 5) with extensions (StarterKit, KaTeX Math, Lowlight Codeblock, Tables, TaskList, Mermaid, Callouts, Slash Commands).
-  - [ ] Build reusable `RichEditor.svelte` and `RichRenderer.svelte` wrapper components.
-  - [ ] Configure `@sveltejs/adapter-node` and multi-stage production `Dockerfile`.
+- [x] **10.1. Project Initialization & Design System Foundations**
+  - [x] Initialize SvelteKit V3 RC project in `frontend/` with TypeScript and Svelte 5 runes support.
+  - [x] Configure `vite.config.ts` (consolidated config) with `#lib` subpath alias and `$app/tsconfig`.
+  - [x] Install and configure Tailwind CSS 4 with daisyUI 5 plugin (`dark` default and `light` themes).
+  - [x] Implement Glassmorphism design system in `src/app.css` (`glass-panel`, `glass-card`, `glass-navbar`, `glass-sidebar`, `glass-modal`, `gradient-accent`).
+  - [x] Configure Google Fonts (Inter) and JetBrains Mono typography tokens.
+  - [x] Integrate Edra rich text editor (Tiptap + Svelte 5) with extensions (StarterKit, KaTeX Math, Lowlight Codeblock, Tables, TaskList, Mermaid, Callouts, Slash Commands).
+  - [x] Build reusable `RichEditor.svelte` and `RichRenderer.svelte` wrapper components.
+  - [x] Configure `@sveltejs/adapter-node` and multi-stage production `Dockerfile`.
 
-- [ ] **10.2. Core Client Infrastructure & SignalR**
-  - [ ] Implement `ApiClient` (`#lib/api/client.ts`) with typed `ApiResponse<T>` unwrapping and concurrent 401 JWT refresh deduplication.
-  - [ ] Implement `AuthStore` (`#lib/stores/auth.svelte.ts`) with Svelte 5 runes (`$state`, `$derived`).
-  - [ ] Implement server hooks (`hooks.server.ts`) for session cookie validation, route guards, and CSP security headers.
-  - [ ] Implement SignalR connection factory with exponential backoff (`#lib/signalr/connection.ts`).
-  - [ ] Implement strongly-typed `ExamHubClient` (`#lib/signalr/exam-hub.ts`) and `NotificationHubClient`.
-  - [ ] Implement global Toast notification store and floating glass toast stack.
+- [x] **10.2. Core Client Infrastructure & SignalR**
+  - [x] Implement `ApiClient` (`#lib/api/client.ts`) with typed `ApiResponse<T>` unwrapping and concurrent 401 JWT refresh deduplication.
+  - [x] Implement `AuthStore` (`#lib/stores/auth.svelte.ts`) with Svelte 5 runes (`$state`, `$derived`).
+  - [x] Implement server hooks (`hooks.server.ts`) for session cookie validation, route guards, and CSP security headers.
+  - [x] Implement SignalR connection factory with exponential backoff (`#lib/signalr/connection.ts`).
+  - [x] Implement strongly-typed `ExamHubClient` (`#lib/signalr/exam-hub.ts`) and `NotificationHubClient`.
+  - [x] Implement global Toast notification store and floating glass toast stack.
 
-- [ ] **10.3. Layout & Shared UI Component Library**
-  - [ ] Build `Navbar.svelte` with frosted glass styling, dynamic breadcrumbs, role badges, and theme switcher.
-  - [ ] Build `Sidebar.svelte` with role-based navigation links and collapsed state.
-  - [ ] Build `PageShell.svelte` master layout.
-  - [ ] Build core UI atoms: `GlassCard`, `GlassModal`, `StatCard`, `SearchInput`, `ConfirmModal`, `EmptyState`.
-  - [ ] Build `FileUpload.svelte` with direct presigned S3 upload and progress bar.
+- [x] **10.3. Layout & Shared UI Component Library**
+  - [x] Build `Navbar.svelte` with frosted glass styling, dynamic breadcrumbs, role badges, and theme switcher.
+  - [x] Build `Sidebar.svelte` with role-based navigation links and collapsed state.
+  - [x] Build `PageShell.svelte` master layout.
+  - [x] Build core UI atoms: `GlassCard`, `GlassModal`, `StatCard`, `SearchInput`, `ConfirmModal`, `EmptyState`.
+  - [x] Build `FileUpload.svelte` with direct presigned S3 upload and progress bar.
 
-- [ ] **10.4. Authentication Flow**
-  - [ ] Implement Login page (`/login`) with email/password form and Google OAuth button.
-  - [ ] Implement Register page (`/register`) with client/server validation.
-  - [ ] Implement centered glassmorphism auth layout with subtle glow particles.
-  - [ ] Implement Logout action, Redis session guard invalidation, and token cleanup.
+- [x] **10.4. Authentication Flow**
+  - [x] Implement Login page (`/login`) with email/password form and Google OAuth button.
+  - [x] Implement Register page (`/register`) with client/server validation.
+  - [x] Implement centered glassmorphism auth layout with subtle glow particles.
+  - [x] Implement Logout action, Redis session guard invalidation, and token cleanup.
 
-- [ ] **10.5. Student Portal: Course Catalog & Learning Player**
-  - [ ] Course Catalog (`/courses`) with category filters, access type badges, search, and daisyUI pagination.
-  - [ ] Course Details (`/courses/[id]`) with curriculum preview accordion and dynamic enrollment CTA.
-  - [ ] Enrollment flow handler: `OpenFree` instant enroll, `OpenPaid` mock checkout flow, `PrivateWithKey` enrollment key modal.
-  - [ ] Learning Player (`/courses/[id]/learn`) with split sidebar syllabus navigation.
-  - [ ] Video Player with streaming MinIO presigned URL.
-  - [ ] PDF Document Viewer and Downloadable File handler.
-  - [ ] Lesson Discussion sidebar with Edra rich comment composer.
+- [x] **10.5. Student Portal: Course Catalog & Learning Player**
+  - [x] Course Catalog (`/courses`) with category filters, access type badges, search, and daisyUI pagination.
+  - [x] Course Details (`/courses/[id]`) with curriculum preview accordion and dynamic enrollment CTA.
+  - [x] Enrollment flow handler: `OpenFree` instant enroll, `OpenPaid` mock checkout flow, `PrivateWithKey` enrollment key modal.
+  - [x] Learning Player (`/courses/[id]/learn`) with split sidebar syllabus navigation.
+  - [x] Video Player with streaming MinIO presigned URL.
+  - [x] PDF Document Viewer and Downloadable File handler.
+  - [x] Lesson Discussion sidebar with Edra rich comment composer.
 
-- [ ] **10.6. Student Portal: Assignments, Grades & Certificates**
-  - [ ] Assignment Details & Submission view (`/courses/[id]/assignments/[assignmentId]`) with Edra instructions and deadline timer.
-  - [ ] Assignment submission component with direct file upload to MinIO.
-  - [ ] My Grades page (`/grades`) displaying course score breakdown.
-  - [ ] Certificates page (`/certificates`) showing earned digital certificates with SHA-256 integrity hash.
-  - [ ] Public Certificate Verification page (`/certificates/verify/[hash]`).
+- [x] **10.6. Student Portal: Assignments, Grades & Certificates**
+  - [x] Assignment Details & Submission view (`/courses/[id]/assignments/[assignmentId]`) with Edra instructions and deadline timer.
+  - [x] Assignment submission component with direct file upload to MinIO.
+  - [x] My Grades page (`/grades`) displaying course score breakdown.
+  - [x] Certificates page (`/certificates`) showing earned digital certificates with SHA-256 integrity hash.
+  - [x] Public Certificate Verification page (`/certificates/verify/[hash]`).
 
-- [ ] **10.7. Strict Realtime Exam Runner & Anti-Cheat Engine**
-  - [ ] Pre-Exam Checker (`/exams/[id]/start`): webcam/microphone check, local PiP video preview, fullscreen trigger.
-  - [ ] Realtime Exam Runner (`/exams/submissions/[submissionId]`):
-    - [ ] Synchronized countdown timer with server time drift compensation.
-    - [ ] Question palette grid with answered, unanswered, and flagged indicators.
-    - [ ] Question cards supporting SingleChoice, MultipleChoice, TrueFalse, and Essay (Edra editor).
-  - [ ] Client Security Interceptors (RealExam mode):
-    - [ ] `visibilitychange` detector $\rightarrow$ SignalR `ReportViolation("TabSwitch")`.
-    - [ ] `window.onblur` detector $\rightarrow$ SignalR `ReportViolation("WindowFocusLoss")`.
-    - [ ] `fullscreenchange` detector $\rightarrow$ SignalR `ReportViolation("FullscreenExit")`.
-    - [ ] Context menu and key shortcut lock (`Ctrl+C`, `Ctrl+V`, `Alt+Tab`, `F12`).
-  - [ ] Web Worker Snapshot Capture Engine (`snapshot.worker.ts`):
-    - [ ] Randomized 30–60s interval worker.
-    - [ ] Offscreen canvas frame capture $\rightarrow$ WebP export.
-    - [ ] Presigned upload request $\rightarrow$ direct PUT to MinIO bucket `exam-snapshots`.
-    - [ ] SignalR `ReportSnapshotUploaded` notification.
-  - [ ] Redis answer buffer autosaving with debouncing (Zero DB writes) and auto-recovery on page reload.
-  - [ ] Finish exam confirmation modal, stream event publication, and redirect to result.
-  - [ ] Simulation Mode instant review screen with answer keys, explanations, and score summary.
+- [x] **10.7. Strict Realtime Exam Runner & Anti-Cheat Engine**
+  - [x] Pre-Exam Checker (`/exams/[id]/start`): webcam/microphone check, local PiP video preview, fullscreen trigger.
+  - [x] Realtime Exam Runner (`/exams/submissions/[submissionId]`):
+    - [x] Synchronized countdown timer with server time drift compensation.
+    - [x] Question palette grid with answered, unanswered, and flagged indicators.
+    - [x] Question cards supporting SingleChoice, MultipleChoice, TrueFalse, and Essay (Edra editor).
+  - [x] Client Security Interceptors (RealExam mode):
+    - [x] `visibilitychange` detector $\rightarrow$ SignalR `ReportViolation("TabSwitch")`.
+    - [x] `window.onblur` detector $\rightarrow$ SignalR `ReportViolation("WindowFocusLoss")`.
+    - [x] `fullscreenchange` detector $\rightarrow$ SignalR `ReportViolation("FullscreenExit")`.
+    - [x] Context menu and key shortcut lock (`Ctrl+C`, `Ctrl+V`, `Alt+Tab`, `F12`).
+  - [x] Web Worker Snapshot Capture Engine (`snapshot.worker.ts`):
+    - [x] Randomized 30–60s interval worker.
+    - [x] Offscreen canvas frame capture $\rightarrow$ WebP export.
+    - [x] Presigned upload request $\rightarrow$ direct PUT to MinIO bucket `exam-snapshots`.
+    - [x] SignalR `ReportSnapshotUploaded` notification.
+  - [x] Redis answer buffer autosaving with debouncing (Zero DB writes) and auto-recovery on page reload.
+  - [x] Finish exam confirmation modal, stream event publication, and redirect to result.
+  - [x] Simulation Mode instant review screen with answer keys, explanations, and score summary.
 
-- [ ] **10.8. Instructor Dashboard**
-  - [ ] Course & Curriculum Builder (`/instructor/courses/create`, `/edit`):
-    - [ ] Edra editor for course descriptions and lesson content.
-    - [ ] Drag-and-drop section and lesson reordering.
-    - [ ] Material upload (video/PDF) via presigned MinIO URLs.
-  - [ ] Exam & Question Bank Builder (`/instructor/exams/create`, `/edit`):
-    - [ ] Mode selector (Simulation vs RealExam), duration, passing score, max violations.
-    - [ ] Question manager with Edra rich prompt/explanation formatting and option answer keys.
-  - [ ] Assignment Grading Panel: submission review, score entry, and Edra feedback writer.
-  - [ ] Course Announcement & Discussion moderation tools.
+- [x] **10.8. Instructor Dashboard**
+  - [x] Course & Curriculum Builder (`/instructor/courses/create`, `/edit`):
+    - [x] Edra editor for course descriptions and lesson content.
+    - [x] Drag-and-drop section and lesson reordering.
+    - [x] Material upload (video/PDF) via presigned MinIO URLs.
+  - [x] Exam & Question Bank Builder (`/instructor/exams/create`, `/edit`):
+    - [x] Mode selector (Simulation vs RealExam), duration, passing score, max violations.
+    - [x] Question manager with Edra rich prompt/explanation formatting and option answer keys.
+  - [x] Assignment Grading Panel: submission review, score entry, and Edra feedback writer.
+  - [x] Course Announcement & Discussion moderation tools.
 
-- [ ] **10.9. Live Proctor & Examination Monitoring Console**
-  - [ ] Live candidate grid view (`/proctor/exams/[quizId]/live`) with liveness indicator and violation badges.
-  - [ ] Real-time violation alert feed from SignalR `ProctorViolationAlert`.
-  - [ ] Candidate webcam snapshot timeline modal with presigned view links.
-  - [ ] Proctor intervention actions: Send warning popup, Force Disconnect / Disqualify candidate.
+- [x] **10.9. Live Proctor & Examination Monitoring Console**
+  - [x] Live candidate grid view (`/proctor/exams/[quizId]/live`) with liveness indicator and violation badges.
+  - [x] Real-time violation alert feed from SignalR `ProctorViolationAlert`.
+  - [x] Candidate webcam snapshot timeline modal with presigned view links.
+  - [x] Proctor intervention actions: Send warning popup, Force Disconnect / Disqualify candidate.
 
-- [ ] **10.10. Communications Module UI**
-  - [ ] Platform & Course Announcements list (`/announcements`) with pinned item priorities.
-  - [ ] Discussion Threads listing with search and pagination.
-  - [ ] Hierarchical nested comment tree with Edra composer and thread closing indicator.
+- [x] **10.10. Communications Module UI**
+  - [x] Platform & Course Announcements list (`/announcements`) with pinned item priorities.
+  - [x] Discussion Threads listing with search and pagination.
+  - [x] Hierarchical nested comment tree with Edra composer and thread closing indicator.
 
-- [ ] **10.11. Polish, Optimization & Container Wiring**
-  - [ ] Responsive layout validation across mobile, tablet, and desktop viewports.
-  - [ ] Skeleton loaders, empty state illustrations, and glassmorphic micro-animations.
-  - [ ] SvelteKit V3 error boundary and fallback pages (404, 500, unauthorized).
-  - [ ] Update `docker/docker-compose.yml` to wire SvelteKit V3 container with backend and MinIO networks.
+- [x] **10.11. Polish, Optimization & Container Wiring**
+  - [x] Responsive layout validation across mobile, tablet, and desktop viewports.
+  - [x] Skeleton loaders, empty state illustrations, and glassmorphic micro-animations.
+  - [x] SvelteKit V3 error boundary and fallback pages (404, 500, unauthorized).
+  - [x] Update `docker/docker-compose.yml` to wire SvelteKit V3 container with backend and MinIO networks.
 
 ---
 
