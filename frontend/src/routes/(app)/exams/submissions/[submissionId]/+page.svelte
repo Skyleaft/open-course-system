@@ -328,6 +328,9 @@
 	function handleEssayChange(text: string) {
 		if (!currentQuestion) return;
 		const qId = currentQuestion.id;
+		const existingText = answers[qId]?.essayText || '';
+		if (existingText === text) return;
+
 		answers[qId] = {
 			...answers[qId],
 			selectedOptionIds: answers[qId]?.selectedOptionIds || [],
@@ -374,7 +377,7 @@
 	}
 </script>
 
-<div class="space-y-6">
+<div class="space-y-5 pb-12">
 	{#if isLoading}
 		<div class="space-y-6 max-w-7xl mx-auto py-8">
 			<div class="glass-panel h-16 rounded-2xl animate-pulse"></div>
@@ -409,59 +412,57 @@
 			{terminationReason}
 		/>
 
-		<!-- Top Sticky Exam Bar -->
-		<div class="glass-navbar sticky top-16 z-30 -mx-4 -mt-4 px-4 py-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 border-b border-base-content/10">
-			<div class="mx-auto flex max-w-7xl items-center justify-between gap-4">
-				<!-- Left: Title & Mode & Autosave -->
-				<div class="flex items-center gap-3 min-w-0">
-					<span class="badge {isRealExam ? 'badge-primary' : 'badge-neutral'} font-bold uppercase text-[11px] flex-shrink-0">
-						{mode}
-					</span>
-					<div class="min-w-0 hidden md:block">
-						<h1 class="text-sm font-bold text-base-content truncate max-w-xs lg:max-w-md" title={examTitle}>
-							{examTitle}
-						</h1>
-					</div>
-					<div class="hidden sm:flex items-center gap-2 text-xs text-base-content/70">
-						{#if isSaving}
-							<span class="flex items-center gap-1 text-primary animate-pulse font-medium">
-								<Save class="h-3.5 w-3.5" /> Saving...
-							</span>
-						{:else if lastSavedTime}
-							<span class="flex items-center gap-1 text-success text-[11px]">
-								<CheckCircle2 class="h-3.5 w-3.5" /> Saved at {lastSavedTime}
-							</span>
-						{/if}
-					</div>
+		<!-- Top Header Exam Bar -->
+		<div class="rounded-2xl bg-base-100/90 backdrop-blur-xl px-4 sm:px-6 py-3 border border-base-content/10 shadow-lg flex items-center justify-between gap-4">
+			<!-- Left: Title & Mode & Autosave -->
+			<div class="flex items-center gap-3 min-w-0">
+				<span class="badge {isRealExam ? 'badge-primary' : 'badge-neutral'} font-bold uppercase text-[11px] flex-shrink-0">
+					{mode}
+				</span>
+				<div class="min-w-0 hidden md:block">
+					<h1 class="text-sm font-bold text-base-content truncate max-w-xs lg:max-w-md" title={examTitle}>
+						{examTitle}
+					</h1>
 				</div>
-
-				<!-- Right: Timer & Finish Action -->
-				<div class="flex items-center gap-3 flex-shrink-0">
-					<ExamTimer bind:remainingSeconds onTimeout={handleFinishExam} />
-
-					<button
-						type="button"
-						class="btn btn-primary btn-sm rounded-xl font-bold shadow-md shadow-primary/20 gap-1.5"
-						onclick={() => (isFinishModalOpen = true)}
-					>
-						<span>Finish Exam</span>
-					</button>
+				<div class="hidden sm:flex items-center gap-2 text-xs text-base-content/70">
+					{#if isSaving}
+						<span class="flex items-center gap-1 text-primary animate-pulse font-medium">
+							<Save class="h-3.5 w-3.5" /> Saving...
+						</span>
+					{:else if lastSavedTime}
+						<span class="flex items-center gap-1 text-success text-[11px]">
+							<CheckCircle2 class="h-3.5 w-3.5" /> Saved at {lastSavedTime}
+						</span>
+					{/if}
 				</div>
+			</div>
+
+			<!-- Right: Timer & Finish Action -->
+			<div class="flex items-center gap-3 flex-shrink-0">
+				<ExamTimer bind:remainingSeconds onTimeout={handleFinishExam} />
+
+				<button
+					type="button"
+					class="btn btn-primary btn-sm rounded-xl font-bold shadow-md shadow-primary/20 gap-1.5"
+					onclick={() => (isFinishModalOpen = true)}
+				>
+					<span>Finish Exam</span>
+				</button>
 			</div>
 		</div>
 
-		<!-- Section Navigation Bar (Split per Section) -->
+		<!-- Section Navigation Ribbon (Split per Section) -->
 		{#if hasMultipleSections}
-			<div class="glass-card rounded-2xl p-3 border border-base-content/10 shadow-lg">
-				<div class="flex items-center justify-between pb-2 border-b border-base-content/10 mb-2">
+			<div class="glass-card rounded-2xl p-3 sm:p-4 border border-base-content/10 shadow-md space-y-2.5">
+				<div class="flex items-center justify-between pb-2 border-b border-base-content/10">
 					<div class="flex items-center gap-2">
 						<Layers class="w-4 h-4 text-primary" />
-						<span class="text-xs font-bold uppercase tracking-wider text-base-content/70">
+						<span class="text-xs font-bold uppercase tracking-wider text-base-content/80">
 							Exam Sections ({sectionSummaries.length})
 						</span>
 					</div>
-					<span class="text-xs font-medium text-base-content/60">
-						Overall: <strong class="text-primary">{totalAnswered}</strong> / {questions.length} Answered
+					<span class="text-xs font-medium text-base-content/70">
+						Overall: <strong class="text-primary font-bold">{totalAnswered}</strong> / {questions.length} Answered
 					</span>
 				</div>
 
@@ -473,9 +474,9 @@
 
 						<button
 							type="button"
-							class="text-left p-2.5 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between gap-1.5 {isSecActive
-								? 'bg-primary/15 border-primary shadow-md shadow-primary/10 ring-1 ring-primary/40'
-								: 'bg-base-100/50 border-base-content/10 hover:bg-base-100 hover:border-base-content/25'}"
+							class="text-left p-3 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between gap-2 {isSecActive
+								? 'bg-primary/15 border-primary shadow-md shadow-primary/10 ring-2 ring-primary/40'
+								: 'bg-base-100/60 border-base-content/10 hover:bg-base-200/60 hover:border-base-content/25'}"
 							onclick={() => jumpToSection(sec)}
 						>
 							<div class="flex items-center justify-between gap-2">
@@ -486,7 +487,7 @@
 									</span>
 								</div>
 								{#if isCompleted}
-									<CheckCircle2 class="w-3.5 h-3.5 text-success flex-shrink-0" />
+									<CheckCircle2 class="w-4 h-4 text-success flex-shrink-0" />
 								{:else if sec.flaggedCount > 0}
 									<span class="badge badge-warning badge-xs text-[9px] px-1 font-bold">
 										{sec.flaggedCount}⚑
@@ -496,13 +497,13 @@
 
 							<!-- Progress Info & Bar -->
 							<div class="space-y-1">
-								<div class="flex items-center justify-between text-[10px] text-base-content/70">
+								<div class="flex items-center justify-between text-[10px] text-base-content/70 font-medium">
 									<span>{sec.answeredCount} / {sec.totalQuestions} Qs</span>
 									<span class="font-bold {isCompleted ? 'text-success' : 'text-primary'}">{progressPercent}%</span>
 								</div>
-								<div class="w-full bg-base-300 h-1 rounded-full overflow-hidden">
+								<div class="w-full bg-base-200 h-1.5 rounded-full overflow-hidden">
 									<div
-										class="h-full transition-all duration-300 {isCompleted ? 'bg-success' : 'bg-primary'}"
+										class="h-full transition-all duration-300 rounded-full {isCompleted ? 'bg-success' : 'bg-primary'}"
 										style="width: {progressPercent}%"
 									></div>
 								</div>
@@ -514,9 +515,9 @@
 		{/if}
 
 		<!-- Main Question Area & Sidebar Palette -->
-		<div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
+		<div class="grid grid-cols-1 gap-6 lg:grid-cols-4 items-start">
 			<!-- Question Card & Navigation Actions -->
-			<div class="space-y-6 lg:col-span-3">
+			<div class="space-y-5 lg:col-span-3">
 				{#if currentQuestion}
 					<QuestionCard
 						question={currentQuestion}
@@ -533,7 +534,7 @@
 					/>
 
 					<!-- Bottom Nav Buttons -->
-					<div class="flex items-center justify-between gap-3">
+					<div class="flex items-center justify-between gap-3 pt-1">
 						<button
 							type="button"
 							class="btn btn-ghost glass-card btn-sm rounded-xl border border-base-content/10 gap-1.5"
@@ -541,7 +542,7 @@
 							onclick={() => (currentIndex -= 1)}
 						>
 							<ChevronLeft class="h-4 w-4" />
-							<span>Previous Question</span>
+							<span>Previous</span>
 						</button>
 
 						<div class="flex items-center gap-2">
@@ -551,7 +552,7 @@
 									class="btn btn-primary btn-sm rounded-xl font-semibold shadow-md shadow-primary/20 gap-1.5"
 									onclick={() => (currentIndex += 1)}
 								>
-									<span>Next Question</span>
+									<span>Next</span>
 									<ChevronRight class="h-4 w-4" />
 								</button>
 							{:else}
@@ -570,7 +571,7 @@
 			</div>
 
 			<!-- Question Palette Sidebar (Section Split Enabled) -->
-			<div class="space-y-4">
+			<div class="space-y-4 lg:sticky lg:top-4">
 				<QuestionPalette
 					{questions}
 					{sections}

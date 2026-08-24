@@ -2,7 +2,7 @@
 	import type { QuizQuestion } from '$lib/api/types.ts';
 	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
 	import RichEditor from '$lib/components/editor/RichEditor.svelte';
-	import { Flag, CheckSquare, Square, CircleDot, Circle, Folder, Sparkles } from 'lucide-svelte';
+	import { Flag, Check, Folder, Sparkles } from 'lucide-svelte';
 
 	interface Props {
 		question: QuizQuestion;
@@ -39,7 +39,7 @@
 	const optionLabels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
 </script>
 
-<div class="glass-panel overflow-hidden rounded-3xl border border-base-content/10 p-6 sm:p-8 shadow-2xl space-y-6">
+<div class="glass-card overflow-hidden rounded-3xl border border-base-content/10 p-6 sm:p-8 shadow-xl space-y-6">
 	<!-- Section Context Banner if question is part of a named section -->
 	{#if question.sectionTitle}
 		<div class="flex items-center justify-between p-3 rounded-2xl bg-primary/10 border border-primary/20 text-xs">
@@ -48,7 +48,7 @@
 				<span>Section: {question.sectionTitle}</span>
 			</div>
 			{#if sectionIndex !== undefined && sectionTotal !== undefined}
-				<span class="badge badge-primary badge-outline badge-xs font-semibold">
+				<span class="badge badge-primary badge-sm font-semibold">
 					Question {sectionIndex + 1} of {sectionTotal}
 				</span>
 			{/if}
@@ -93,35 +93,26 @@
 				{@const optLabel = optionLabels[optIdx] || String(optIdx + 1)}
 
 				<div
-					class="group glass-card flex items-center gap-3.5 rounded-2xl border p-4 transition-all duration-200 cursor-pointer {isSelected
-						? 'border-primary/60 bg-primary/15 shadow-md shadow-primary/10 ring-1 ring-primary/40'
-						: 'border-base-content/10 hover:border-base-content/25 hover:bg-base-200/50'}"
+					class="group flex items-center gap-4 rounded-2xl border p-4 transition-all duration-200 cursor-pointer {isSelected
+						? 'border-primary bg-primary/10 shadow-md shadow-primary/10 ring-2 ring-primary/40'
+						: 'border-base-content/10 bg-base-100/60 hover:border-base-content/25 hover:bg-base-200/50'}"
 					onclick={() => onToggleOption(optId, isSingleSelection)}
 					role="button"
 					tabindex="0"
 					onkeydown={(e) => (e.key === 'Enter' || e.key === ' ') && onToggleOption(optId, isSingleSelection)}
 				>
-					<!-- Option Badge Letter (A, B, C...) -->
-					<span class="flex h-7 w-7 items-center justify-center rounded-xl text-xs font-bold transition-all {isSelected
-						? 'bg-primary text-primary-content shadow-sm'
+					<!-- Option Badge Letter (A, B, C...) with Selection Highlight -->
+					<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-bold transition-all {isSelected
+						? 'bg-primary text-primary-content shadow-sm scale-105'
 						: 'bg-base-200 text-base-content/70 group-hover:bg-base-300'}">
-						{optLabel}
-					</span>
-
-					<!-- Radio/Check Icon -->
-					<div class="shrink-0">
-						{#if isSingleSelection}
-							{#if isSelected}
-								<CircleDot class="h-5 w-5 text-primary" />
+						{#if isSelected}
+							{#if isSingleSelection}
+								{optLabel}
 							{:else}
-								<Circle class="h-5 w-5 text-base-content/40 group-hover:text-base-content/60" />
+								<Check class="h-4 w-4 stroke-[3]" />
 							{/if}
 						{:else}
-							{#if isSelected}
-								<CheckSquare class="h-5 w-5 text-primary" />
-							{:else}
-								<Square class="h-5 w-5 text-base-content/40 group-hover:text-base-content/60" />
-							{/if}
+							{optLabel}
 						{/if}
 					</div>
 

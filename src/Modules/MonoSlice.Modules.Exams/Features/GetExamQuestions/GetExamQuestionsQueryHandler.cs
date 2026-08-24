@@ -70,8 +70,8 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
         var cachedAnswers = await _cacheService.GetAsync<Dictionary<Guid, CachedAnswerDto>>(
             $"exam_answers:{submission.Id}", cancellationToken) ?? [];
 
-        // Flatten questions across sections
-        var resolvedQuestions = new List<(BankQuestion Question, decimal Points, Guid SectionId, string SectionTitle)>();
+        var displayOrder = 1;
+        var questionDtos = new List<StudentQuestionDto>();
         var sectionSummaryList = new List<StudentExamSectionDto>();
 
         foreach (var section in exam.Sections.OrderBy(s => s.OrderIndex))
@@ -83,9 +83,10 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
                 questions = questions.Take(section.QuestionCount.Value).ToList();
             }
 
-            foreach (var q in questions)
+            // Shuffle questions deterministically WITHIN this section
+            if (exam.ShuffleQuestions && questions.Count > 0)
             {
-                resolvedQuestions.Add((q, section.PointsOverride ?? q.Points, section.Id, section.Title));
+                questions = ExamShuffler.Shuffle(questions, submission.RandomSeed + section.OrderIndex);
             }
 
             sectionSummaryList.Add(new StudentExamSectionDto(
@@ -94,42 +95,32 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
                 section.Description,
                 section.OrderIndex,
                 questions.Count));
-        }
 
-        // Apply Fisher-Yates shuffle deterministically
-        if (exam.ShuffleQuestions)
-        {
-            resolvedQuestions = ExamShuffler.Shuffle(resolvedQuestions, submission.RandomSeed);
-        }
-
-        var displayOrder = 1;
-        var questionDtos = new List<StudentQuestionDto>();
-
-        foreach (var item in resolvedQuestions)
-        {
-            var q = item.Question;
-            var options = q.Options.ToList();
-            if (exam.ShuffleOptions && options.Count > 0)
+            foreach (var q in questions)
             {
-                options = ExamShuffler.Shuffle(options, submission.RandomSeed + q.OrderIndex);
+                var options = q.Options.ToList();
+                if (exam.ShuffleOptions && options.Count > 0)
+                {
+                    options = ExamShuffler.Shuffle(options, submission.RandomSeed + q.OrderIndex);
+                }
+
+                var optionDtos = options.Select(o => new StudentOptionDto(o.Id, o.Text)).ToList();
+
+                // Populate previously saved answers if student is reconnecting/resuming
+                cachedAnswers.TryGetValue(q.Id, out var savedAnswer);
+
+                questionDtos.Add(new StudentQuestionDto(
+                    q.Id,
+                    q.QuestionText,
+                    q.Type.ToString(),
+                    section.PointsOverride ?? q.Points,
+                    displayOrder++,
+                    savedAnswer?.SelectedOptionIds,
+                    savedAnswer?.EssayText,
+                    optionDtos,
+                    section.Id,
+                    section.Title));
             }
-
-            var optionDtos = options.Select(o => new StudentOptionDto(o.Id, o.Text)).ToList();
-
-            // Populate previously saved answers if student is reconnecting/resuming
-            cachedAnswers.TryGetValue(q.Id, out var savedAnswer);
-
-            questionDtos.Add(new StudentQuestionDto(
-                q.Id,
-                q.QuestionText,
-                q.Type.ToString(),
-                item.Points,
-                displayOrder++,
-                savedAnswer?.SelectedOptionIds,
-                savedAnswer?.EssayText,
-                optionDtos,
-                item.SectionId,
-                item.SectionTitle));
         }
 
         var paperDto = new StudentExamPaperDto(

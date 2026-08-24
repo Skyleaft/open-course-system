@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { Edra, createEditor } from '#lib/components/edra/shadcn/index.ts';
-	import '#lib/components/edra/shadcn/editor.css';
-	import '#lib/components/edra/onedark.css';
+	import { Edra, createEditor } from '$lib/components/edra/shadcn/index.ts';
+	import '$lib/components/edra/shadcn/editor.css';
+	import '$lib/components/edra/onedark.css';
+	import { untrack } from 'svelte';
 
 	interface Props {
 		content?: string;
@@ -21,13 +22,18 @@
 		onFileUpload
 	}: Props = $props();
 
+	let isUpdatingInternally = false;
+	let lastEmittedContent = '';
+
 	const editor = createEditor({
 		onFileUpload: (file) => (onFileUpload ? onFileUpload(file) : Promise.resolve('')),
 		onUpdate: () => {
-			if (editor) {
+			if (editor && !isUpdatingInternally) {
 				const json = JSON.stringify(editor.getJSON());
 				const html = editor.getHTML();
-				content = html || json;
+				const result = html || json;
+				lastEmittedContent = result;
+				content = result;
 				if (onUpdate) {
 					onUpdate(json, html);
 				}
@@ -36,17 +42,30 @@
 	});
 
 	$effect(() => {
-		if (editor && content) {
-			try {
-				const parsed = JSON.parse(content);
-				if (JSON.stringify(editor.getJSON()) !== content) {
-					editor.commands.setContent(parsed);
+		// Only sync if content changed from external source (avoid circular loops)
+		if (editor && content !== undefined && content !== lastEmittedContent) {
+			untrack(() => {
+				isUpdatingInternally = true;
+				try {
+					if (!content) {
+						editor.commands.clearContent();
+					} else {
+						try {
+							const parsed = JSON.parse(content);
+							if (JSON.stringify(editor.getJSON()) !== content) {
+								editor.commands.setContent(parsed, { emitUpdate: false });
+							}
+						} catch {
+							if (editor.getHTML() !== content) {
+								editor.commands.setContent(content, { emitUpdate: false });
+							}
+						}
+					}
+					lastEmittedContent = content;
+				} finally {
+					isUpdatingInternally = false;
 				}
-			} catch {
-				if (editor.getHTML() !== content) {
-					editor.commands.setContent(content);
-				}
-			}
+			});
 		}
 	});
 
