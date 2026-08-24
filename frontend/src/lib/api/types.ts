@@ -257,6 +257,8 @@ export interface BankQuestion {
 	bankCategory?: string;
 	quizId?: string;
 	examId?: string;
+	sectionId?: string | null;
+	sectionTitle?: string | null;
 	questionText?: string;
 	text?: string;
 	type: QuestionType;
@@ -300,8 +302,18 @@ export interface StudentOptionDto {
 	text: string;
 }
 
+export interface StudentExamSectionDto {
+	id: string;
+	title: string;
+	description?: string | null;
+	orderIndex: number;
+	questionCount: number;
+}
+
 export interface StudentQuestionDto {
 	id: string;
+	sectionId?: string | null;
+	sectionTitle?: string | null;
 	questionText: string;
 	type: QuestionType | string;
 	points: number;
@@ -320,6 +332,7 @@ export interface StudentExamPaperDto {
 	maxAllowedEndTimeUtc: string;
 	activeSessionToken: string;
 	questions: StudentQuestionDto[];
+	sections?: StudentExamSectionDto[];
 }
 
 export interface OptionReviewDto {
@@ -559,4 +572,11 @@ export interface PaginatedList<T> {
 	totalPages: number;
 	hasPreviousPage: boolean;
 	hasNextPage: boolean;
+}
+
+export interface ImportQuestionBankResult {
+	bankId: string;
+	bankTitle: string;
+	totalImportedQuestions: number;
+	warnings: string[];
 }

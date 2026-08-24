@@ -31,7 +31,10 @@ using MonoSlice.Modules.Exams.Features.ListQuestions;
 using MonoSlice.Modules.Exams.Features.UpdateQuestionBank;
 using MonoSlice.Modules.Exams.Features.UpdateQuestion;
 using MonoSlice.Modules.Exams.Features.GetStudentExamOverview;
+using MonoSlice.Modules.Exams.Features.ImportQuestionBank;
+using MonoSlice.Modules.Exams.Features.ExportQuestionBankTemplate;
 using MonoSlice.Modules.Exams.Domain.Services;
+using MonoSlice.Modules.Exams.Services;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Contracts;
 using MonoSlice.Shared.Abstractions.Messaging;
@@ -71,10 +74,12 @@ public static class ExamsModule
 
         // Register module services and contract API
         services.AddScoped<IExamFinalizerService, MonoSlice.Modules.Exams.Domain.Services.ExamFinalizerService>();
+        services.AddScoped<IWordQuestionBankService, WordQuestionBankService>();
         services.AddScoped<IExamsModuleApi, ExamsModuleApi>();
 
         // Register integration event handlers
         services.AddTransient<IIntegrationEventHandler<CourseDeletedIntegrationEvent>, EventHandlers.CourseDeletedIntegrationEventHandler>();
+        services.AddTransient<IIntegrationEventHandler<StudentUnenrolledIntegrationEvent>, EventHandlers.StudentUnenrolledIntegrationEventHandler>();
 
         return services;
     }
@@ -83,6 +88,7 @@ public static class ExamsModule
     {
         var dispatcher = app.ServiceProvider.GetService<IIntegrationEventDispatcher>();
         dispatcher?.RegisterEvent<CourseDeletedIntegrationEvent>();
+        dispatcher?.RegisterEvent<StudentUnenrolledIntegrationEvent>();
 
         var examsV1Group = app.MapGroup("/api/v1/exams")
             .WithTags("Exams");
@@ -97,6 +103,8 @@ public static class ExamsModule
         examsV1Group.MapGetQuestionBankEndpoint();
         examsV1Group.MapUpdateQuestionBankEndpoint();
         examsV1Group.MapDeleteQuestionBankEndpoint();
+        examsV1Group.MapImportQuestionBankEndpoint();
+        examsV1Group.MapExportQuestionBankTemplateEndpoint();
         examsV1Group.MapListQuestionsEndpoint();
         examsV1Group.MapAddQuestionEndpoint();
         examsV1Group.MapGetQuestionEndpoint();

@@ -13,7 +13,15 @@ public sealed record StudentExamPaperDto(
     DateTime StartedAtUtc,
     DateTime MaxAllowedEndTimeUtc,
     string ActiveSessionToken,
-    IReadOnlyList<StudentQuestionDto> Questions);
+    IReadOnlyList<StudentQuestionDto> Questions,
+    IReadOnlyList<StudentExamSectionDto>? Sections = null);
+
+public sealed record StudentExamSectionDto(
+    Guid Id,
+    string Title,
+    string? Description,
+    int OrderIndex,
+    int QuestionCount);
 
 public sealed record StudentQuestionDto(
     Guid Id,
@@ -23,7 +31,9 @@ public sealed record StudentQuestionDto(
     int DisplayOrder,
     IReadOnlyList<Guid>? SelectedOptionIds,
     string? EssayText,
-    IReadOnlyList<StudentOptionDto> Options);
+    IReadOnlyList<StudentOptionDto> Options,
+    Guid? SectionId = null,
+    string? SectionTitle = null);
 
 public sealed record StudentOptionDto(
     Guid Id,

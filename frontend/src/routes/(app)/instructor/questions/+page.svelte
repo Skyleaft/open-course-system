@@ -14,7 +14,10 @@
 		Check,
 		Clock,
 		AlertCircle,
-		HelpCircle
+		HelpCircle,
+		Download,
+		FileUp,
+		FileText
 	} from 'lucide-svelte';
 	import { examsApi } from '$lib/api/exams.ts';
 	import type { QuestionBank } from '$lib/api/types.ts';
@@ -35,6 +38,15 @@
 	let bankCategory = $state('');
 	let bankDescription = $state('');
 	let bankTags = $state('');
+
+	// Import Word Modal
+	let isImportModalOpen = $state(false);
+	let importFile = $state<File | null>(null);
+	let importTitle = $state('');
+	let importCategory = $state('');
+	let importDescription = $state('');
+	let importTags = $state('');
+	let isDownloadingTemplate = $state(false);
 
 	// Delete Bank Modal
 	let isDeleteModalOpen = $state(false);
@@ -96,6 +108,65 @@
 		bankDescription = '';
 		bankTags = '';
 		isBankModalOpen = true;
+	}
+
+	function openImportModal() {
+		importFile = null;
+		importTitle = '';
+		importCategory = '';
+		importDescription = '';
+		importTags = '';
+		isImportModalOpen = true;
+	}
+
+	async function handleDownloadTemplate() {
+		isDownloadingTemplate = true;
+		try {
+			const blob = await examsApi.downloadQuestionBankTemplate();
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = 'QuestionBank-Template.docx';
+			document.body.appendChild(a);
+			a.click();
+			window.URL.revokeObjectURL(url);
+			document.body.removeChild(a);
+			toast.success('Question Bank Word Template downloaded successfully.');
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to download Word template.');
+		} finally {
+			isDownloadingTemplate = false;
+		}
+	}
+
+	async function handleImportWord(e: Event) {
+		e.preventDefault();
+		if (!importFile) {
+			toast.warning('Please select a Word Document (.docx) file.');
+			return;
+		}
+
+		const formData = new FormData();
+		formData.append('file', importFile);
+		if (importTitle.trim()) formData.append('title', importTitle.trim());
+		if (importCategory.trim()) formData.append('category', importCategory.trim());
+		if (importDescription.trim()) formData.append('description', importDescription.trim());
+		if (importTags.trim()) formData.append('tags', importTags.trim());
+
+		isActionLoading = true;
+		try {
+			const result = await examsApi.importQuestionBank(formData);
+			toast.success(`Imported ${result.totalImportedQuestions} questions into "${result.bankTitle}"!`);
+			if (result.warnings && result.warnings.length > 0) {
+				toast.info(result.warnings.join(' | '));
+			}
+			isImportModalOpen = false;
+			await loadQuestionBanks();
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to import questions from Word document.');
+		} finally {
+			isActionLoading = false;
+		}
 	}
 
 	function openEditBank(bank: QuestionBank) {
@@ -182,14 +253,39 @@
 			</p>
 		</div>
 
-		<button
-			type="button"
-			class="btn btn-sm btn-primary gap-1.5 shadow-md shadow-primary/20"
-			onclick={openCreateBank}
-		>
-			<FolderPlus class="w-4 h-4" />
-			New Question Pool
-		</button>
+		<div class="flex items-center gap-2 flex-wrap">
+			<button
+				type="button"
+				class="btn btn-sm btn-ghost border border-base-content/10 gap-1.5 hover:bg-base-200"
+				onclick={handleDownloadTemplate}
+				disabled={isDownloadingTemplate}
+			>
+				{#if isDownloadingTemplate}
+					<span class="loading loading-spinner loading-xs"></span>
+				{:else}
+					<Download class="w-4 h-4 text-primary" />
+				{/if}
+				<span>Word Template</span>
+			</button>
+
+			<button
+				type="button"
+				class="btn btn-sm btn-outline btn-primary gap-1.5"
+				onclick={openImportModal}
+			>
+				<FileUp class="w-4 h-4" />
+				<span>Import Word (.docx)</span>
+			</button>
+
+			<button
+				type="button"
+				class="btn btn-sm btn-primary gap-1.5 shadow-md shadow-primary/20"
+				onclick={openCreateBank}
+			>
+				<FolderPlus class="w-4 h-4" />
+				<span>New Pool</span>
+			</button>
+		</div>
 	</div>
 
 	<!-- Stats Overview -->
@@ -510,5 +606,158 @@
 			</div>
 		</div>
 		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isDeleteModalOpen = false)}></div>
+	</div>
+{/if}
+
+<!-- Import Question Bank from Word Modal -->
+{#if isImportModalOpen}
+	<div class="modal modal-open z-50">
+		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-lg">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
+				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
+					<FileUp class="w-5 h-5 text-primary" />
+					Import Questions from Word (.docx)
+				</h3>
+				<button
+					type="button"
+					class="btn btn-xs btn-circle btn-ghost"
+					onclick={() => (isImportModalOpen = false)}
+				>✕</button>
+			</div>
+
+			<form onsubmit={handleImportWord} class="space-y-4 pt-3">
+				<!-- Template Helper Banner -->
+				<div class="p-3 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-between gap-3">
+					<div class="space-y-0.5">
+						<p class="text-xs font-bold text-primary flex items-center gap-1.5">
+							<FileText class="w-4 h-4" />
+							Need a formatted sample?
+						</p>
+						<p class="text-[11px] text-base-content/70 leading-tight">
+							Download our pre-structured Word document template.
+						</p>
+					</div>
+					<button
+						type="button"
+						class="btn btn-xs btn-primary gap-1"
+						onclick={handleDownloadTemplate}
+						disabled={isDownloadingTemplate}
+					>
+						{#if isDownloadingTemplate}
+							<span class="loading loading-spinner loading-xs"></span>
+						{:else}
+							<Download class="w-3.5 h-3.5" />
+						{/if}
+						Template
+					</button>
+				</div>
+
+				<!-- File Input -->
+				<div>
+					<label for="import-file-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+						Word Document (.docx) <span class="text-error">*</span>
+					</label>
+					<input
+						id="import-file-input"
+						type="file"
+						accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+						onchange={(e) => {
+							const target = e.currentTarget;
+							if (target.files && target.files.length > 0) {
+								importFile = target.files[0];
+								if (!importTitle) {
+									importTitle = target.files[0].name.replace(/\.[^/.]+$/, '');
+								}
+							}
+						}}
+						class="file-input file-input-bordered file-input-primary file-input-sm w-full bg-base-200/50"
+						required
+					/>
+					{#if importFile}
+						<p class="text-[11px] text-success font-medium mt-1">
+							Selected: {importFile.name} ({(importFile.size / 1024).toFixed(1)} KB)
+						</p>
+					{/if}
+				</div>
+
+				<!-- Optional Bank Title -->
+				<div>
+					<label for="import-title-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+						Question Pool Title (Optional)
+					</label>
+					<input
+						id="import-title-input"
+						type="text"
+						bind:value={importTitle}
+						placeholder="Defaults to document title / file name"
+						class="input input-bordered input-sm w-full bg-base-200/50"
+					/>
+				</div>
+
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+					<div>
+						<label for="import-cat-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+							Category (Optional)
+						</label>
+						<input
+							id="import-cat-input"
+							type="text"
+							bind:value={importCategory}
+							placeholder="e.g. Computer Science"
+							class="input input-bordered input-sm w-full bg-base-200/50"
+						/>
+					</div>
+					<div>
+						<label for="import-tags-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+							Tags (Optional)
+						</label>
+						<input
+							id="import-tags-input"
+							type="text"
+							bind:value={importTags}
+							placeholder="e.g. intro, quiz"
+							class="input input-bordered input-sm w-full bg-base-200/50"
+						/>
+					</div>
+				</div>
+
+				<div>
+					<label for="import-desc-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+						Description (Optional)
+					</label>
+					<textarea
+						id="import-desc-input"
+						bind:value={importDescription}
+						rows="2"
+						placeholder="Add context or notes for this pool..."
+						class="textarea textarea-bordered textarea-sm w-full bg-base-200/50"
+					></textarea>
+				</div>
+
+				<div class="modal-action pt-2">
+					<button
+						type="button"
+						class="btn btn-sm btn-ghost"
+						onclick={() => (isImportModalOpen = false)}
+						disabled={isActionLoading}
+					>
+						Cancel
+					</button>
+					<button
+						type="submit"
+						class="btn btn-sm btn-primary gap-1.5"
+						disabled={isActionLoading || !importFile}
+					>
+						{#if isActionLoading}
+							<span class="loading loading-spinner loading-xs"></span>
+						{:else}
+							<FileUp class="w-4 h-4" />
+						{/if}
+						Import Questions
+					</button>
+				</div>
+			</form>
+		</div>
+		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isImportModalOpen = false)}></div>
 	</div>
 {/if}

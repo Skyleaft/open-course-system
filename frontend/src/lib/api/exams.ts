@@ -12,7 +12,8 @@ import type {
 	BankQuestion,
 	StudentExamPaperDto,
 	ExamResultDetailsDto,
-	StudentExamOverviewDto
+	StudentExamOverviewDto,
+	ImportQuestionBankResult
 } from './types.ts';
 
 export const examsApi = {
@@ -143,6 +144,20 @@ export const examsApi = {
 
 	async deleteQuestionBank(id: string): Promise<boolean> {
 		return apiClient.delete<boolean>(`/api/v1/exams/question-banks/${id}`);
+	},
+
+	async importQuestionBank(
+		formData: FormData,
+		targetBankId?: string
+	): Promise<ImportQuestionBankResult> {
+		const endpoint = targetBankId
+			? `/api/v1/exams/question-banks/${targetBankId}/import`
+			: '/api/v1/exams/question-banks/import';
+		return apiClient.post<ImportQuestionBankResult>(endpoint, formData);
+	},
+
+	async downloadQuestionBankTemplate(customFetch?: typeof fetch): Promise<Blob> {
+		return apiClient.getBlob('/api/v1/exams/question-banks/template', undefined, customFetch);
 	},
 
 	// Bank Questions Query & CRUD

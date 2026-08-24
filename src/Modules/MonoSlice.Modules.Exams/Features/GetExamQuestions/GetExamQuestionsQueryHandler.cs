@@ -71,7 +71,8 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
             $"exam_answers:{submission.Id}", cancellationToken) ?? [];
 
         // Flatten questions across sections
-        var resolvedQuestions = new List<(BankQuestion Question, decimal Points)>();
+        var resolvedQuestions = new List<(BankQuestion Question, decimal Points, Guid SectionId, string SectionTitle)>();
+        var sectionSummaryList = new List<StudentExamSectionDto>();
 
         foreach (var section in exam.Sections.OrderBy(s => s.OrderIndex))
         {
@@ -84,8 +85,15 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
 
             foreach (var q in questions)
             {
-                resolvedQuestions.Add((q, section.PointsOverride ?? q.Points));
+                resolvedQuestions.Add((q, section.PointsOverride ?? q.Points, section.Id, section.Title));
             }
+
+            sectionSummaryList.Add(new StudentExamSectionDto(
+                section.Id,
+                section.Title,
+                section.Description,
+                section.OrderIndex,
+                questions.Count));
         }
 
         // Apply Fisher-Yates shuffle deterministically
@@ -119,7 +127,9 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
                 displayOrder++,
                 savedAnswer?.SelectedOptionIds,
                 savedAnswer?.EssayText,
-                optionDtos));
+                optionDtos,
+                item.SectionId,
+                item.SectionTitle));
         }
 
         var paperDto = new StudentExamPaperDto(
@@ -130,7 +140,8 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
             submission.StartedAtUtc,
             submission.MaxAllowedEndTimeUtc,
             submission.ActiveSessionToken,
-            questionDtos);
+            questionDtos,
+            sectionSummaryList);
 
         return ApiResponse.Ok(paperDto);
     }
