@@ -1,15 +1,16 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { coursesApi } from '#lib/api/courses.ts';
-	import { examsApi } from '#lib/api/exams.ts';
-	import type { Course, CourseSection, Lesson, LessonType, CourseExam, QuizExam } from '#lib/api/types.ts';
-	import GlassCard from '#lib/components/ui/GlassCard.svelte';
-	import GlassModal from '#lib/components/ui/GlassModal.svelte';
-	import ConfirmModal from '#lib/components/ui/ConfirmModal.svelte';
-	import RichEditor from '#lib/components/editor/RichEditor.svelte';
-	import CourseExamAttachment from '#lib/components/course/CourseExamAttachment.svelte';
-	import { toast } from '#lib/stores/toast.svelte.ts';
+	import { coursesApi } from '$lib/api/courses.ts';
+	import { examsApi } from '$lib/api/exams.ts';
+	import type { Course, CourseSection, Lesson, LessonType, CourseExam, QuizExam } from '$lib/api/types.ts';
+	import GlassCard from '$lib/components/ui/GlassCard.svelte';
+	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
+	import RichEditor from '$lib/components/editor/RichEditor.svelte';
+	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
+	import CourseExamAttachment from '$lib/components/course/CourseExamAttachment.svelte';
+	import { toast } from '$lib/stores/toast.svelte.ts';
 	import {
 		Plus,
 		Check,
@@ -29,9 +30,10 @@
 		CheckCircle2,
 		Lock,
 		AlignLeft,
-		BookOpen
-	} from '@lucide/svelte';
-	import { onMount } from 'svelte';
+		BookOpen,
+		EyeOff,
+		X
+	} from 'lucide-svelte';
 
 	const courseId = (page.params.id || '') as string;
 	let course = $state<Course | null>(null);
@@ -83,7 +85,8 @@
 	let deletingLessonId = $state<string | null>(null);
 	let deletingLessonTitle = $state('');
 
-	// Delete Course Modal
+	// Publish / Unpublish / Delete Modals
+	let isUnpublishModalOpen = $state(false);
 	let isDeleteCourseModalOpen = $state(false);
 
 	const accessModels = [
@@ -91,7 +94,7 @@
 			id: 'OpenFree',
 			title: 'Open Free',
 			badge: 'Free',
-			badgeClass: 'badge-success text-success-content',
+			badgeClass: 'badge-success text-white',
 			desc: 'Immediate self-enrollment without payment.',
 			icon: CheckCircle2
 		},
@@ -158,8 +161,8 @@
 	}
 
 	// Course Settings Save Handler
-	async function handleSaveCourseSettings(e: Event) {
-		e.preventDefault();
+	async function handleSaveCourseSettings(e?: Event) {
+		if (e) e.preventDefault();
 		if (!editCourseTitle.trim()) {
 			toast.warning('Please provide a course title.');
 			return;
@@ -167,6 +170,11 @@
 
 		if (editCourseAccessType === 'OpenPaid' && Number(editCoursePrice) <= 0) {
 			toast.warning('Please enter a valid course price greater than $0.');
+			return;
+		}
+
+		if (editCourseAccessType === 'PrivateWithKey' && !editCourseEnrollmentKey.trim() && !course?.id) {
+			toast.warning('Please enter a secret enrollment key.');
 			return;
 		}
 
@@ -384,6 +392,20 @@
 		}
 	}
 
+	async function handleUnpublish() {
+		isActionLoading = true;
+		try {
+			await coursesApi.unpublishCourse(courseId);
+			toast.success('Course unpublished. Reverted to Draft status.');
+			if (course) course.isPublished = false;
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to unpublish course.');
+		} finally {
+			isActionLoading = false;
+			isUnpublishModalOpen = false;
+		}
+	}
+
 	async function handleDeleteCourse() {
 		isActionLoading = true;
 		try {
@@ -399,97 +421,138 @@
 	}
 </script>
 
-<div class="space-y-8 max-w-6xl mx-auto pb-16">
+<div class="space-y-6 max-w-6xl mx-auto pb-16">
 	<!-- Header Navigation & Actions -->
 	<div class="flex flex-wrap items-center justify-between gap-3">
 		<a
 			href="/instructor/courses"
-			class="inline-flex items-center gap-1.5 text-xs font-semibold text-base-content/60 hover:text-primary transition-colors"
+			class="btn btn-sm btn-ghost gap-2 text-base-content/70 hover:text-base-content"
 		>
-			<ArrowLeft class="h-4 w-4" />
-			Back to Courses
+			<ArrowLeft class="w-4 h-4" />
+			<span>Back to Courses</span>
 		</a>
 
 		<div class="flex items-center gap-2">
-			{#if course && !course.isPublished}
-				<button
-					class="btn btn-success btn-sm rounded-xl text-white font-bold border-0 shadow-md gap-1.5"
-					onclick={handlePublish}
-					disabled={isActionLoading}
-				>
-					<Send class="h-3.5 w-3.5" />
-					Publish Course
-				</button>
+			<button
+				type="button"
+				class="btn btn-primary btn-sm gap-1.5 shadow-md shadow-primary/20"
+				onclick={() => handleSaveCourseSettings()}
+				disabled={isSavingSettings}
+			>
+				{#if isSavingSettings}
+					<span class="loading loading-spinner loading-xs"></span>
+				{:else}
+					<Save class="w-3.5 h-3.5" />
+				{/if}
+				Save Changes
+			</button>
+
+			{#if course}
+				{#if course.isPublished}
+					<button
+						type="button"
+						class="btn btn-warning btn-outline btn-sm gap-1.5"
+						onclick={() => (isUnpublishModalOpen = true)}
+						disabled={isActionLoading}
+					>
+						<EyeOff class="w-3.5 h-3.5" />
+						Unpublish Course
+					</button>
+				{:else}
+					<button
+						type="button"
+						class="btn btn-success btn-sm text-white font-bold shadow-md gap-1.5"
+						onclick={handlePublish}
+						disabled={isActionLoading}
+					>
+						<Send class="w-3.5 h-3.5" />
+						Publish Course
+					</button>
+				{/if}
 			{/if}
 
 			<button
-				class="btn btn-error btn-outline btn-sm rounded-xl gap-1.5"
+				type="button"
+				class="btn btn-error btn-outline btn-sm gap-1.5"
 				onclick={() => (isDeleteCourseModalOpen = true)}
 				disabled={isActionLoading}
 			>
-				<Trash2 class="h-3.5 w-3.5" />
+				<Trash2 class="w-3.5 h-3.5" />
 				Delete Course
 			</button>
 		</div>
 	</div>
 
 	{#if isLoading}
-		<div class="h-80 rounded-3xl bg-base-200/50 animate-pulse"></div>
+		<div class="h-64 rounded-3xl bg-base-200/50 animate-pulse flex items-center justify-center">
+			<span class="loading loading-spinner loading-lg text-primary"></span>
+		</div>
 	{:else if course}
 		<!-- Course Overview Banner -->
-		<GlassCard class="p-6 sm:p-8 space-y-4">
-			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-				<div class="space-y-1.5">
-					<div class="flex items-center gap-2">
-						<span class="badge badge-primary badge-xs font-bold uppercase">{course.accessType}</span>
-						<span class="badge {course.isPublished ? 'badge-success text-white' : 'badge-warning'} badge-xs font-semibold">
+		<GlassCard class="p-6 sm:p-7 space-y-4">
+			<div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+				<div class="space-y-2 flex-1 min-w-0">
+					<div class="flex items-center gap-2 flex-wrap">
+						<span class="badge badge-primary badge-sm font-bold uppercase text-[10px]">{course.accessType}</span>
+						<span class="badge {course.isPublished ? 'badge-success text-white' : 'badge-warning'} badge-sm font-semibold text-[10px]">
 							{course.isPublished ? 'Published' : 'Draft'}
 						</span>
+						<span class="badge badge-sm badge-outline text-[10px]">
+							{course.sections?.length || 0} Sections • {course.exams?.length || 0} Exams
+						</span>
 					</div>
+
 					<h1 class="text-2xl sm:text-3xl font-extrabold text-base-content tracking-tight">{course.title}</h1>
+
 					{#if course.description}
-						<p class="text-xs text-base-content/70 line-clamp-2 max-w-2xl">{course.description}</p>
+						<div class="text-xs text-base-content/70 line-clamp-3 max-w-3xl pt-0.5">
+							<RichRenderer content={course.description} />
+						</div>
 					{/if}
 				</div>
 
-				<div class="flex items-center gap-2">
+				<div class="flex items-center gap-2 flex-shrink-0">
 					<!-- Tabs switch -->
 					<div class="flex items-center gap-1 rounded-2xl p-1 bg-base-200/70 border border-base-content/10">
 						<button
-							class="btn btn-xs rounded-xl font-semibold transition-all gap-1.5 {activeTab === 'curriculum'
+							type="button"
+							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'curriculum'
 								? 'btn-primary text-primary-content shadow-xs'
 								: 'btn-ghost text-base-content/70'}"
 							onclick={() => (activeTab = 'curriculum')}
 						>
-							<Layers class="h-3.5 w-3.5" />
-							Curriculum
+							<Layers class="w-3.5 h-3.5" />
+							Curriculum ({course.sections?.length || 0})
 						</button>
 						<button
-							class="btn btn-xs rounded-xl font-semibold transition-all gap-1.5 {activeTab === 'exams'
+							type="button"
+							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'exams'
 								? 'btn-primary text-primary-content shadow-xs'
 								: 'btn-ghost text-base-content/70'}"
 							onclick={() => (activeTab = 'exams')}
 						>
-							<FileText class="h-3.5 w-3.5" />
-							Examinations ({course.exams?.length || 0})
+							<FileText class="w-3.5 h-3.5" />
+							Exams ({course.exams?.length || 0})
 						</button>
 						<button
-							class="btn btn-xs rounded-xl font-semibold transition-all gap-1.5 {activeTab === 'settings'
+							type="button"
+							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'settings'
 								? 'btn-primary text-primary-content shadow-xs'
 								: 'btn-ghost text-base-content/70'}"
 							onclick={() => (activeTab = 'settings')}
 						>
-							<Settings class="h-3.5 w-3.5" />
+							<Settings class="w-3.5 h-3.5" />
 							Settings
 						</button>
 					</div>
 
 					{#if activeTab === 'curriculum'}
 						<button
-							class="btn btn-primary btn-sm rounded-xl text-primary-content font-semibold border-0 shadow-md gap-1.5"
+							type="button"
+							class="btn btn-primary btn-xs rounded-xl text-primary-content font-bold shadow-sm gap-1"
 							onclick={() => (isAddSectionModalOpen = true)}
 						>
-							<Plus class="h-4 w-4" />
+							<Plus class="w-3.5 h-3.5" />
 							Add Section
 						</button>
 					{/if}
@@ -498,109 +561,154 @@
 		</GlassCard>
 
 		{#if activeTab === 'curriculum'}
-			<!-- Tab 1: Sections & Lessons Builder -->
-			<div class="space-y-4">
-				{#if (course.sections || []).length === 0}
+			<!-- Tab 1: Curriculum & Lessons Studio -->
+			<GlassCard class="p-6 space-y-4">
+				<div class="flex items-center justify-between">
+					<div>
+						<h3 class="text-base font-bold text-base-content flex items-center gap-2">
+							<Layers class="w-5 h-5 text-primary" />
+							Curriculum Sections & Lesson Materials
+						</h3>
+						<p class="text-xs text-base-content/70">
+							Structure learning modules into ordered sections containing text lessons, video streams, or PDF resources.
+						</p>
+					</div>
+
+					<button
+						type="button"
+						class="btn btn-sm btn-primary gap-1.5 shadow-sm"
+						onclick={() => (isAddSectionModalOpen = true)}
+					>
+						<Plus class="w-4 h-4" />
+						Add Section
+					</button>
+				</div>
+
+				{#if !course.sections || course.sections.length === 0}
 					<div class="py-12 text-center bg-base-200/40 rounded-2xl border border-dashed border-base-300">
 						<Layers class="w-10 h-10 text-base-content/30 mx-auto mb-2.5" />
 						<p class="text-sm font-semibold text-base-content/80">No curriculum sections yet</p>
+						<p class="text-xs text-base-content/50 max-w-sm mx-auto mt-1">
+							Add sections to organize lessons, downloadable resources, and video lectures.
+						</p>
 						<button
 							type="button"
-							class="btn btn-sm btn-primary gap-1.5 mt-3"
+							class="btn btn-sm btn-primary gap-1.5 mt-4"
 							onclick={() => (isAddSectionModalOpen = true)}
 						>
 							<Plus class="w-4 h-4" />
-							Add Section
+							Add First Section
 						</button>
 					</div>
 				{:else}
-					{#each course.sections || [] as section, sIdx (section.id || sIdx)}
-						<GlassCard class="space-y-4 p-6">
-							<!-- Section Header -->
-							<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
-								<div class="flex items-center gap-2">
-									<span class="flex h-6 w-6 items-center justify-center rounded-lg bg-primary text-primary-content text-xs font-bold">
-										{sIdx + 1}
-									</span>
-									<h3 class="text-base font-bold text-base-content">{section.title}</h3>
-								</div>
-
-								<div class="flex items-center gap-1">
-									<button
-										class="btn btn-ghost btn-xs text-base-content/70 hover:text-primary rounded-lg p-1.5"
-										title="Edit section title"
-										onclick={() => openEditSection(section)}
-									>
-										<Edit3 class="h-3.5 w-3.5" />
-									</button>
-
-									<button
-										class="btn btn-ghost btn-xs text-base-content/70 hover:text-error rounded-lg p-1.5"
-										title="Delete section"
-										onclick={() => openDeleteSection(section)}
-									>
-										<Trash2 class="h-3.5 w-3.5" />
-									</button>
-
-									<div class="h-4 w-px bg-base-content/15 mx-1"></div>
-
-									<button
-										class="btn btn-primary btn-outline btn-xs rounded-xl gap-1 font-semibold"
-										onclick={() => openAddLesson(section.id)}
-									>
-										<Plus class="h-3.5 w-3.5" />
-										Add Lesson
-									</button>
-								</div>
-							</div>
-
-							<!-- Lessons List -->
-							<div class="space-y-2">
-								{#each section.lessons || [] as lesson (lesson.id)}
-									<div class="group flex items-center justify-between rounded-xl bg-base-200/50 p-3 text-xs border border-base-content/5 hover:border-primary/20 transition-colors">
-										<div class="flex items-center gap-2.5">
-											{#if lesson.type === 'Video'}
-												<PlayCircle class="h-4 w-4 text-primary" />
-											{:else if lesson.type === 'PdfDocument'}
-												<FileText class="h-4 w-4 text-secondary" />
-											{:else if lesson.type === 'DownloadableFile'}
-												<Download class="h-4 w-4 text-accent" />
-											{:else}
-												<AlignLeft class="h-4 w-4 text-primary" />
-											{/if}
-											<div>
-												<span class="font-semibold text-base-content block">{lesson.title}</span>
-												<span class="text-[10px] text-base-content/50 font-mono">
-													{lesson.type} • {lesson.durationMinutes || 0} mins
-												</span>
-											</div>
-										</div>
-
-										<div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity">
-											<button
-												class="btn btn-ghost btn-xs text-base-content/70 hover:text-primary rounded-lg p-1.5"
-												title="Edit Lesson"
-												onclick={() => openEditLesson(lesson)}
-											>
-												<Edit3 class="h-3.5 w-3.5" />
-											</button>
-											<button
-												class="btn btn-ghost btn-xs text-base-content/70 hover:text-error rounded-lg p-1.5"
-												title="Delete Lesson"
-												onclick={() => openDeleteLesson(lesson)}
-											>
-												<Trash2 class="h-3.5 w-3.5" />
-											</button>
-										</div>
+					<div class="space-y-4">
+						{#each course.sections as section, sIdx (section.id || sIdx)}
+							<div class="bg-base-200/50 rounded-2xl border border-base-content/10 overflow-hidden">
+								<!-- Section Header -->
+								<div class="p-4 bg-base-100/60 flex items-center justify-between gap-3 border-b border-base-content/5 flex-wrap">
+									<div class="flex items-center gap-3 min-w-0">
+										<span class="w-7 h-7 rounded-lg bg-primary/10 text-primary font-mono font-bold text-xs flex items-center justify-center flex-shrink-0">
+											{sIdx + 1}
+										</span>
+										<span class="font-bold text-sm text-base-content">{section.title}</span>
+										<span class="badge badge-sm badge-ghost text-[10px]">
+											{section.lessons?.length || 0} lessons
+										</span>
 									</div>
-								{/each}
+
+									<div class="flex items-center gap-1.5 ml-auto">
+										<button
+											type="button"
+											class="btn btn-xs btn-primary btn-outline gap-1 text-xs"
+											onclick={() => openAddLesson(section.id)}
+										>
+											<Plus class="w-3.5 h-3.5" />
+											Add Lesson
+										</button>
+
+										<button
+											type="button"
+											class="btn btn-xs btn-ghost btn-square"
+											onclick={() => openEditSection(section)}
+											title="Edit Section Title"
+										>
+											<Edit3 class="w-3.5 h-3.5 text-base-content/70" />
+										</button>
+
+										<button
+											type="button"
+											class="btn btn-xs btn-ghost btn-square text-error hover:bg-error/10"
+											onclick={() => openDeleteSection(section)}
+											title="Remove Section"
+										>
+											<Trash2 class="w-3.5 h-3.5" />
+										</button>
+									</div>
+								</div>
+
+								<!-- Lessons List -->
+								<div class="p-3 divide-y divide-base-content/5 space-y-1">
+									{#if !section.lessons || section.lessons.length === 0}
+										<div class="py-4 text-center text-xs text-base-content/50 italic">
+											No lessons in this section yet. Click "Add Lesson" to compose one.
+										</div>
+									{:else}
+										{#each section.lessons as lesson (lesson.id)}
+											<div class="p-2.5 rounded-xl hover:bg-base-100/60 flex items-center justify-between gap-3 transition-colors flex-wrap">
+												<div class="flex items-center gap-2.5 min-w-0">
+													<div class="w-7 h-7 rounded-lg bg-base-300/60 flex items-center justify-center text-base-content/70 flex-shrink-0">
+														{#if lesson.type === 'Video'}
+															<PlayCircle class="w-4 h-4 text-primary" />
+														{:else if lesson.type === 'PdfDocument'}
+															<FileText class="w-4 h-4 text-secondary" />
+														{:else if lesson.type === 'DownloadableFile'}
+															<Download class="w-4 h-4 text-accent" />
+														{:else}
+															<AlignLeft class="w-4 h-4 text-base-content/70" />
+														{/if}
+													</div>
+
+													<div class="min-w-0">
+														<p class="font-semibold text-xs text-base-content truncate">{lesson.title}</p>
+														<div class="flex items-center gap-2 text-[10px] text-base-content/50 mt-0.5">
+															<span class="badge badge-xs badge-outline font-mono text-[9px]">{lesson.type}</span>
+															{#if lesson.durationMinutes > 0}
+																<span>•</span>
+																<span>{lesson.durationMinutes} mins</span>
+															{/if}
+														</div>
+													</div>
+												</div>
+
+												<div class="flex items-center gap-1 ml-auto">
+													<button
+														type="button"
+														class="btn btn-xs btn-ghost btn-square"
+														onclick={() => openEditLesson(lesson)}
+														title="Edit Lesson Content"
+													>
+														<Edit3 class="w-3.5 h-3.5 text-base-content/70" />
+													</button>
+													<button
+														type="button"
+														class="btn btn-xs btn-ghost btn-square text-error hover:bg-error/10"
+														onclick={() => openDeleteLesson(lesson)}
+														title="Delete Lesson"
+													>
+														<Trash2 class="w-3.5 h-3.5" />
+													</button>
+												</div>
+											</div>
+										{/each}
+									{/if}
+								</div>
 							</div>
-						</GlassCard>
-					{/each}
+						{/each}
+					</div>
 				{/if}
-			</div>
+			</GlassCard>
 		{:else if activeTab === 'exams'}
-			<!-- Tab 2: Attached Course Exams Studio -->
+			<!-- Tab 2: Reusable Exams Attachment -->
 			<GlassCard class="p-6">
 				<CourseExamAttachment
 					courseExams={course.exams || []}
@@ -611,53 +719,57 @@
 				/>
 			</GlassCard>
 		{:else}
-			<!-- Tab 3: Course Settings -->
+			<!-- Tab 3: Course Settings Studio -->
 			<GlassCard class="p-6 sm:p-8">
-				<form onsubmit={handleSaveCourseSettings} class="space-y-6 max-w-2xl">
+				<form onsubmit={handleSaveCourseSettings} class="space-y-6 max-w-3xl">
 					<div>
-						<label for="course-title-edit" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80">
+						<label for="edit-c-title" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80">
 							Course Title <span class="text-error">*</span>
 						</label>
 						<input
-							id="course-title-edit"
+							id="edit-c-title"
 							type="text"
 							bind:value={editCourseTitle}
-							class="input input-bordered w-full bg-base-100/50"
+							class="input input-bordered w-full bg-base-100/50 font-semibold"
 							required
 						/>
 					</div>
 
-					<div>
-						<label for="course-desc-edit" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80">
-							Course Description
+					<div class="space-y-1.5">
+						<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80 block">
+							Course Description / Syllabus Overview
 						</label>
-						<textarea
-							id="course-desc-edit"
-							bind:value={editCourseDescription}
-							rows="3"
-							class="textarea textarea-bordered w-full bg-base-100/50"
-						></textarea>
+						<RichEditor
+							bind:content={editCourseDescription}
+							placeholder="Provide a detailed syllabus overview, learning objectives, and prerequisites..."
+						/>
 					</div>
 
-					<!-- Access Type Model Selection -->
-					<div class="space-y-2">
-						<span class="label-text text-xs font-bold uppercase tracking-wider text-base-content/80 block">
-							Enrollment & Monetization Model
-						</span>
+					<!-- Access Model Selector Cards -->
+					<div class="space-y-3">
+						<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80 block">
+							Access Model
+						</label>
 						<div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
 							{#each accessModels as model}
 								<button
 									type="button"
-									class="p-4 rounded-2xl border text-left flex flex-col justify-between transition-all {editCourseAccessType === model.id ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-base-content/10 bg-base-200/50 text-base-content/70'}"
+									class="text-left rounded-2xl p-4 transition-all duration-200 flex flex-col justify-between border cursor-pointer {editCourseAccessType === model.id
+										? 'bg-primary/10 border-primary shadow-md ring-1 ring-primary/30'
+										: 'bg-base-100/40 border-base-content/10 hover:border-base-content/30 hover:bg-base-100/70'}"
 									onclick={() => (editCourseAccessType = model.id)}
 								>
-									<div class="flex items-center justify-between mb-2">
-										<model.icon class="w-5 h-5" />
-										<span class="badge badge-xs {model.badgeClass}">{model.badge}</span>
-									</div>
-									<div>
-										<p class="font-bold text-xs text-base-content">{model.title}</p>
-										<p class="text-[10px] text-base-content/60 mt-0.5">{model.desc}</p>
+									<div class="space-y-2">
+										<div class="flex items-center justify-between">
+											<div class="w-8 h-8 rounded-xl flex items-center justify-center {editCourseAccessType === model.id ? 'bg-primary text-primary-content' : 'bg-base-200 text-base-content/70'}">
+												<model.icon class="w-4 h-4" />
+											</div>
+											<span class="badge {model.badgeClass} badge-xs font-semibold text-[9px]">
+												{model.badge}
+											</span>
+										</div>
+										<div class="font-bold text-sm text-base-content">{model.title}</div>
+										<p class="text-xs text-base-content/65 leading-relaxed">{model.desc}</p>
 									</div>
 								</button>
 							{/each}
@@ -665,32 +777,40 @@
 					</div>
 
 					{#if editCourseAccessType === 'OpenPaid'}
-						<div>
-							<label for="course-price-edit" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80">
-								Price (USD) <span class="text-error">*</span>
+						<div class="p-4 rounded-2xl bg-base-200/50 border border-base-content/10 space-y-2">
+							<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80 block" for="edit-c-price">
+								Course Price ($ USD) <span class="text-error">*</span>
 							</label>
-							<input
-								id="course-price-edit"
-								type="number"
-								min="1"
-								step="0.01"
-								bind:value={editCoursePrice}
-								class="input input-bordered w-full bg-base-100/50"
-								required
-							/>
+							<div class="relative">
+								<span class="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-base-content/50">$</span>
+								<input
+									id="edit-c-price"
+									type="number"
+									step="0.01"
+									min="0.01"
+									class="input input-bordered w-full bg-base-100/70 pl-8 pr-4 font-mono font-semibold"
+									bind:value={editCoursePrice}
+									required
+								/>
+							</div>
 						</div>
 					{:else if editCourseAccessType === 'PrivateWithKey'}
-						<div>
-							<label for="course-key-edit" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80">
-								Update Enrollment Key (Leave blank to keep existing)
+						<div class="p-4 rounded-2xl bg-base-200/50 border border-base-content/10 space-y-2">
+							<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80 block" for="edit-c-key">
+								Update Secret Enrollment Passkey (Leave blank to keep existing)
 							</label>
-							<input
-								id="course-key-edit"
-								type="password"
-								bind:value={editCourseEnrollmentKey}
-								placeholder="Enter new secret passphrase..."
-								class="input input-bordered w-full bg-base-100/50"
-							/>
+							<div class="relative">
+								<span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-base-content/50">
+									<Lock class="w-4 h-4" />
+								</span>
+								<input
+									id="edit-c-key"
+									type="password"
+									placeholder="New secret passphrase (optional)..."
+									class="input input-bordered w-full bg-base-100/70 pl-10 pr-4 font-mono"
+									bind:value={editCourseEnrollmentKey}
+								/>
+							</div>
 						</div>
 					{/if}
 
@@ -705,7 +825,7 @@
 							{:else}
 								<Save class="w-4 h-4" />
 							{/if}
-							Save Settings
+							Save Parameters
 						</button>
 					</div>
 				</form>
@@ -716,55 +836,59 @@
 
 <!-- Add Section Modal -->
 {#if isAddSectionModalOpen}
-	<div class="modal modal-open z-50">
-		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-md">
-			<h3 class="font-bold text-base text-base-content">Add Curriculum Section</h3>
-			<form
-				onsubmit={(e) => {
-					e.preventDefault();
-					handleAddSection();
-				}}
-				class="space-y-4 mt-4"
-			>
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in" role="dialog" aria-modal="true">
+		<div class="fixed inset-0" onclick={() => (isAddSectionModalOpen = false)} role="presentation"></div>
+		<div class="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
+				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
+					<Layers class="w-5 h-5 text-primary" />
+					<span>Add Curriculum Section</span>
+				</h3>
+				<button type="button" class="btn btn-ghost btn-circle btn-xs text-base-content/60" onclick={() => (isAddSectionModalOpen = false)}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+			<form onsubmit={(e) => { e.preventDefault(); handleAddSection(); }} class="space-y-4">
 				<div>
-					<label for="add-sec-title" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+					<label for="sec-title" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
 						Section Title <span class="text-error">*</span>
 					</label>
 					<input
-						id="add-sec-title"
+						id="sec-title"
 						type="text"
 						bind:value={newSectionTitle}
-						placeholder="e.g. Chapter 1: Introduction"
+						placeholder="e.g. Module 1: Architecture Overview"
 						class="input input-bordered input-sm w-full bg-base-200/50"
 						required
 					/>
 				</div>
-				<div class="modal-action">
-					<button type="button" class="btn btn-sm btn-ghost" onclick={() => (isAddSectionModalOpen = false)}>
-						Cancel
-					</button>
-					<button type="submit" class="btn btn-sm btn-primary" disabled={isActionLoading || !newSectionTitle.trim()}>
-						Add Section
+				<div class="flex justify-end gap-2 pt-3 border-t border-base-content/10">
+					<button type="button" class="btn btn-sm btn-ghost" onclick={() => (isAddSectionModalOpen = false)}>Cancel</button>
+					<button type="submit" class="btn btn-sm btn-primary gap-1.5" disabled={isActionLoading || !newSectionTitle.trim()}>
+						<Plus class="w-4 h-4" />
+						Create Section
 					</button>
 				</div>
 			</form>
 		</div>
-		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isAddSectionModalOpen = false)}></div>
 	</div>
 {/if}
 
 <!-- Edit Section Modal -->
 {#if isEditSectionModalOpen}
-	<div class="modal modal-open z-50">
-		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-md">
-			<h3 class="font-bold text-base text-base-content">Edit Section Title</h3>
-			<form
-				onsubmit={(e) => {
-					e.preventDefault();
-					handleEditSection();
-				}}
-				class="space-y-4 mt-4"
-			>
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in" role="dialog" aria-modal="true">
+		<div class="fixed inset-0" onclick={() => (isEditSectionModalOpen = false)} role="presentation"></div>
+		<div class="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
+				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
+					<Edit3 class="w-5 h-5 text-primary" />
+					<span>Edit Section Title</span>
+				</h3>
+				<button type="button" class="btn btn-ghost btn-circle btn-xs text-base-content/60" onclick={() => (isEditSectionModalOpen = false)}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+			<form onsubmit={(e) => { e.preventDefault(); handleEditSection(); }} class="space-y-4">
 				<div>
 					<label for="edit-sec-title" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
 						Section Title <span class="text-error">*</span>
@@ -777,75 +901,53 @@
 						required
 					/>
 				</div>
-				<div class="modal-action">
-					<button type="button" class="btn btn-sm btn-ghost" onclick={() => (isEditSectionModalOpen = false)}>
-						Cancel
-					</button>
-					<button type="submit" class="btn btn-sm btn-primary" disabled={isActionLoading || !editingSectionTitle.trim()}>
-						Save Changes
+				<div class="flex justify-end gap-2 pt-3 border-t border-base-content/10">
+					<button type="button" class="btn btn-sm btn-ghost" onclick={() => (isEditSectionModalOpen = false)}>Cancel</button>
+					<button type="submit" class="btn btn-sm btn-primary gap-1.5" disabled={isActionLoading || !editingSectionTitle.trim()}>
+						<Check class="w-4 h-4" />
+						Save Title
 					</button>
 				</div>
 			</form>
 		</div>
-		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isEditSectionModalOpen = false)}></div>
 	</div>
 {/if}
 
-<!-- Delete Section Modal -->
-<ConfirmModal
-	isOpen={isDeleteSectionModalOpen}
-	title="Remove Section"
-	message={`Are you sure you want to delete "${deletingSectionTitle}" and all lessons within it?`}
-	confirmText="Delete Section"
-	isDanger={true}
-	isLoading={isActionLoading}
-	onConfirm={handleDeleteSection}
-	onCancel={() => (isDeleteSectionModalOpen = false)}
-/>
-
 <!-- Add Lesson Modal -->
 {#if isAddLessonModalOpen}
-	<div class="modal modal-open z-50">
-		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-2xl">
-			<h3 class="font-bold text-base text-base-content">Add Lesson Material</h3>
-			<form
-				onsubmit={(e) => {
-					e.preventDefault();
-					handleAddLesson();
-				}}
-				class="space-y-4 mt-4"
-			>
-				<div>
-					<label for="add-les-title" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Lesson Title <span class="text-error">*</span>
-					</label>
-					<input
-						id="add-les-title"
-						type="text"
-						bind:value={newLessonTitle}
-						class="input input-bordered input-sm w-full bg-base-200/50"
-						required
-					/>
-				</div>
-
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in" role="dialog" aria-modal="true">
+		<div class="fixed inset-0" onclick={() => (isAddLessonModalOpen = false)} role="presentation"></div>
+		<div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
+				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
+					<Plus class="w-5 h-5 text-primary" />
+					<span>Add New Lesson Material</span>
+				</h3>
+				<button type="button" class="btn btn-ghost btn-circle btn-xs text-base-content/60" onclick={() => (isAddLessonModalOpen = false)}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+			<form onsubmit={(e) => { e.preventDefault(); handleAddLesson(); }} class="space-y-4">
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 					<div>
-						<label for="add-les-type" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Material Type
+						<label for="l-title" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+							Lesson Title <span class="text-error">*</span>
 						</label>
-						<select id="add-les-type" bind:value={newLessonType} class="select select-bordered select-sm w-full bg-base-200/50">
-							{#each materialTypes as mt}
-								<option value={mt.id}>{mt.label}</option>
-							{/each}
-						</select>
+						<input
+							id="l-title"
+							type="text"
+							bind:value={newLessonTitle}
+							placeholder="e.g. Understanding Event-Driven Messaging"
+							class="input input-bordered input-sm w-full bg-base-200/50"
+							required
+						/>
 					</div>
-
 					<div>
-						<label for="add-les-dur" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+						<label for="l-dur" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
 							Estimated Duration (Minutes)
 						</label>
 						<input
-							id="add-les-dur"
+							id="l-dur"
 							type="number"
 							min="1"
 							bind:value={newLessonDuration}
@@ -854,88 +956,98 @@
 					</div>
 				</div>
 
+				<div>
+					<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70 block">
+						Material Content Type
+					</label>
+					<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+						{#each materialTypes as m}
+							<button
+								type="button"
+								class="p-3 rounded-xl border text-left transition-all flex flex-col items-center justify-center gap-1.5 {newLessonType === m.id ? 'bg-primary/10 border-primary shadow-xs' : 'bg-base-200/50 border-base-content/10 hover:bg-base-200'}"
+								onclick={() => (newLessonType = m.id)}
+							>
+								<m.icon class="w-5 h-5 {newLessonType === m.id ? 'text-primary' : 'text-base-content/60'}" />
+								<span class="text-[11px] font-bold text-base-content">{m.label}</span>
+							</button>
+						{/each}
+					</div>
+				</div>
+
 				{#if newLessonType === 'Video' || newLessonType === 'PdfDocument' || newLessonType === 'DownloadableFile'}
 					<div>
-						<label for="add-les-url" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Media / Resource URL
+						<label for="l-url" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+							Resource / Media URL <span class="text-error">*</span>
 						</label>
 						<input
-							id="add-les-url"
+							id="l-url"
 							type="url"
 							bind:value={newLessonContentUrl}
-							placeholder="https://..."
+							placeholder="https://storage.domain.com/lectures/lesson-01.mp4"
 							class="input input-bordered input-sm w-full bg-base-200/50"
+							required
 						/>
 					</div>
 				{/if}
 
-				<div>
-					<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Article / Lecture Content
-					</label>
-					<RichEditor
-						bind:content={newLessonTextContent}
-						placeholder="Write lesson notes or content..."
-					/>
-				</div>
+				{#if newLessonType === 'Text'}
+					<div class="space-y-1.5">
+						<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70 block">
+							Lesson Body / Written Guide
+						</label>
+						<RichEditor
+							bind:content={newLessonTextContent}
+							placeholder="Write comprehensive markdown/rich lesson text with code blocks and formulas..."
+						/>
+					</div>
+				{/if}
 
-				<div class="modal-action">
-					<button type="button" class="btn btn-sm btn-ghost" onclick={() => (isAddLessonModalOpen = false)}>
-						Cancel
-					</button>
-					<button type="submit" class="btn btn-sm btn-primary" disabled={isActionLoading || !newLessonTitle.trim()}>
+				<div class="flex justify-end gap-2 pt-3 border-t border-base-content/10">
+					<button type="button" class="btn btn-sm btn-ghost" onclick={() => (isAddLessonModalOpen = false)}>Cancel</button>
+					<button type="submit" class="btn btn-sm btn-primary gap-1.5" disabled={isActionLoading || !newLessonTitle.trim()}>
+						<Plus class="w-4 h-4" />
 						Create Lesson
 					</button>
 				</div>
 			</form>
 		</div>
-		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isAddLessonModalOpen = false)}></div>
 	</div>
 {/if}
 
 <!-- Edit Lesson Modal -->
 {#if isEditLessonModalOpen}
-	<div class="modal modal-open z-50">
-		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-2xl">
-			<h3 class="font-bold text-base text-base-content">Edit Lesson Material</h3>
-			<form
-				onsubmit={(e) => {
-					e.preventDefault();
-					handleEditLesson();
-				}}
-				class="space-y-4 mt-4"
-			>
-				<div>
-					<label for="edit-les-title" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Lesson Title <span class="text-error">*</span>
-					</label>
-					<input
-						id="edit-les-title"
-						type="text"
-						bind:value={editingLessonTitle}
-						class="input input-bordered input-sm w-full bg-base-200/50"
-						required
-					/>
-				</div>
-
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in" role="dialog" aria-modal="true">
+		<div class="fixed inset-0" onclick={() => (isEditLessonModalOpen = false)} role="presentation"></div>
+		<div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
+				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
+					<Edit3 class="w-5 h-5 text-primary" />
+					<span>Edit Lesson Material</span>
+				</h3>
+				<button type="button" class="btn btn-ghost btn-circle btn-xs text-base-content/60" onclick={() => (isEditLessonModalOpen = false)}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+			<form onsubmit={(e) => { e.preventDefault(); handleEditLesson(); }} class="space-y-4">
+				<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 					<div>
-						<label for="edit-les-type" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Material Type
-						</label>
-						<select id="edit-les-type" bind:value={editingLessonType} class="select select-bordered select-sm w-full bg-base-200/50">
-							{#each materialTypes as mt}
-								<option value={mt.id}>{mt.label}</option>
-							{/each}
-						</select>
-					</div>
-
-					<div>
-						<label for="edit-les-dur" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Estimated Duration (Minutes)
+						<label for="edit-l-title" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+							Lesson Title <span class="text-error">*</span>
 						</label>
 						<input
-							id="edit-les-dur"
+							id="edit-l-title"
+							type="text"
+							bind:value={editingLessonTitle}
+							class="input input-bordered input-sm w-full bg-base-200/50"
+							required
+						/>
+					</div>
+					<div>
+						<label for="edit-l-dur" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+							Duration (Minutes)
+						</label>
+						<input
+							id="edit-l-dur"
 							type="number"
 							min="1"
 							bind:value={editingLessonDuration}
@@ -944,49 +1056,80 @@
 					</div>
 				</div>
 
+				<div>
+					<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70 block">
+						Material Content Type
+					</label>
+					<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+						{#each materialTypes as m}
+							<button
+								type="button"
+								class="p-3 rounded-xl border text-left transition-all flex flex-col items-center justify-center gap-1.5 {editingLessonType === m.id ? 'bg-primary/10 border-primary shadow-xs' : 'bg-base-200/50 border-base-content/10 hover:bg-base-200'}"
+								onclick={() => (editingLessonType = m.id)}
+							>
+								<m.icon class="w-5 h-5 {editingLessonType === m.id ? 'text-primary' : 'text-base-content/60'}" />
+								<span class="text-[11px] font-bold text-base-content">{m.label}</span>
+							</button>
+						{/each}
+					</div>
+				</div>
+
 				{#if editingLessonType === 'Video' || editingLessonType === 'PdfDocument' || editingLessonType === 'DownloadableFile'}
 					<div>
-						<label for="edit-les-url" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Media / Resource URL
+						<label for="edit-l-url" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+							Resource / Media URL <span class="text-error">*</span>
 						</label>
 						<input
-							id="edit-les-url"
+							id="edit-l-url"
 							type="url"
 							bind:value={editingLessonContentUrl}
 							class="input input-bordered input-sm w-full bg-base-200/50"
+							required
 						/>
 					</div>
 				{/if}
 
-				<div>
-					<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Article / Lecture Content
-					</label>
-					<RichEditor
-						bind:content={editingLessonTextContent}
-						placeholder="Write lesson notes or content..."
-					/>
-				</div>
+				{#if editingLessonType === 'Text'}
+					<div class="space-y-1.5">
+						<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70 block">
+							Lesson Body / Written Guide
+						</label>
+						<RichEditor
+							bind:content={editingLessonTextContent}
+							placeholder="Write comprehensive markdown/rich lesson text with code blocks and formulas..."
+						/>
+					</div>
+				{/if}
 
-				<div class="modal-action">
-					<button type="button" class="btn btn-sm btn-ghost" onclick={() => (isEditLessonModalOpen = false)}>
-						Cancel
-					</button>
-					<button type="submit" class="btn btn-sm btn-primary" disabled={isActionLoading || !editingLessonTitle.trim()}>
-						Save Changes
+				<div class="flex justify-end gap-2 pt-3 border-t border-base-content/10">
+					<button type="button" class="btn btn-sm btn-ghost" onclick={() => (isEditLessonModalOpen = false)}>Cancel</button>
+					<button type="submit" class="btn btn-sm btn-primary gap-1.5" disabled={isActionLoading || !editingLessonTitle.trim()}>
+						<Check class="w-4 h-4" />
+						Save Lesson
 					</button>
 				</div>
 			</form>
 		</div>
-		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isEditLessonModalOpen = false)}></div>
 	</div>
 {/if}
 
-<!-- Delete Lesson Modal -->
+<!-- Delete Section Confirmation Modal -->
+<ConfirmModal
+	isOpen={isDeleteSectionModalOpen}
+	title="Remove Curriculum Section"
+	message={`Are you sure you want to remove section "${deletingSectionTitle}" and all its contained lessons?`}
+	confirmText="Remove Section"
+	isDanger={true}
+	isLoading={isActionLoading}
+	onConfirm={handleDeleteSection}
+	onCancel={() => (isDeleteSectionModalOpen = false)}
+/>
+
+<!-- Delete Lesson Confirmation Modal -->
 <ConfirmModal
 	isOpen={isDeleteLessonModalOpen}
-	title="Remove Lesson"
-	message={`Are you sure you want to remove "${deletingLessonTitle}"?`}
+	title="Delete Lesson Material"
+	message={`Are you sure you want to delete lesson "${deletingLessonTitle}"?`}
 	confirmText="Delete Lesson"
 	isDanger={true}
 	isLoading={isActionLoading}
@@ -994,11 +1137,23 @@
 	onCancel={() => (isDeleteLessonModalOpen = false)}
 />
 
-<!-- Delete Course Modal -->
+<!-- Unpublish Course Confirmation Modal -->
+<ConfirmModal
+	isOpen={isUnpublishModalOpen}
+	title="Unpublish Course"
+	message="Are you sure you want to unpublish this course? It will be reverted to Draft status and hidden from the public catalog. Existing enrolled students will continue to have access."
+	confirmText="Unpublish to Draft"
+	isDanger={false}
+	isLoading={isActionLoading}
+	onConfirm={handleUnpublish}
+	onCancel={() => (isUnpublishModalOpen = false)}
+/>
+
+<!-- Delete Course Confirmation Modal -->
 <ConfirmModal
 	isOpen={isDeleteCourseModalOpen}
 	title="Delete Course"
-	message="Are you sure you want to permanently delete this course and all associated enrollments?"
+	message="Are you sure you want to permanently delete this course? All associated curriculum, lessons, assignments, and enrollments will be deleted."
 	confirmText="Delete Course"
 	isDanger={true}
 	isLoading={isActionLoading}

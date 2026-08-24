@@ -44,6 +44,7 @@ public sealed class GetCourseQueryHandler : IQueryHandler<GetCourseQuery, ApiRes
                 .Include(c => c.Sections.OrderBy(s => s.OrderIndex))
                     .ThenInclude(s => s.Lessons.OrderBy(l => l.OrderIndex))
                 .Include(c => c.Assignments.OrderBy(a => a.DeadlineUtc))
+                .Include(c => c.Exams.OrderBy(e => e.OrderIndex))
                 .FirstOrDefaultAsync(c => c.Id == query.Id, cancellationToken);
 
             if (course is null)
@@ -73,6 +74,13 @@ public sealed class GetCourseQueryHandler : IQueryHandler<GetCourseQuery, ApiRes
                 a.MaxScore
             )).ToList();
 
+            var exams = course.Exams.Select(e => new CourseExamDto(
+                e.Id,
+                e.ExamId,
+                e.OrderIndex,
+                e.IsMandatory
+            )).ToList();
+
             dto = new CourseCurriculumDto(
                 course.Id,
                 course.InstructorId,
@@ -84,7 +92,8 @@ public sealed class GetCourseQueryHandler : IQueryHandler<GetCourseQuery, ApiRes
                 course.ThumbnailUrl,
                 course.CreatedAtUtc,
                 sections,
-                assignments);
+                assignments,
+                exams);
 
             await _cacheService.SetAsync(cacheKey, dto, TimeSpan.FromHours(1), cancellationToken);
         }

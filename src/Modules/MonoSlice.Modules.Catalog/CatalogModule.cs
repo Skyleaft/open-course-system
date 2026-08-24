@@ -8,11 +8,13 @@ using MonoSlice.Modules.Catalog.Contracts;
 using MonoSlice.Modules.Catalog.EventHandlers;
 using MonoSlice.Modules.Catalog.Features.AddLesson;
 using MonoSlice.Modules.Catalog.Features.AddSection;
+using MonoSlice.Modules.Catalog.Features.AttachExam;
 using MonoSlice.Modules.Catalog.Features.CreateAssignment;
 using MonoSlice.Modules.Catalog.Features.CreateCourse;
 using MonoSlice.Modules.Catalog.Features.DeleteCourse;
 using MonoSlice.Modules.Catalog.Features.DeleteLesson;
 using MonoSlice.Modules.Catalog.Features.DeleteSection;
+using MonoSlice.Modules.Catalog.Features.DetachExam;
 using MonoSlice.Modules.Catalog.Features.EnrollCourse;
 using MonoSlice.Modules.Catalog.Features.GetCourse;
 using MonoSlice.Modules.Catalog.Features.GetLesson;
@@ -92,6 +94,8 @@ public static class CatalogModule
         coursesV1Group.MapDeleteLessonEndpoint();
         coursesV1Group.MapCreateAssignmentEndpoint();
         coursesV1Group.MapSubmitAssignmentEndpoint();
+        coursesV1Group.MapAttachExamEndpoint();
+        coursesV1Group.MapDetachExamEndpoint();
 
         return app;
     }

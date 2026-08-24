@@ -69,6 +69,15 @@ export const examsApi = {
 		availableToUtc?: string;
 		shuffleQuestions?: boolean;
 		shuffleOptions?: boolean;
+		sections?: Array<{
+			id?: string;
+			questionBankId: string;
+			title: string;
+			description?: string | null;
+			pointsOverride?: number | null;
+			questionCount?: number | null;
+			orderIndex: number;
+		}>;
 	}): Promise<QuizExam> {
 		return apiClient.put<QuizExam>(`/api/v1/exams/${id}`, data);
 	},

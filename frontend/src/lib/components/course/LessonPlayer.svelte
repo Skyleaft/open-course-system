@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { Lesson } from '#lib/api/types.ts';
-	import RichRenderer from '#lib/components/editor/RichRenderer.svelte';
+	import type { Lesson } from '$lib/api/types.ts';
+	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
 	import {
 		PlayCircle,
 		FileText,
@@ -8,8 +8,9 @@
 		AlertCircle,
 		ExternalLink,
 		BookOpen,
-		AlignLeft
-	} from '@lucide/svelte';
+		AlignLeft,
+		Clock
+	} from 'lucide-svelte';
 
 	interface Props {
 		lesson: Lesson;
@@ -18,9 +19,9 @@
 	let { lesson }: Props = $props();
 </script>
 
-<div class="glass-card overflow-hidden rounded-3xl border border-white/10 shadow-2xl">
+<div class="bg-base-200/40 overflow-hidden rounded-3xl border border-base-content/10 shadow-xl">
 	{#if lesson.type === 'Video'}
-		<div class="relative aspect-video w-full bg-black">
+		<div class="relative aspect-video w-full bg-black flex items-center justify-center">
 			{#if lesson.contentUrl}
 				<video
 					src={lesson.contentUrl}
@@ -32,8 +33,9 @@
 					Your browser does not support the video tag.
 				</video>
 			{:else}
-				<div class="flex h-full items-center justify-center text-xs text-base-content/40">
-					No video source provided.
+				<div class="flex flex-col items-center justify-center gap-2 text-xs text-white/50">
+					<PlayCircle class="w-8 h-8 text-white/30" />
+					<span>No video source URL configured for this lesson.</span>
 				</div>
 			{/if}
 		</div>
@@ -53,8 +55,8 @@
 		</div>
 	{:else if lesson.type === 'DownloadableFile'}
 		<div class="p-8 text-center space-y-4">
-			<div class="gradient-accent mx-auto flex h-16 w-16 items-center justify-center rounded-3xl text-white shadow-xl">
-				<Download class="h-8 w-8" />
+			<div class="w-16 h-16 rounded-3xl bg-primary/10 text-primary mx-auto flex items-center justify-center shadow-md">
+				<Download class="w-8 h-8" />
 			</div>
 			<div class="space-y-1">
 				<h3 class="text-lg font-bold text-base-content">{lesson.title}</h3>
@@ -66,29 +68,29 @@
 					download
 					target="_blank"
 					rel="noopener noreferrer"
-					class="btn btn-primary gradient-accent rounded-xl text-white font-semibold border-0 shadow-md gap-2"
+					class="btn btn-primary btn-sm rounded-xl gap-2 shadow-md"
 				>
-					<Download class="h-4 w-4" />
-					Download Material
+					<Download class="w-4 h-4" />
+					Download Resource
 				</a>
 			{/if}
 		</div>
 	{:else}
 		<!-- Default / Text Lesson: Rich Reading Surface -->
-		<div class="p-8 space-y-6">
+		<div class="p-6 sm:p-8 space-y-6">
 			{#if lesson.textContent}
-				<div class="prose max-w-none">
+				<div class="prose max-w-none text-base-content leading-relaxed">
 					<RichRenderer content={lesson.textContent} />
 				</div>
 			{:else}
 				<div class="flex flex-col items-center justify-center py-12 text-center space-y-2">
-					<AlignLeft class="h-10 w-10 text-base-content/30" />
+					<AlignLeft class="w-10 h-10 text-base-content/30" />
 					<p class="text-xs text-base-content/50">No text content written for this lesson yet.</p>
 				</div>
 			{/if}
 
 			{#if lesson.contentUrl}
-				<div class="pt-4 border-t border-white/10 flex items-center justify-between">
+				<div class="pt-4 border-t border-base-content/10 flex items-center justify-between">
 					<span class="text-xs text-base-content/60">Attached Reference Resource</span>
 					<a
 						href={lesson.contentUrl}
@@ -96,7 +98,7 @@
 						rel="noopener noreferrer"
 						class="btn btn-sm btn-ghost text-xs text-primary hover:bg-primary/10 gap-1.5 rounded-xl font-semibold"
 					>
-						<ExternalLink class="h-3.5 w-3.5" />
+						<ExternalLink class="w-3.5 h-3.5" />
 						Open Resource
 					</a>
 				</div>
@@ -105,13 +107,16 @@
 	{/if}
 
 	<!-- Lesson Title & Metadata Bar -->
-	<div class="p-6 border-t border-white/10 space-y-2">
+	<div class="p-6 border-t border-base-content/10 bg-base-100/50 space-y-1.5">
 		<div class="flex items-center gap-2">
-			<span class="badge badge-primary badge-xs uppercase font-bold">{lesson.type || 'Text'}</span>
+			<span class="badge badge-primary badge-xs uppercase font-bold text-[9px]">{lesson.type || 'Text'}</span>
 			{#if lesson.durationMinutes > 0}
-				<span class="text-xs text-base-content/60">{lesson.durationMinutes} minutes</span>
+				<span class="text-xs text-base-content/60 flex items-center gap-1">
+					<Clock class="w-3 h-3 text-base-content/40" />
+					{lesson.durationMinutes} minutes
+				</span>
 			{/if}
 		</div>
-		<h2 class="text-2xl font-extrabold text-base-content tracking-tight">{lesson.title}</h2>
+		<h2 class="text-xl sm:text-2xl font-extrabold text-base-content tracking-tight">{lesson.title}</h2>
 	</div>
 </div>

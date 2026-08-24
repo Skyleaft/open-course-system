@@ -28,7 +28,8 @@ public static class UpdateExamEndpoint
                     AvailableFromUtc = command.AvailableFromUtc,
                     AvailableToUtc = command.AvailableToUtc,
                     ShuffleQuestions = command.ShuffleQuestions,
-                    ShuffleOptions = command.ShuffleOptions
+                    ShuffleOptions = command.ShuffleOptions,
+                    Sections = command.Sections
                 };
                 var response = await mediator.Send(enrichedCommand, ct);
                 return Results.Json(response, statusCode: response.StatusCode);

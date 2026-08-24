@@ -1,7 +1,7 @@
 <script lang="ts">
-	import type { QuizSection, QuestionBank, BankQuestion } from '#lib/api/types.ts';
+	import type { QuizSection, QuestionBank, BankQuestion } from '$lib/api/types.ts';
 	import QuestionBankPackageSelector from './QuestionBankPackageSelector.svelte';
-	import RichRenderer from '#lib/components/editor/RichRenderer.svelte';
+	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
 	import {
 		Layers,
 		Plus,
@@ -18,8 +18,9 @@
 		ChevronDown,
 		ChevronUp,
 		Settings,
-		HelpCircle
-	} from '@lucide/svelte';
+		HelpCircle,
+		X
+	} from 'lucide-svelte';
 
 	interface Props {
 		sections: QuizSection[];
@@ -255,36 +256,42 @@
 						</div>
 					</div>
 
-					<!-- Expanded Question Preview -->
+					<!-- Description if any -->
+					{#if section.description}
+						<div class="px-4 py-2 text-xs text-base-content/70 bg-base-100/30 border-t border-base-content/5">
+							{section.description}
+						</div>
+					{/if}
+
+					<!-- Questions Preview Drawer -->
 					{#if isExpanded}
-						<div class="p-3.5 border-t border-base-content/10 bg-base-200/30 space-y-2">
+						<div class="p-4 border-t border-base-content/10 bg-base-200/30 space-y-2.5">
 							{#if questions.length === 0}
-								<p class="text-xs text-base-content/50 italic py-2 text-center">
-									No questions found in this Question Bank.
+								<p class="text-xs text-base-content/50 italic text-center py-3">
+									This Question Bank pool has no questions yet. Questions added to this bank will automatically show up here.
 								</p>
 							{:else}
-								{#each questions.slice(0, effectiveCount) as q, qIdx (q.id || qIdx)}
-									{@const effectivePts = section.pointsOverride ?? q.points}
-									<div class="p-2.5 rounded-xl bg-base-100 border border-base-content/5 flex items-start gap-2.5">
-										<span class="w-5 h-5 rounded-full bg-base-200 text-base-content/60 text-[10px] font-mono flex items-center justify-center flex-shrink-0 mt-0.5">
-											{qIdx + 1}
-										</span>
-										<div class="min-w-0 flex-1">
-											<div class="text-xs font-semibold text-base-content line-clamp-2">
-												<RichRenderer content={q.questionText || q.text || ''} />
+								{#each questions.slice(0, effectiveCount) as q, qIdx}
+									<div class="p-3 rounded-xl bg-base-100/80 border border-base-content/5 text-xs space-y-1.5">
+										<div class="flex items-center justify-between gap-2">
+											<span class="font-mono font-bold text-[10px] text-base-content/60">Q{qIdx + 1}</span>
+											<div class="flex items-center gap-1.5">
+												<span class="badge badge-xs badge-outline badge-primary font-bold text-[9px]">{q.type}</span>
+												<span class="badge badge-xs badge-neutral font-mono font-bold text-[9px]">
+													{section.pointsOverride ?? q.points ?? 5} pts
+												</span>
 											</div>
-											<div class="flex items-center gap-2 mt-1.5 text-[11px] text-base-content/60 flex-wrap">
-												<span class="badge badge-xs badge-outline">{q.type}</span>
-												<span class="font-mono text-primary font-bold">{effectivePts} pts</span>
-												{#if section.pointsOverride}
-													<span class="text-[10px] text-warning">(Overridden from {q.points} pts)</span>
-												{/if}
-												<span>•</span>
-												<span>{q.options?.length || 0} options</span>
-											</div>
+										</div>
+										<div class="text-base-content font-medium">
+											<RichRenderer content={q.questionText || q.text || ''} />
 										</div>
 									</div>
 								{/each}
+								{#if questions.length > effectiveCount}
+									<p class="text-[11px] text-base-content/50 text-center italic pt-1">
+										+ {questions.length - effectiveCount} additional questions in pool (limited by section count of {section.questionCount})
+									</p>
+								{/if}
 							{/if}
 						</div>
 					{/if}
@@ -294,36 +301,55 @@
 	{/if}
 </div>
 
-<!-- Add / Edit Section Modal -->
+<!-- Add/Edit Section Modal (Clean Centered Modal) -->
 {#if isModalOpen}
-	<div class="modal modal-open z-50">
-		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-lg">
-			<h3 class="font-bold text-base text-base-content flex items-center gap-2">
-				<Layers class="w-5 h-5 text-primary" />
-				{editingIndex !== null ? 'Configure Section' : 'Add Exam Section'}
-			</h3>
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in"
+		role="dialog"
+		aria-modal="true"
+	>
+		<!-- Backdrop click -->
+		<div class="fixed inset-0" onclick={() => (isModalOpen = false)} role="presentation"></div>
+
+		<div class="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
+				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
+					<Layers class="w-5 h-5 text-primary" />
+					<span>{editingIndex !== null ? 'Edit Section Settings' : 'Add New Exam Section'}</span>
+				</h3>
+				<button
+					type="button"
+					class="btn btn-ghost btn-circle btn-xs text-base-content/60 hover:text-base-content"
+					onclick={() => (isModalOpen = false)}
+					aria-label="Close modal"
+				>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
 
 			<form
 				onsubmit={(e) => {
 					e.preventDefault();
 					handleSaveSectionModal();
 				}}
-				class="space-y-4 mt-4"
+				class="space-y-4"
 			>
+				<!-- Section Title -->
 				<div>
-					<label for="section-title-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+					<label for="sec-title-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
 						Section Title <span class="text-error">*</span>
 					</label>
 					<input
-						id="section-title-input"
+						id="sec-title-input"
 						type="text"
 						bind:value={modalSectionTitle}
-						placeholder="e.g. Section 1 - Core Fundamentals"
+						placeholder="e.g. Core C# Fundamentals"
 						class="input input-bordered input-sm w-full bg-base-200/50"
 						required
 					/>
 				</div>
 
+				<!-- Section Description -->
 				<div>
 					<label for="section-desc-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
 						Section Description (Optional)
@@ -347,7 +373,7 @@
 							<div class="min-w-0">
 								{#if selectedBank}
 									<p class="font-bold text-xs text-base-content truncate">{selectedBank.title}</p>
-									<p class="text-[11px] text-base-content/60">{selectedBank.questions?.length || 0} questions available</p>
+									<p class="text-[11px] text-base-content/60">{selectedBank.questionCount ?? (selectedBank.questions?.length || 0)} questions available</p>
 								{:else}
 									<p class="text-xs text-base-content/40 italic">No Question Bank selected</p>
 								{/if}
@@ -399,7 +425,7 @@
 				</div>
 
 				<!-- Actions -->
-				<div class="modal-action pt-2">
+				<div class="flex justify-end gap-2 pt-3 border-t border-base-content/10">
 					<button
 						type="button"
 						class="btn btn-sm btn-ghost"
@@ -418,7 +444,6 @@
 				</div>
 			</form>
 		</div>
-		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isModalOpen = false)}></div>
 	</div>
 {/if}
 

@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { page } from '$app/state';
-	import { coursesApi } from '#lib/api/courses.ts';
-	import { communicationsApi } from '#lib/api/communications.ts';
-	import type { Course, Lesson, DiscussionThread } from '#lib/api/types.ts';
-	import LessonPlayer from '#lib/components/course/LessonPlayer.svelte';
-	import SyllabusTree from '#lib/components/course/SyllabusTree.svelte';
-	import RichEditor from '#lib/components/editor/RichEditor.svelte';
-	import RichRenderer from '#lib/components/editor/RichRenderer.svelte';
-	import { toast } from '#lib/stores/toast.svelte.ts';
-	import { ArrowLeft, MessageSquare, BookOpen, Send, CheckCircle2 } from '@lucide/svelte';
 	import { onMount } from 'svelte';
+	import { page } from '$app/state';
+	import { coursesApi } from '$lib/api/courses.ts';
+	import { communicationsApi } from '$lib/api/communications.ts';
+	import type { Course, Lesson, DiscussionThread } from '$lib/api/types.ts';
+	import LessonPlayer from '$lib/components/course/LessonPlayer.svelte';
+	import SyllabusTree from '$lib/components/course/SyllabusTree.svelte';
+	import RichEditor from '$lib/components/editor/RichEditor.svelte';
+	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
+	import { toast } from '$lib/stores/toast.svelte.ts';
+	import { ArrowLeft, MessageSquare, BookOpen, Send, CheckCircle2 } from 'lucide-svelte';
 
 	const courseId = (page.params.id || '') as string;
 	let course = $state<Course | null>(null);
@@ -49,7 +49,7 @@
 	}
 
 	async function handleCreateThread() {
-		if (!newThreadTitle || !newThreadContent) {
+		if (!newThreadTitle.trim() || !newThreadContent.trim()) {
 			toast.warning('Please enter both title and question details.');
 			return;
 		}
@@ -59,10 +59,10 @@
 			await communicationsApi.createThread({
 				courseId,
 				lessonId: activeLesson?.id || null,
-				title: newThreadTitle,
-				content: newThreadContent
+				title: newThreadTitle.trim(),
+				content: newThreadContent.trim()
 			});
-			toast.success('Discussion thread created!');
+			toast.success('Discussion question posted!');
 			newThreadTitle = '';
 			newThreadContent = '';
 			if (activeLesson) {
@@ -76,15 +76,15 @@
 	}
 </script>
 
-<div class="space-y-6">
+<div class="space-y-6 max-w-7xl mx-auto pb-16">
 	<!-- Top Bar -->
-	<div class="flex items-center justify-between border-b border-white/10 pb-4">
+	<div class="flex items-center justify-between border-b border-base-content/10 pb-4">
 		<a
 			href="/courses/{courseId}"
-			class="inline-flex items-center gap-1.5 text-xs font-semibold text-base-content/60 hover:text-primary transition-colors"
+			class="btn btn-sm btn-ghost gap-2 text-base-content/70 hover:text-base-content"
 		>
-			<ArrowLeft class="h-4 w-4" />
-			Course Overview
+			<ArrowLeft class="w-4 h-4" />
+			<span>Course Overview</span>
 		</a>
 
 		<div class="flex items-center gap-2">
@@ -94,8 +94,8 @@
 
 	{#if isLoading}
 		<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
-			<div class="lg:col-span-2 h-[500px] glass-panel rounded-3xl animate-pulse"></div>
-			<div class="h-[500px] glass-panel rounded-3xl animate-pulse"></div>
+			<div class="lg:col-span-2 h-[500px] bg-base-200/50 rounded-3xl animate-pulse"></div>
+			<div class="h-[500px] bg-base-200/50 rounded-3xl animate-pulse"></div>
 		</div>
 	{:else if course && activeLesson}
 		<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -103,40 +103,40 @@
 			<div class="space-y-6 lg:col-span-2">
 				<LessonPlayer lesson={activeLesson} />
 
-				<!-- Lesson Discussion Section with Edra -->
-				<div class="glass-card rounded-3xl border border-white/10 p-6 space-y-6 shadow-xl">
-					<div class="flex items-center justify-between border-b border-white/10 pb-3">
+				<!-- Lesson Discussion Section -->
+				<div class="glass-card rounded-3xl border border-base-content/10 p-6 space-y-6 shadow-xl">
+					<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
 						<div class="flex items-center gap-2 font-bold text-base text-base-content">
-							<MessageSquare class="h-4 w-4 text-primary" />
-							Lesson Q&A & Discussion ({threads.length})
+							<MessageSquare class="w-4 h-4 text-primary" />
+							<span>Lesson Q&A & Discussion ({threads.length})</span>
 						</div>
 					</div>
 
-					<!-- New Thread Composer with Edra -->
-					<div class="glass-panel rounded-2xl border border-white/10 p-4 space-y-3">
+					<!-- New Thread Composer -->
+					<div class="p-4 rounded-2xl bg-base-200/50 border border-base-content/10 space-y-3">
 						<input
 							type="text"
-							class="glass-input input input-sm h-10 w-full rounded-xl text-sm font-semibold"
+							class="input input-sm input-bordered h-10 w-full rounded-xl text-sm font-semibold bg-base-100/50"
 							placeholder="Ask a question or discuss this lesson..."
 							bind:value={newThreadTitle}
 						/>
 
 						<RichEditor
-							placeholder="Describe your question in detail..."
-							minHeight="140px"
-							onUpdate={(json) => (newThreadContent = json)}
+							bind:content={newThreadContent}
+							placeholder="Describe your question or discussion in detail..."
 						/>
 
 						<div class="flex justify-end pt-1">
 							<button
-								class="btn btn-primary gradient-accent btn-sm rounded-xl text-white font-semibold border-0 shadow-md gap-1.5"
+								type="button"
+								class="btn btn-primary btn-sm rounded-xl font-semibold gap-1.5 shadow-sm"
 								onclick={handleCreateThread}
 								disabled={isPostingThread}
 							>
 								{#if isPostingThread}
 									<span class="loading loading-spinner loading-xs"></span>
 								{:else}
-									<Send class="h-3.5 w-3.5" />
+									<Send class="w-3.5 h-3.5" />
 									Post Question
 								{/if}
 							</button>
@@ -146,18 +146,20 @@
 					<!-- Existing Threads List -->
 					<div class="space-y-3">
 						{#each threads as thread (thread.id)}
-							<div class="glass-panel rounded-2xl border border-white/5 p-4 space-y-2">
+							<div class="p-4 rounded-2xl border border-base-content/5 bg-base-200/30 space-y-2">
 								<div class="flex items-center justify-between">
 									<h4 class="text-xs font-bold text-base-content">{thread.title}</h4>
 									<span class="text-[10px] text-base-content/50">
 										{new Date(thread.createdAtUtc).toLocaleDateString()}
 									</span>
 								</div>
-								<RichRenderer content={thread.content} class="text-xs text-base-content/80" />
+								<div class="text-xs text-base-content/80">
+									<RichRenderer content={thread.content} />
+								</div>
 							</div>
 						{:else}
 							<div class="text-center py-6 text-xs text-base-content/50">
-								No discussions yet. Be the first to ask a question!
+								No discussions for this lesson yet. Be the first to ask a question!
 							</div>
 						{/each}
 					</div>
@@ -167,8 +169,8 @@
 			<!-- Syllabus Sidebar Navigator -->
 			<div class="space-y-4">
 				<div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-base-content/60 px-1">
-					<BookOpen class="h-4 w-4" />
-					Course Syllabus
+					<BookOpen class="w-4 h-4 text-primary" />
+					<span>Course Syllabus</span>
 				</div>
 
 				<div class="sticky top-20">

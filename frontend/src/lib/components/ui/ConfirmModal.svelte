@@ -1,6 +1,6 @@
 <script lang="ts">
 	import GlassModal from './GlassModal.svelte';
-	import { AlertTriangle } from '@lucide/svelte';
+	import { AlertTriangle } from 'lucide-svelte';
 
 	interface Props {
 		isOpen: boolean;

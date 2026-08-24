@@ -1,11 +1,11 @@
 <script lang="ts">
-	import type { Course } from '#lib/api/types.ts';
-	import { coursesApi } from '#lib/api/courses.ts';
-	import { paymentsApi } from '#lib/api/payments.ts';
-	import { authStore } from '#lib/stores/auth.svelte.ts';
-	import { toast } from '#lib/stores/toast.svelte.ts';
-	import GlassModal from '#lib/components/ui/GlassModal.svelte';
-	import { Key, DollarSign, CheckCircle2, ArrowRight } from '@lucide/svelte';
+	import type { Course } from '$lib/api/types.ts';
+	import { coursesApi } from '$lib/api/courses.ts';
+	import { paymentsApi } from '$lib/api/payments.ts';
+	import { authStore } from '$lib/stores/auth.svelte.ts';
+	import { toast } from '$lib/stores/toast.svelte.ts';
+	import GlassModal from '$lib/components/ui/GlassModal.svelte';
+	import { Key, DollarSign, CheckCircle2, ArrowRight } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 
 	interface Props {
@@ -52,14 +52,14 @@
 	}
 
 	async function executeKeyEnroll() {
-		if (!enrollmentKey) {
+		if (!enrollmentKey.trim()) {
 			toast.warning('Please enter the enrollment key.');
 			return;
 		}
 
 		isLoading = true;
 		try {
-			await coursesApi.enroll(course.id, enrollmentKey);
+			await coursesApi.enroll(course.id, enrollmentKey.trim());
 			toast.success('Access granted with key!');
 			isKeyModalOpen = false;
 			if (onEnrolled) onEnrolled();
@@ -103,21 +103,22 @@
 
 <div>
 	<button
-		class="btn btn-primary gradient-accent w-full rounded-2xl font-bold text-white border-0 shadow-lg h-12 text-sm"
+		type="button"
+		class="btn btn-primary w-full rounded-2xl font-bold text-primary-content shadow-lg h-12 text-sm gap-2"
 		onclick={handleEnrollClick}
 		disabled={isLoading}
 	>
 		{#if isLoading}
 			<span class="loading loading-spinner loading-sm"></span>
 		{:else if course.accessType === 'OpenFree'}
-			<CheckCircle2 class="h-4 w-4 mr-1" />
-			Enroll for Free
+			<CheckCircle2 class="w-4 h-4" />
+			<span>Enroll for Free</span>
 		{:else if course.accessType === 'OpenPaid'}
-			<DollarSign class="h-4 w-4 mr-1" />
-			Enroll for ${course.price?.toFixed(2) || '0.00'}
+			<DollarSign class="w-4 h-4" />
+			<span>Enroll for ${Number(course.price || 0).toFixed(2)}</span>
 		{:else}
-			<Key class="h-4 w-4 mr-1" />
-			Enter with Key
+			<Key class="w-4 h-4" />
+			<span>Enter with Passkey</span>
 		{/if}
 	</button>
 
@@ -132,23 +133,26 @@
 				This course requires a private enrollment key from your instructor.
 			</p>
 			<div class="space-y-1.5">
-				<label class="text-xs font-semibold" for="secret-key">Enrollment Key</label>
+				<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70" for="secret-key">
+					Enrollment Passkey
+				</label>
 				<input
 					id="secret-key"
 					type="password"
-					class="glass-input input input-sm h-11 w-full rounded-xl text-sm"
-					placeholder="Enter enrollment key..."
+					class="input input-bordered input-sm h-11 w-full bg-base-200/50 text-sm"
+					placeholder="Enter secret passkey..."
 					bind:value={enrollmentKey}
 				/>
 			</div>
 		</div>
 
 		{#snippet actions()}
-			<button class="btn btn-ghost btn-sm rounded-xl" onclick={() => (isKeyModalOpen = false)}>
+			<button type="button" class="btn btn-ghost btn-sm" onclick={() => (isKeyModalOpen = false)}>
 				Cancel
 			</button>
 			<button
-				class="btn btn-primary gradient-accent btn-sm rounded-xl text-white font-semibold border-0"
+				type="button"
+				class="btn btn-primary btn-sm font-semibold"
 				onclick={executeKeyEnroll}
 				disabled={isLoading}
 			>
@@ -167,34 +171,35 @@
 		onClose={() => (isPaidModalOpen = false)}
 	>
 		<div class="space-y-4">
-			<div class="glass-card rounded-xl p-4 border border-white/10 space-y-2">
+			<div class="p-4 rounded-xl border border-base-content/10 bg-base-200/50 space-y-2">
 				<div class="flex justify-between text-xs text-base-content/70">
 					<span>Course</span>
-					<span class="font-semibold text-base-content">{course.title}</span>
+					<span class="font-bold text-base-content truncate max-w-xs">{course.title}</span>
 				</div>
-				<div class="flex justify-between text-sm font-bold border-t border-white/10 pt-2 text-primary">
+				<div class="flex justify-between text-sm font-extrabold border-t border-base-content/10 pt-2 text-primary font-mono">
 					<span>Total Amount</span>
-					<span>${course.price?.toFixed(2) || '0.00'}</span>
+					<span>${Number(course.price || 0).toFixed(2)}</span>
 				</div>
 			</div>
-			<div class="rounded-xl bg-info/10 border border-info/20 p-3 text-xs text-info">
-				💡 Mock payment simulation enabled. Click below to simulate instantaneous payment webhook.
+			<div class="rounded-xl bg-info/10 border border-info/20 p-3 text-xs text-info leading-relaxed">
+				💡 Mock payment simulation enabled. Click below to simulate instantaneous payment webhook confirmation.
 			</div>
 		</div>
 
 		{#snippet actions()}
-			<button class="btn btn-ghost btn-sm rounded-xl" onclick={() => (isPaidModalOpen = false)}>
+			<button type="button" class="btn btn-ghost btn-sm" onclick={() => (isPaidModalOpen = false)}>
 				Cancel
 			</button>
 			<button
-				class="btn btn-primary gradient-accent btn-sm rounded-xl text-white font-semibold border-0"
+				type="button"
+				class="btn btn-primary btn-sm font-semibold"
 				onclick={completeMockPayment}
 				disabled={isLoading}
 			>
 				{#if isLoading}
 					<span class="loading loading-spinner loading-xs"></span>
 				{/if}
-				Simulate Payment ($ {course.price?.toFixed(2)})
+				Simulate Payment (${Number(course.price || 0).toFixed(2)})
 			</button>
 		{/snippet}
 	</GlassModal>

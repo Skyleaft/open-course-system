@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { coursesApi } from '#lib/api/courses.ts';
-	import type { Course } from '#lib/api/types.ts';
-	import CourseCard from '#lib/components/course/CourseCard.svelte';
-	import SearchInput from '#lib/components/ui/SearchInput.svelte';
+	import { onMount } from 'svelte';
+	import { coursesApi } from '$lib/api/courses.ts';
+	import type { Course } from '$lib/api/types.ts';
+	import CourseCard from '$lib/components/course/CourseCard.svelte';
+	import SearchInput from '$lib/components/ui/SearchInput.svelte';
 	import {
 		BookOpen,
 		Sparkles,
@@ -13,8 +14,7 @@
 		ChevronRight,
 		RotateCcw,
 		Layers
-	} from '@lucide/svelte';
-	import { onMount } from 'svelte';
+	} from 'lucide-svelte';
 
 	let courses = $state<Course[]>([]);
 	let isLoading = $state(true);
@@ -117,13 +117,13 @@
 	);
 </script>
 
-<div class="space-y-8">
+<div class="space-y-8 max-w-7xl mx-auto pb-16">
 	<!-- Header Banner -->
-	<div class="glass-panel relative overflow-hidden rounded-3xl border border-white/10 p-8 shadow-2xl backdrop-blur-2xl">
+	<div class="glass-panel relative overflow-hidden rounded-3xl border border-base-content/10 p-6 sm:p-10 shadow-2xl backdrop-blur-2xl">
 		<div class="relative z-10 space-y-2">
-			<div class="inline-flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-1 text-xs font-semibold text-primary">
-				<Sparkles class="h-3.5 w-3.5" />
-				Curated Learning Paths
+			<div class="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 border border-primary/20 px-3 py-1 text-xs font-semibold text-primary">
+				<Sparkles class="w-3.5 h-3.5" />
+				<span>Curated Learning Paths</span>
 			</div>
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
 				<div>
@@ -131,10 +131,10 @@
 						Explore Course Catalog
 					</h1>
 					<p class="text-xs text-base-content/70 sm:text-sm max-w-xl mt-1">
-						Master distributed engineering, computer science fundamentals, and prepare for certifications.
+						Master software engineering principles, prepare for examinations, and earn verifiable certificates.
 					</p>
 				</div>
-				<div class="badge badge-primary badge-outline text-xs px-3 py-3 font-semibold self-start sm:self-auto">
+				<div class="badge badge-primary badge-outline text-xs px-3 py-3 font-bold self-start sm:self-auto">
 					{totalCount} {totalCount === 1 ? 'Course' : 'Courses'} Available
 				</div>
 			</div>
@@ -151,11 +151,12 @@
 
 			<div class="flex flex-wrap items-center gap-3">
 				<!-- Access Type Pills -->
-				<div class="glass-card flex items-center gap-1 rounded-2xl p-1 border border-white/5 overflow-x-auto max-w-full">
+				<div class="glass-card flex items-center gap-1 rounded-2xl p-1 border border-base-content/10 overflow-x-auto max-w-full">
 					{#each accessTypes as type}
 						<button
-							class="btn btn-xs rounded-xl font-medium transition-colors {selectedAccessType === type
-								? 'btn-primary gradient-accent text-white font-semibold shadow-xs border-0'
+							type="button"
+							class="btn btn-xs rounded-xl font-semibold transition-all {selectedAccessType === type
+								? 'btn-primary text-primary-content shadow-xs'
 								: 'btn-ghost text-base-content/70 hover:bg-base-100/40'}"
 							onclick={() => handleFilterChange(type)}
 						>
@@ -167,7 +168,7 @@
 				<!-- Sort Dropdown -->
 				<div class="flex items-center gap-2">
 					<select
-						class="select select-sm select-bordered rounded-2xl bg-base-100/50 border-white/10 text-xs text-base-content focus:border-primary"
+						class="select select-sm select-bordered rounded-2xl bg-base-100/50 border-base-content/10 text-xs text-base-content focus:border-primary"
 						bind:value={selectedSort}
 						onchange={handleSortChange}
 					>
@@ -178,10 +179,11 @@
 
 					<!-- Toggle Advanced Filters Drawer/Panel -->
 					<button
-						class="btn btn-sm btn-ghost glass-card border border-white/10 rounded-2xl gap-1.5 text-xs text-base-content/80 hover:bg-base-100/40"
+						type="button"
+						class="btn btn-sm btn-ghost glass-card border border-base-content/10 rounded-2xl gap-1.5 text-xs text-base-content/80 hover:bg-base-100/40"
 						onclick={() => (showFilters = !showFilters)}
 					>
-						<SlidersHorizontal class="h-3.5 w-3.5 {showFilters ? 'text-primary' : ''}" />
+						<SlidersHorizontal class="w-3.5 h-3.5 {showFilters ? 'text-primary' : ''}" />
 						Filters
 						{#if hasActiveFilters}
 							<span class="badge badge-primary badge-xs">Active</span>
@@ -193,7 +195,7 @@
 
 		<!-- Expandable Advanced Filter Panel -->
 		{#if showFilters}
-			<div class="glass-card rounded-2xl p-4 border border-white/10 space-y-4">
+			<div class="glass-card rounded-2xl p-4 border border-base-content/10 space-y-4">
 				<div class="flex flex-wrap items-end justify-between gap-4">
 					<div class="flex flex-wrap items-center gap-4">
 						<div class="space-y-1">
@@ -203,7 +205,7 @@
 								type="number"
 								min="0"
 								placeholder="0"
-								class="input input-sm input-bordered rounded-xl bg-base-100/40 border-white/10 w-28 text-xs"
+								class="input input-sm input-bordered rounded-xl bg-base-100/40 border-base-content/10 w-28 text-xs font-mono"
 								bind:value={minPrice}
 							/>
 						</div>
@@ -214,24 +216,26 @@
 								type="number"
 								min="0"
 								placeholder="500"
-								class="input input-sm input-bordered rounded-xl bg-base-100/40 border-white/10 w-28 text-xs"
+								class="input input-sm input-bordered rounded-xl bg-base-100/40 border-base-content/10 w-28 text-xs font-mono"
 								bind:value={maxPrice}
 							/>
 						</div>
 						<button
+							type="button"
 							class="btn btn-sm btn-primary rounded-xl text-xs font-semibold self-end"
 							onclick={handlePriceFilterApply}
 						>
-							Apply Filter
+							Apply Price
 						</button>
 					</div>
 
 					{#if hasActiveFilters}
 						<button
+							type="button"
 							class="btn btn-sm btn-ghost text-xs text-error hover:bg-error/10 gap-1 rounded-xl"
 							onclick={resetFilters}
 						>
-							<RotateCcw class="h-3 w-3" />
+							<RotateCcw class="w-3.5 h-3.5" />
 							Reset All
 						</button>
 					{/if}
@@ -244,7 +248,7 @@
 	{#if isLoading}
 		<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 			{#each Array(6) as _}
-				<div class="glass-card flex flex-col justify-between h-56 rounded-2xl p-5 border border-white/5 animate-pulse">
+				<div class="glass-card flex flex-col justify-between h-56 rounded-2xl p-5 border border-base-content/10 animate-pulse">
 					<div class="space-y-3">
 						<div class="h-5 w-20 bg-base-100/40 rounded-lg"></div>
 						<div class="h-6 w-3/4 bg-base-100/40 rounded-lg"></div>
@@ -263,23 +267,25 @@
 
 		<!-- Pagination Controls -->
 		{#if totalPages > 1}
-			<div class="flex items-center justify-between pt-6 border-t border-white/10">
+			<div class="flex items-center justify-between pt-6 border-t border-base-content/10">
 				<p class="text-xs text-base-content/60">
 					Showing <span class="font-bold text-base-content">{courses.length}</span> of <span class="font-bold text-base-content">{totalCount}</span> courses
 				</p>
-				<div class="join glass-card border border-white/10 rounded-2xl p-0.5">
+				<div class="join glass-card border border-base-content/10 rounded-2xl p-0.5">
 					<button
+						type="button"
 						class="join-item btn btn-xs btn-ghost text-base-content/70"
 						disabled={pageIndex <= 1}
 						onclick={() => setPage(pageIndex - 1)}
 					>
-						<ChevronLeft class="h-3.5 w-3.5" />
+						<ChevronLeft class="w-3.5 h-3.5" />
 					</button>
 
 					{#each Array(totalPages) as _, i}
 						{#if i + 1 === pageIndex || i + 1 === 1 || i + 1 === totalPages || Math.abs(i + 1 - pageIndex) <= 1}
 							<button
-								class="join-item btn btn-xs {pageIndex === i + 1 ? 'btn-primary gradient-accent text-white font-bold' : 'btn-ghost text-base-content/70'}"
+								type="button"
+								class="join-item btn btn-xs {pageIndex === i + 1 ? 'btn-primary text-primary-content font-bold' : 'btn-ghost text-base-content/70'}"
 								onclick={() => setPage(i + 1)}
 							>
 								{i + 1}
@@ -288,26 +294,27 @@
 					{/each}
 
 					<button
+						type="button"
 						class="join-item btn btn-xs btn-ghost text-base-content/70"
 						disabled={pageIndex >= totalPages}
 						onclick={() => setPage(pageIndex + 1)}
 					>
-						<ChevronRight class="h-3.5 w-3.5" />
+						<ChevronRight class="w-3.5 h-3.5" />
 					</button>
 				</div>
 			</div>
 		{/if}
 	{:else}
-		<div class="glass-card rounded-3xl p-12 text-center border border-white/5 space-y-4">
-			<div class="gradient-accent mx-auto flex h-14 w-14 items-center justify-center rounded-2xl text-white">
-				<BookOpen class="h-7 w-7" />
+		<div class="glass-card rounded-3xl p-12 text-center border border-base-content/10 space-y-4">
+			<div class="w-14 h-14 rounded-2xl bg-primary/10 text-primary mx-auto flex items-center justify-center">
+				<BookOpen class="w-7 h-7" />
 			</div>
 			<div class="space-y-1">
 				<h3 class="text-lg font-bold text-base-content">No courses found</h3>
 				<p class="text-xs text-base-content/60">Try adjusting your filters, price range, or search keywords.</p>
 			</div>
 			{#if hasActiveFilters}
-				<button class="btn btn-sm btn-ghost rounded-xl border border-white/10 text-xs" onclick={resetFilters}>
+				<button type="button" class="btn btn-sm btn-ghost rounded-xl border border-base-content/10 text-xs" onclick={resetFilters}>
 					Reset Filters
 				</button>
 			{/if}

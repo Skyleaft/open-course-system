@@ -28,6 +28,7 @@ public sealed class UpdateExamCommandHandler : ICommandHandler<UpdateExamCommand
         CancellationToken cancellationToken)
     {
         var exam = await _dbContext.Exams
+            .Include(e => e.Sections)
             .FirstOrDefaultAsync(e => e.Id == command.Id, cancellationToken);
 
         if (exam is null)
@@ -57,6 +58,63 @@ public sealed class UpdateExamCommandHandler : ICommandHandler<UpdateExamCommand
             command.ShuffleQuestions,
             command.ShuffleOptions,
             updatedBy: _currentUser.UserId);
+
+        // Synchronize Sections if provided
+        if (command.Sections is not null)
+        {
+            var requestedSectionIds = command.Sections
+                .Where(s => s.Id.HasValue && s.Id.Value != Guid.Empty)
+                .Select(s => s.Id!.Value)
+                .ToHashSet();
+
+            // 1. Remove sections not present in request
+            var sectionsToRemove = exam.Sections
+                .Where(s => !requestedSectionIds.Contains(s.Id))
+                .ToList();
+
+            foreach (var sec in sectionsToRemove)
+            {
+                exam.RemoveSection(sec.Id);
+                _dbContext.Sections.Remove(sec);
+            }
+
+            // 2. Update existing or add new
+            foreach (var secDto in command.Sections)
+            {
+                if (secDto.Id.HasValue && secDto.Id.Value != Guid.Empty)
+                {
+                    var existing = exam.Sections.FirstOrDefault(s => s.Id == secDto.Id.Value);
+                    if (existing is not null)
+                    {
+                        existing.Update(
+                            questionBankId: secDto.QuestionBankId,
+                            title: secDto.Title,
+                            orderIndex: secDto.OrderIndex,
+                            pointsOverride: secDto.PointsOverride,
+                            questionCount: secDto.QuestionCount,
+                            description: secDto.Description);
+                    }
+                    else
+                    {
+                        exam.AddSection(
+                            questionBankId: secDto.QuestionBankId,
+                            title: secDto.Title,
+                            pointsOverride: secDto.PointsOverride,
+                            questionCount: secDto.QuestionCount,
+                            description: secDto.Description);
+                    }
+                }
+                else
+                {
+                    exam.AddSection(
+                        questionBankId: secDto.QuestionBankId,
+                        title: secDto.Title,
+                        pointsOverride: secDto.PointsOverride,
+                        questionCount: secDto.QuestionCount,
+                        description: secDto.Description);
+                }
+            }
+        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

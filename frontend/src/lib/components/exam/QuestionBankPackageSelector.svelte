@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { QuestionBank } from '#lib/api/types.ts';
-	import GlassModal from '#lib/components/ui/GlassModal.svelte';
+	import type { QuestionBank } from '$lib/api/types.ts';
+	import GlassModal from '$lib/components/ui/GlassModal.svelte';
 	import {
 		Search,
 		BookOpen,
@@ -10,7 +10,7 @@
 		Tag,
 		Sparkles,
 		Plus
-	} from '@lucide/svelte';
+	} from 'lucide-svelte';
 
 	interface Props {
 		isOpen: boolean;

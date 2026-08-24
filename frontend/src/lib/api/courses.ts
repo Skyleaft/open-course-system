@@ -83,6 +83,10 @@ export const coursesApi = {
 		return apiClient.post<{ id: string; isPublished: boolean }>(`/api/v1/courses/${id}/publish`);
 	},
 
+	async unpublishCourse(id: string): Promise<void> {
+		return apiClient.post<void>(`/api/v1/courses/${id}/unpublish`);
+	},
+
 	async addSection(courseId: string, data: { title: string }): Promise<SectionResultDto> {
 		return apiClient.post<SectionResultDto>(`/api/v1/courses/${courseId}/sections`, {
 			title: data.title

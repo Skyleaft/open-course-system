@@ -17,7 +17,14 @@ public sealed record CourseCurriculumDto(
     DateTime CreatedAtUtc,
     IReadOnlyList<SectionDto> Sections,
     IReadOnlyList<AssignmentDto> Assignments,
+    IReadOnlyList<CourseExamDto> Exams,
     bool IsEnrolled = false);
+
+public sealed record CourseExamDto(
+    Guid Id,
+    Guid ExamId,
+    int OrderIndex,
+    bool IsMandatory);
 
 public sealed record SectionDto(
     Guid Id,

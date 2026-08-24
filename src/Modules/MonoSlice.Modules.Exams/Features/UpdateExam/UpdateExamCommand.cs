@@ -33,4 +33,15 @@ public sealed partial class UpdateExamCommand : ICommand<ApiResponse<ExamDetailD
     public bool ShuffleQuestions { get; init; } = true;
 
     public bool ShuffleOptions { get; init; } = true;
+
+    public List<SectionUpdateDto>? Sections { get; init; }
 }
+
+public sealed record SectionUpdateDto(
+    Guid? Id,
+    Guid QuestionBankId,
+    string Title,
+    string? Description,
+    decimal? PointsOverride,
+    int? QuestionCount,
+    int OrderIndex);
