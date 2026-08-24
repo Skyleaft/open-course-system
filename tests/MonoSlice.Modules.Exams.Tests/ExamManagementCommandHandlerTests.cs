@@ -42,11 +42,12 @@ public class ExamManagementCommandHandlerTests
         _currentUser.UserId.Returns(instructorId);
         _currentUser.IsInRole("Instructor").Returns(true);
 
+        var qb = QuestionBank.Create(instructorId, "Bank 1", "Exp");
+        qb.AddQuestion("Q1", QuestionType.SingleChoice, 5m, "Exp", [new(Guid.CreateVersion7(), "A", true)]);
+        _dbContext.QuestionBanks.Add(qb);
+
         var exam = QuizExam.Create(instructorId, "Exam to Delete", "Desc", QuizMode.RealExam, 60, 75m);
-        exam.AddQuestion("Q1", QuestionType.SingleChoice, 5m, "Exp", new List<QuestionOption>
-        {
-            new(Guid.CreateVersion7(), "A", true)
-        });
+        exam.AddSection(qb.Id, "Section 1");
 
         _dbContext.Exams.Add(exam);
         await _dbContext.SaveChangesAsync();
@@ -62,7 +63,7 @@ public class ExamManagementCommandHandlerTests
 
         Assert.True(result.Data);
         Assert.Null(await _dbContext.Exams.FindAsync(exam.Id));
-        Assert.Empty(await _dbContext.Questions.Where(q => q.ExamId == exam.Id).ToListAsync());
+        Assert.Empty(await _dbContext.Sections.Where(s => s.ExamId == exam.Id).ToListAsync());
 
         await _eventBus.Received(1).PublishAsync(
             Arg.Is<ExamDeletedIntegrationEvent>(e => e.ExamId == exam.Id && e.InstructorId == instructorId),
@@ -95,20 +96,31 @@ public class ExamManagementCommandHandlerTests
     }
 
     [Fact]
-    public async Task QuestionCrud_GetUpdateAndDelete_ShouldSucceed()
+    public async Task QuestionBankCrud_GetUpdateAndDelete_ShouldSucceed()
     {
         var instructorId = Guid.CreateVersion7();
+        _currentUser.IsAuthenticated.Returns(true);
         _currentUser.UserId.Returns(instructorId);
         _currentUser.IsInRole("Instructor").Returns(true);
 
-        var exam = QuizExam.Create(instructorId, "Exam", "Desc", QuizMode.RealExam, 60, 75m);
-        var q = exam.AddQuestion("Original Question", QuestionType.SingleChoice, 5m, "Explanation", new List<QuestionOption>
-        {
-            new(Guid.CreateVersion7(), "Option 1", true),
-            new(Guid.CreateVersion7(), "Option 2", false)
-        });
+        var qb = QuestionBank.Create(
+            instructorId,
+            "Package 1",
+            "Description",
+            category: "General",
+            tags: ["test"]);
 
-        _dbContext.Exams.Add(exam);
+        var q = qb.AddQuestion(
+            "Original Question",
+            QuestionType.SingleChoice,
+            5m,
+            "Explanation",
+            [
+                new(Guid.CreateVersion7(), "Option 1", true),
+                new(Guid.CreateVersion7(), "Option 2", false)
+            ]);
+
+        _dbContext.QuestionBanks.Add(qb);
         await _dbContext.SaveChangesAsync();
 
         // 1. Get Question
@@ -126,23 +138,26 @@ public class ExamManagementCommandHandlerTests
             Type = QuestionType.MultipleChoice,
             Points = 10m,
             Explanation = "Updated Exp",
-            Options = new List<QuestionOptionDto>
-            {
+            Category = "Advanced",
+            Tags = ["updated"],
+            Options =
+            [
                 new(null, "New Option 1", true),
                 new(null, "New Option 2", true)
-            }
+            ]
         }, CancellationToken.None);
 
         Assert.Equal("Updated Question Title", updateRes.Data.QuestionText);
         Assert.Equal(10m, updateRes.Data.Points);
         Assert.Equal("MultipleChoice", updateRes.Data.Type);
+        Assert.Equal("Advanced", updateRes.Data.Category);
 
         // 3. Delete Question
-        var deleteHandler = new DeleteQuestionCommandHandler(_dbContext, _currentUser, _cacheService);
+        var deleteHandler = new DeleteQuestionCommandHandler(_dbContext, _currentUser);
         var deleteRes = await deleteHandler.Handle(new DeleteQuestionCommand(q.Id), CancellationToken.None);
         Assert.True(deleteRes.Data);
 
-        var deletedQuestion = await _dbContext.Questions.FindAsync(q.Id);
+        var deletedQuestion = await _dbContext.BankQuestions.FindAsync(q.Id);
         Assert.Null(deletedQuestion);
     }
 

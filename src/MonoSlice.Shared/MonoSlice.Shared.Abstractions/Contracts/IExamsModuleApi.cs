@@ -2,13 +2,13 @@ namespace MonoSlice.Shared.Abstractions.Contracts;
 
 public record QuizExamContractDto(
     Guid Id,
-    Guid CourseId,
     string Title,
     string Mode,
     int DurationMinutes,
     decimal PassingScore,
     int MaxAllowedViolations,
-    bool IsPublished);
+    bool IsPublished,
+    Guid? CourseId = null);
 
 public record QuizSubmissionContractDto(
     Guid Id,

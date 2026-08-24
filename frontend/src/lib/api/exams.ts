@@ -41,7 +41,6 @@ export const examsApi = {
 	},
 
 	async createExam(data: {
-		courseId?: string;
 		title: string;
 		description?: string;
 		mode: string;
@@ -58,7 +57,6 @@ export const examsApi = {
 	},
 
 	async updateExam(id: string, data: {
-		courseId?: string;
 		title: string;
 		description?: string;
 		mode: string;
@@ -82,15 +80,19 @@ export const examsApi = {
 		return apiClient.post(`/api/v1/exams/${id}/publish`);
 	},
 
-	// Question CRUD
-	async addQuestion(examId: string, data: {
+	// Question Bank CRUD
+	async addQuestion(examId: string | undefined, data: {
 		questionText: string;
 		type: QuestionType | string;
 		points: number;
 		explanation?: string;
+		category?: string;
+		tags?: string[];
 		options?: Array<{ id?: string; text: string; isCorrect: boolean }>;
+		sectionId?: string;
 	}): Promise<QuizQuestion> {
-		return apiClient.post<QuizQuestion>(`/api/v1/exams/${examId}/questions`, data);
+		const endpoint = examId ? `/api/v1/exams/${examId}/questions` : '/api/v1/exams/questions';
+		return apiClient.post<QuizQuestion>(endpoint, { ...data, examId });
 	},
 
 	async addQuestions(
@@ -102,6 +104,8 @@ export const examsApi = {
 			orderIndex: number;
 			options: Array<{ id?: string; text: string; isCorrect: boolean }>;
 			explanation?: string;
+			category?: string;
+			tags?: string[];
 		}>
 	): Promise<{ count: number }> {
 		let count = 0;
@@ -111,6 +115,8 @@ export const examsApi = {
 				type: q.type,
 				points: q.points,
 				explanation: q.explanation,
+				category: q.category,
+				tags: q.tags,
 				options: q.options
 			});
 			count++;
@@ -127,6 +133,8 @@ export const examsApi = {
 		type: QuestionType | string;
 		points: number;
 		explanation?: string;
+		category?: string;
+		tags?: string[];
 		options?: Array<{ id?: string; text: string; isCorrect: boolean }>;
 	}): Promise<QuizQuestion> {
 		return apiClient.put<QuizQuestion>(`/api/v1/exams/questions/${questionId}`, data);

@@ -22,6 +22,9 @@ public sealed class Course : AggregateRoot<Guid>
     private readonly List<Assignment> _assignments = [];
     public IReadOnlyList<Assignment> Assignments => _assignments.AsReadOnly();
 
+    private readonly List<CourseExam> _exams = [];
+    public IReadOnlyList<CourseExam> Exams => _exams.AsReadOnly();
+
     private Course() : base(Guid.CreateVersion7()) { }
 
     public static Course Create(
@@ -121,5 +124,34 @@ public sealed class Course : AggregateRoot<Guid>
         _assignments.Add(assignment);
         UpdatedAtUtc = DateTime.UtcNow;
         return assignment;
+    }
+
+    public CourseExam AttachExam(Guid examId, bool isMandatory = true)
+    {
+        if (examId == Guid.Empty)
+        {
+            throw new ValidationException("Exam ID is required.");
+        }
+
+        var existing = _exams.FirstOrDefault(e => e.ExamId == examId);
+        if (existing is not null)
+        {
+            throw new BusinessRuleException("This exam is already attached to this course.");
+        }
+
+        var courseExam = CourseExam.Create(Id, examId, _exams.Count + 1, isMandatory);
+        _exams.Add(courseExam);
+        UpdatedAtUtc = DateTime.UtcNow;
+        return courseExam;
+    }
+
+    public void DetachExam(Guid examId)
+    {
+        var courseExam = _exams.FirstOrDefault(e => e.ExamId == examId || e.Id == examId);
+        if (courseExam is not null)
+        {
+            _exams.Remove(courseExam);
+            UpdatedAtUtc = DateTime.UtcNow;
+        }
     }
 }

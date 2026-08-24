@@ -3,9 +3,9 @@ using MonoSlice.Shared.Abstractions.Exceptions;
 
 namespace MonoSlice.Modules.Exams.Domain;
 
-public sealed class QuizQuestion : Entity<Guid>
+public sealed class BankQuestion : Entity<Guid>
 {
-    public Guid ExamId { get; private set; }
+    public Guid BankId { get; private set; }
     public string QuestionText { get; private set; } = string.Empty;
     public QuestionType Type { get; private set; } = QuestionType.SingleChoice;
     public decimal Points { get; private set; } = 1m;
@@ -13,17 +13,22 @@ public sealed class QuizQuestion : Entity<Guid>
     public string? Explanation { get; private set; }
     public List<QuestionOption> Options { get; private set; } = [];
 
-    private QuizQuestion() : base(Guid.CreateVersion7()) { }
+    private BankQuestion() : base(Guid.CreateVersion7()) { }
 
-    public static QuizQuestion Create(
-        Guid examId,
+    public static BankQuestion Create(
+        Guid bankId,
         string questionText,
         QuestionType type,
         decimal points,
         int orderIndex,
-        string? explanation,
+        string? explanation = null,
         IEnumerable<QuestionOption>? options = null)
     {
+        if (bankId == Guid.Empty)
+        {
+            throw new ValidationException("Bank ID is required.");
+        }
+
         if (string.IsNullOrWhiteSpace(questionText))
         {
             throw new ValidationException("Question text cannot be empty.");
@@ -34,10 +39,10 @@ public sealed class QuizQuestion : Entity<Guid>
             throw new ValidationException("Question points must be greater than zero.");
         }
 
-        var question = new QuizQuestion
+        return new BankQuestion
         {
             Id = Guid.CreateVersion7(),
-            ExamId = examId,
+            BankId = bankId,
             QuestionText = questionText.Trim(),
             Type = type,
             Points = points,
@@ -45,16 +50,15 @@ public sealed class QuizQuestion : Entity<Guid>
             Explanation = explanation?.Trim(),
             Options = options?.ToList() ?? []
         };
-
-        return question;
     }
 
     public void Update(
         string questionText,
         QuestionType type,
         decimal points,
-        string? explanation,
-        IEnumerable<QuestionOption>? options)
+        string? explanation = null,
+        IEnumerable<QuestionOption>? options = null,
+        int? orderIndex = null)
     {
         if (string.IsNullOrWhiteSpace(questionText))
         {
@@ -71,5 +75,9 @@ public sealed class QuizQuestion : Entity<Guid>
         Points = points;
         Explanation = explanation?.Trim();
         Options = options?.ToList() ?? [];
+        if (orderIndex.HasValue)
+        {
+            OrderIndex = orderIndex.Value;
+        }
     }
 }

@@ -56,7 +56,6 @@
 			const examRes = await examsApi.createExam({
 				title: title.trim(),
 				description: description.trim() || undefined,
-				courseId: selectedCourseId || undefined,
 				mode,
 				durationMinutes: Number(durationMinutes),
 				passingScore: Number(passingScore),

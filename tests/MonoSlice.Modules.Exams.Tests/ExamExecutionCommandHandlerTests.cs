@@ -18,7 +18,6 @@ public class ExamExecutionCommandHandlerTests
     private readonly ICurrentUser _currentUser;
     private readonly ICacheService _cacheService;
     private readonly IEventStreamPublisher _eventPublisher;
-    private readonly IServiceProvider _serviceProvider;
     private readonly IExamFinalizerService _finalizerService;
 
     public ExamExecutionCommandHandlerTests()
@@ -31,7 +30,6 @@ public class ExamExecutionCommandHandlerTests
         _currentUser = Substitute.For<ICurrentUser>();
         _cacheService = Substitute.For<ICacheService>();
         _eventPublisher = Substitute.For<IEventStreamPublisher>();
-        _serviceProvider = Substitute.For<IServiceProvider>();
         _finalizerService = new ExamFinalizerService(_dbContext, _cacheService, _eventPublisher);
     }
 
@@ -44,31 +42,37 @@ public class ExamExecutionCommandHandlerTests
         _currentUser.IsAuthenticated.Returns(true);
         _currentUser.UserId.Returns(studentId);
 
-        // 1. Create and publish exam with 2 questions (Single Choice 10 pts, True False 10 pts)
-        var exam = QuizExam.Create(instructorId, "Unit Test Quiz", "Desc", QuizMode.RealExam, 45, passingScore: 50m);
-        
+        // 1. Create QuestionBank package
+        var qb = QuestionBank.Create(instructorId, "Math & CS Package", "Questions for assessment");
+
         var opt1Correct = Guid.CreateVersion7();
         var opt1Wrong = Guid.CreateVersion7();
-        var q1 = exam.AddQuestion("Q1: 2 + 2 = ?", QuestionType.SingleChoice, 10m, "2+2=4", new List<QuestionOption>
-        {
+        var q1 = qb.AddQuestion("Q1: 2 + 2 = ?", QuestionType.SingleChoice, 10m, "2+2=4",
+        [
             new(opt1Correct, "4", true),
             new(opt1Wrong, "5", false)
-        });
+        ]);
 
         var opt2True = Guid.CreateVersion7();
         var opt2False = Guid.CreateVersion7();
-        var q2 = exam.AddQuestion("Q2: C# is compiled to IL?", QuestionType.TrueFalse, 10m, "True", new List<QuestionOption>
-        {
+        var q2 = qb.AddQuestion("Q2: C# is compiled to IL?", QuestionType.TrueFalse, 10m, "True",
+        [
             new(opt2True, "True", true),
             new(opt2False, "False", false)
-        });
+        ]);
+
+        _dbContext.QuestionBanks.Add(qb);
+
+        // Create exam and link section to QuestionBank
+        var exam = QuizExam.Create(instructorId, "Unit Test Quiz", "Desc", QuizMode.RealExam, 45, passingScore: 50m);
+        exam.AddSection(qb.Id, "Main Section");
 
         exam.Publish();
         await _dbContext.Exams.AddAsync(exam);
         await _dbContext.SaveChangesAsync();
 
         // 2. Start Exam
-        var startHandler = new StartExamCommandHandler(_dbContext, _currentUser, _cacheService, _serviceProvider);
+        var startHandler = new StartExamCommandHandler(_dbContext, _currentUser, _cacheService);
         var startResult = await startHandler.Handle(new StartExamCommand { ExamId = exam.Id }, CancellationToken.None);
 
         Assert.True(startResult.Success);

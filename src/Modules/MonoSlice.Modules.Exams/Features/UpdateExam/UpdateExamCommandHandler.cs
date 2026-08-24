@@ -54,9 +54,9 @@ public sealed class UpdateExamCommandHandler : ICommandHandler<UpdateExamCommand
             command.MaxAttempts,
             command.AvailableFromUtc,
             command.AvailableToUtc,
-            command.CourseId,
             command.ShuffleQuestions,
-            command.ShuffleOptions);
+            command.ShuffleOptions,
+            updatedBy: _currentUser.UserId);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

@@ -121,12 +121,15 @@ frontend/
 │   │   │   │   ├── PreExamChecker.svelte  # Camera, mic, fullscreen validator
 │   │   │   │   ├── QuestionPalette.svelte # Number grid with status flags
 │   │   │   │   ├── QuestionCard.svelte    # SingleChoice/MultiChoice/Essay/TF
+│   │   │   │   ├── SectionBuilder.svelte  # Multi-section editor with QuestionBank package linking
+│   │   │   │   ├── QuestionBankPackageSelector.svelte # Reusable question package picker
 │   │   │   │   ├── ExamTimer.svelte       # Server drift compensated countdown
 │   │   │   │   ├── ViolationAlert.svelte  # Red alert overlay & disqualification
 │   │   │   │   └── SnapshotEngine.svelte  # Offscreen canvas capture & MinIO PUT
 │   │   │   ├── course/
 │   │   │   │   ├── CourseCard.svelte
 │   │   │   │   ├── SyllabusTree.svelte
+│   │   │   │   ├── CourseExamAttachment.svelte # Attach/detach reusable exams to courses
 │   │   │   │   └── LessonPlayer.svelte    # Video/PDF/File player with MinIO
 │   │   │   └── proctor/
 │   │   │       ├── CandidateGrid.svelte
@@ -178,6 +181,8 @@ frontend/
 │       │   │   ├── +page.svelte
 │       │   │   ├── create/+page.svelte
 │       │   │   └── [id]/edit/+page.svelte
+│       │   ├── questions/
+│       │   │   └── +page.svelte           # Independent Question Bank Repository
 │       │   └── announcements/+page.svelte
 │       └── (proctor)/
 │           ├── +layout.svelte

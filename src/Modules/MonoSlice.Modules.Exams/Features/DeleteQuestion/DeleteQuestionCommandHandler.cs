@@ -11,48 +11,36 @@ public sealed class DeleteQuestionCommandHandler : ICommandHandler<DeleteQuestio
 {
     private readonly ExamsDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
-    private readonly ICacheService _cacheService;
 
     public DeleteQuestionCommandHandler(
         ExamsDbContext dbContext,
-        ICurrentUser currentUser,
-        ICacheService cacheService)
+        ICurrentUser currentUser)
     {
         _dbContext = dbContext;
         _currentUser = currentUser;
-        _cacheService = cacheService;
     }
 
     public async ValueTask<ApiResponse<bool>> Handle(DeleteQuestionCommand command, CancellationToken cancellationToken)
     {
-        var question = await _dbContext.Questions
+        var question = await _dbContext.BankQuestions
             .FirstOrDefaultAsync(q => q.Id == command.QuestionId, cancellationToken);
 
         if (question is null)
         {
-            throw new NotFoundException("Quiz question not found.");
+            throw new NotFoundException("Question not found in question bank.");
         }
 
-        var exam = await _dbContext.Exams
-            .FirstOrDefaultAsync(e => e.Id == question.ExamId, cancellationToken);
+        var bank = await _dbContext.QuestionBanks
+            .FirstOrDefaultAsync(b => b.Id == question.BankId, cancellationToken);
 
-        if (exam is null)
+        if (bank is not null && !_currentUser.IsInRole("Admin") && _currentUser.UserId != bank.CreatedBy)
         {
-            throw new NotFoundException("Parent examination not found.");
+            throw new BusinessRuleException("You do not have permission to delete this question from the bank.");
         }
 
-        if (!_currentUser.IsInRole("Admin") && _currentUser.UserId != exam.InstructorId)
-        {
-            throw new BusinessRuleException("You do not have permission to delete questions from this exam.");
-        }
-
-        _dbContext.Questions.Remove(question);
+        _dbContext.BankQuestions.Remove(question);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        // Invalidate caches
-        await _cacheService.RemoveAsync($"exam:{exam.Id}", cancellationToken);
-        await _cacheService.RemoveAsync($"exam:questions:{exam.Id}", cancellationToken);
-
-        return ApiResponse.Ok(true, "Question deleted successfully.");
+        return ApiResponse.Ok(true, "Question deleted from bank successfully.");
     }
 }

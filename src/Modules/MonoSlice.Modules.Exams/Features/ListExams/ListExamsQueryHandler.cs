@@ -33,11 +33,6 @@ public sealed class ListExamsQueryHandler : IQueryHandler<ListExamsQuery, ApiRes
             dbQuery = dbQuery.Where(e => e.IsPublished == query.IsPublished.Value);
         }
 
-        if (query.CourseId.HasValue)
-        {
-            dbQuery = dbQuery.Where(e => e.CourseId == query.CourseId.Value);
-        }
-
         if (query.Mode.HasValue)
         {
             dbQuery = dbQuery.Where(e => e.Mode == query.Mode.Value);
@@ -60,7 +55,6 @@ public sealed class ListExamsQueryHandler : IQueryHandler<ListExamsQuery, ApiRes
             .Take(pageSize)
             .Select(e => new ExamSummaryDto(
                 e.Id,
-                e.CourseId,
                 e.InstructorId,
                 e.Title,
                 e.Description,
@@ -72,7 +66,10 @@ public sealed class ListExamsQueryHandler : IQueryHandler<ListExamsQuery, ApiRes
                 e.AvailableFromUtc,
                 e.AvailableToUtc,
                 e.IsPublished,
-                e.Questions.Count,
+                e.Sections.Count,
+                e.Sections.SelectMany(s => s.QuestionBank!.Questions).Count(),
+                e.CreatedBy,
+                e.UpdatedBy,
                 e.CreatedAtUtc
             ))
             .ToListAsync(cancellationToken);

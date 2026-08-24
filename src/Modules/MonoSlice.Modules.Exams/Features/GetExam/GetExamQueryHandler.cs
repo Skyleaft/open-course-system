@@ -28,7 +28,9 @@ public sealed class GetExamQueryHandler : IQueryHandler<GetExamQuery, ApiRespons
     {
         var exam = await _dbContext.Exams
             .AsNoTracking()
-            .Include(e => e.Questions.OrderBy(q => q.OrderIndex))
+            .Include(e => e.Sections)
+                .ThenInclude(s => s.QuestionBank)
+                .ThenInclude(qb => qb!.Questions)
             .FirstOrDefaultAsync(e => e.Id == query.Id, cancellationToken);
 
         if (exam is null)
@@ -39,24 +41,65 @@ public sealed class GetExamQueryHandler : IQueryHandler<GetExamQuery, ApiRespons
         var isInstructor = _currentUser.IsAuthenticated &&
             (_currentUser.UserId == exam.InstructorId || _currentUser.Roles.Contains("Admin") || _currentUser.Roles.Contains("Instructor"));
 
-        var questionDtos = exam.Questions.Select(q => new QuestionResultDto(
-            q.Id,
-            q.ExamId,
-            q.QuestionText,
-            q.Type.ToString(),
-            q.Points,
-            q.OrderIndex,
-            isInstructor ? q.Explanation : null,
-            q.Options.Select(o => new QuestionOptionDto(
-                o.Id,
-                o.Text,
-                isInstructor && o.IsCorrect
-            )).ToList()
-        )).ToList();
+        var allQuestions = new List<QuestionResultDto>();
+        var sectionDtos = new List<QuizSectionDetailDto>();
+
+        foreach (var sec in exam.Sections.OrderBy(s => s.OrderIndex))
+        {
+            var secQuestions = new List<QuestionResultDto>();
+
+            if (sec.QuestionBank is not null)
+            {
+                var questions = sec.QuestionBank.Questions.OrderBy(q => q.OrderIndex).ToList();
+                if (sec.QuestionCount.HasValue && sec.QuestionCount.Value > 0)
+                {
+                    questions = questions.Take(sec.QuestionCount.Value).ToList();
+                }
+
+                foreach (var q in questions)
+                {
+                    var qDto = new QuestionResultDto(
+                        q.Id,
+                        exam.Id,
+                        sec.Id,
+                        q.QuestionText,
+                        q.Type.ToString(),
+                        sec.PointsOverride ?? q.Points,
+                        q.OrderIndex,
+                        isInstructor ? q.Explanation : null,
+                        sec.QuestionBank.Category,
+                        sec.QuestionBank.Tags,
+                        q.Options.Select(o => new QuestionOptionDto(
+                            o.Id,
+                            o.Text,
+                            isInstructor && o.IsCorrect
+                        )).ToList(),
+                        sec.QuestionBank.CreatedBy,
+                        sec.QuestionBank.UpdatedBy,
+                        sec.QuestionBank.CreatedAtUtc
+                    );
+
+                    secQuestions.Add(qDto);
+                    allQuestions.Add(qDto);
+                }
+            }
+
+            sectionDtos.Add(new QuizSectionDetailDto(
+                sec.Id,
+                sec.ExamId,
+                sec.QuestionBankId,
+                sec.QuestionBank?.Title,
+                sec.Title,
+                sec.Description,
+                sec.OrderIndex,
+                sec.PointsOverride,
+                sec.QuestionCount,
+                secQuestions
+            ));
+        }
 
         var dto = new ExamFullDetailDto(
             exam.Id,
-            exam.CourseId,
             exam.InstructorId,
             exam.Title,
             exam.Description,
@@ -70,8 +113,11 @@ public sealed class GetExamQueryHandler : IQueryHandler<GetExamQuery, ApiRespons
             exam.IsPublished,
             exam.ShuffleQuestions,
             exam.ShuffleOptions,
+            exam.CreatedBy,
+            exam.UpdatedBy,
             exam.CreatedAtUtc,
-            questionDtos);
+            sectionDtos,
+            allQuestions);
 
         return ApiResponse.Ok(dto);
     }

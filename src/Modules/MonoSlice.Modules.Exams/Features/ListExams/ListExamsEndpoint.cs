@@ -12,7 +12,6 @@ public static class ListExamsEndpoint
     public static void MapListExamsEndpoint(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("", async (
-            [FromQuery] Guid? courseId,
             [FromQuery] QuizMode? mode,
             [FromQuery] bool? isPublished,
             [FromQuery] string? search,
@@ -22,7 +21,6 @@ public static class ListExamsEndpoint
             CancellationToken cancellationToken) =>
         {
             var query = new ListExamsQuery(
-                courseId,
                 mode,
                 isPublished,
                 search,

@@ -31,7 +31,6 @@ public sealed class ExamsModuleApi : IExamsModuleApi
 
         return new QuizExamContractDto(
             exam.Id,
-            exam.CourseId ?? Guid.Empty,
             exam.Title,
             exam.Mode.ToString(),
             exam.DurationMinutes,

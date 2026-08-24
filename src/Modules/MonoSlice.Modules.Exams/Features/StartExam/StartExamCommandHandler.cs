@@ -1,9 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using MonoSlice.Modules.Exams.Domain;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
-using MonoSlice.Shared.Abstractions.Contracts;
 using MonoSlice.Shared.Abstractions.CQRS;
 using MonoSlice.Shared.Abstractions.Exceptions;
 using MonoSlice.Shared.Abstractions.Interfaces;
@@ -15,18 +13,15 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
     private readonly ExamsDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
     private readonly ICacheService _cacheService;
-    private readonly IServiceProvider _serviceProvider;
 
     public StartExamCommandHandler(
         ExamsDbContext dbContext,
         ICurrentUser currentUser,
-        ICacheService cacheService,
-        IServiceProvider serviceProvider)
+        ICacheService cacheService)
     {
         _dbContext = dbContext;
         _currentUser = currentUser;
         _cacheService = cacheService;
-        _serviceProvider = serviceProvider;
     }
 
     public async ValueTask<ApiResponse<ExamAttemptDto>> Handle(
@@ -41,7 +36,9 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
         var studentId = _currentUser.UserId.Value;
 
         var exam = await _dbContext.Exams
-            .Include(e => e.Questions)
+            .Include(e => e.Sections)
+                .ThenInclude(s => s.QuestionBank)
+                .ThenInclude(qb => qb!.Questions)
             .FirstOrDefaultAsync(e => e.Id == command.ExamId, cancellationToken);
 
         if (exam is null)
@@ -65,18 +62,16 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
             throw new BusinessRuleException($"This exam closed at {exam.AvailableToUtc.Value:yyyy-MM-dd HH:mm:ss} UTC.");
         }
 
-        // Verify course enrollment if linked to a course
-        if (exam.CourseId.HasValue)
+        var totalQuestionsCount = 0;
+        foreach (var section in exam.Sections)
         {
-            var coursesApi = _serviceProvider.GetService<ICoursesModuleApi>();
-            if (coursesApi is not null)
+            if (section.QuestionBank is null) continue;
+            var qCount = section.QuestionBank.Questions.Count;
+            if (section.QuestionCount.HasValue && section.QuestionCount.Value > 0)
             {
-                var isEnrolled = await coursesApi.IsStudentEnrolledAsync(studentId, exam.CourseId.Value, cancellationToken);
-                if (!isEnrolled)
-                {
-                    throw new BusinessRuleException("You must be enrolled in the course to attempt this exam.");
-                }
+                qCount = Math.Min(qCount, section.QuestionCount.Value);
             }
+            totalQuestionsCount += qCount;
         }
 
         // Check if there is an existing in-progress submission
@@ -105,7 +100,7 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
                     existing.MaxAllowedEndTimeUtc,
                     exam.AvailableToUtc,
                     existing.ActiveSessionToken,
-                    exam.Questions.Count,
+                    totalQuestionsCount,
                     existing.DurationMinutes);
 
                 return ApiResponse.Ok(existingAttempt, "Resuming active exam attempt.");
@@ -153,7 +148,7 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
             submission.MaxAllowedEndTimeUtc,
             exam.AvailableToUtc,
             submission.ActiveSessionToken,
-            exam.Questions.Count,
+            totalQuestionsCount,
             submission.DurationMinutes);
 
         return ApiResponse.Ok(dto, "Exam attempt started successfully.");

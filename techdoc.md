@@ -53,7 +53,19 @@ Software Architecture & Technical Specification DocumentProject: LMS & Online Ex
   - ExternalPaymentReference: String? (Unique index)
   - CreatedAtUtc: DateTime
   - PaidAtUtc: DateTime?
-3.2 Module: CoursesAggregate Root 1: CourseRoot: CourseChild Entities: CourseSection, Lesson, AssignmentInvariants:Tipe akses kursus (AccessType):OpenFree: Terbuka tanpa syarat, user dapat langsung meng-enroll dirinya.OpenPaid: Membutuhkan verifikasi pembayaran sukses dari modul Payments.PrivateWithKey: Wajib menyertakan enrollment key rahasia yang dicocokkan menggunakan hash BCrypt.Lesson bertipe Text (default) menyimpan konten rich-text (Edra Tiptap JSON schema) pada TextContent dengan ContentUrl opsional. Lesson bertipe Video, PdfDocument, atau DownloadableFile menyimpan path/URL storage MinIO pada ContentUrl dan tidak menyimpan file binary pada database.[Course Aggregate Root]
+3.2 Module: Courses
+Aggregate Root 1: Course
+Root: Course
+Child Entities: CourseSection, Lesson, Assignment, CourseExam
+Invariants:
+- Tipe akses kursus (AccessType):
+  - OpenFree: Terbuka tanpa syarat, user dapat langsung meng-enroll dirinya.
+  - OpenPaid: Membutuhkan verifikasi pembayaran sukses dari modul Payments.
+  - PrivateWithKey: Wajib menyertakan enrollment key rahasia yang dicocokkan menggunakan hash BCrypt.
+- Lesson bertipe Text (default) menyimpan konten rich-text (Edra Tiptap JSON schema) pada TextContent dengan ContentUrl opsional. Lesson bertipe Video, PdfDocument, atau DownloadableFile menyimpan path/URL storage MinIO pada ContentUrl dan tidak menyimpan file binary pada database.
+- Course dapat mengaitkan ujian yang dapat digunakan kembali (reusable QuizExams) melalui child entity CourseExam.
+
+[Course Aggregate Root]
   - Id: UUID
   - Title: String
   - Description: String
@@ -61,6 +73,8 @@ Software Architecture & Technical Specification DocumentProject: LMS & Online Ex
   - Price: Decimal
   - EnrollmentKeyHash: String?
   - IsPublished: Boolean
+  - CreatedAtUtc: DateTime
+  - UpdatedAtUtc: DateTime?
   └── CourseSection (Entity) [1..*]
         - Id: UUID
         - Title: String
@@ -79,25 +93,125 @@ Software Architecture & Technical Specification DocumentProject: LMS & Online Ex
         - Instruction: String
         - DeadlineUtc: DateTime
         - MaxScore: Decimal
-Aggregate Root 2: CourseEnrollment & AssignmentSubmissionInvariants:Satu siswa hanya boleh memiliki satu record CourseEnrollment aktif per kursus (Unique(UserId, CourseId)).Siswa hanya dapat mengunggah AssignmentSubmission sebelum Assignment.DeadlineUtc.3.3 Module: Exams (Dual-Mode & Proctoring Engine)Aggregate Root 1: QuizExamRoot: QuizExamChild Entity: QuizQuestionInvariants:Tipe mode (QuizMode):Simulation: Kuis latihan, tidak ada pembatasan ganti tab, pelanggaran tidak dihitung, kunci jawaban langsung dapat dilihat setelah submit.RealExam: Ujian formal berintegritas tinggi. Wajib mode Fullscreen, oncam & onmic (client-side), anti switch-tab aktif, dan batasan maksimal pelanggaran sebelum diskualifikasi.Ujian berstatus Published tidak dapat diubah daftar pertanyaan atau bobot nilainya.Aggregate Root 2: QuizSubmissionRoot: QuizSubmissionChild Entities / Value Objects: QuizAnswer, ProctoringViolation (VO), ProctoringSnapshot (VO)Invariants:MaxAllowedEndTimeUtc dihitung mutlak saat inisiasi sesi: $\text{StartedAtUtc} + \text{Duration}$.One-Time Token: Setiap submission aktif memegang satu ActiveSessionToken. Jika token di Redis berbeda dengan payload request, akses ditolak (kicked).Deterministic Shuffle Seed: Setiap submission menyimpan RandomSeed. Soal diacak menggunakan algoritma Fisher-Yates berbasis PRNG dengan seed tersebut.Auto-Disqualification: Jika Mode == RealExam dan jumlah Violations $\ge \text{MaxAllowedViolations}$, status submission seketika bertransisi ke Disqualified.[QuizSubmission Aggregate Root]
+  └── CourseExam (Entity) [0..*]
+        - Id: UUID
+        - CourseId: UUID
+        - ExamId: UUID
+        - OrderIndex: Int
+        - IsMandatory: Boolean
+        - CreatedAtUtc: DateTime
+
+Aggregate Root 2: CourseEnrollment & AssignmentSubmission
+Invariants:
+- Satu siswa hanya boleh memiliki satu record CourseEnrollment aktif per kursus (Unique(UserId, CourseId)).
+- Siswa hanya dapat mengunggah AssignmentSubmission sebelum Assignment.DeadlineUtc.
+
+3.3 Module: Exams (Dual-Mode, Question Bank & Proctoring Engine)
+Aggregate Root 1: QuestionBank (Independent Reusable Question Package / Pool)
+Root: QuestionBank
+Child Entities: BankQuestion
+Invariants:
+- QuestionBank bersifat independen dan decoupled sebagai wadah / paket kumpulan soal yang dapat digunakan berulang kali pada berbagai ujian atau kursus.
+- Memiliki audit trail lengkap (CreatedBy, UpdatedBy, CreatedAtUtc, UpdatedAtUtc).
+- Berisi kumpulan BankQuestion. Setiap pertanyaan memiliki tipe tertentu (SingleChoice, MultipleChoice, Essay, TrueFalse), bobot poin default, opsi jawaban (JSONB), serta penjelasan/kunci.
+
+[QuestionBank Aggregate Root]
   - Id: UUID
-  - QuizId: UUID
+  - Title: String
+  - Description: String?
+  - Category: String?
+  - Tags: List<String>
+  - CreatedBy: UUID
+  - UpdatedBy: UUID?
+  - CreatedAtUtc: DateTime
+  - UpdatedAtUtc: DateTime?
+  └── BankQuestion (Entity) [0..*]
+        - Id: UUID
+        - BankId: UUID
+        - QuestionText: String
+        - Type: QuestionType (SingleChoice, MultipleChoice, Essay, TrueFalse)
+        - Points: Decimal
+        - OrderIndex: Int
+        - Explanation: String?
+        - Options: List<QuestionOption> (JSONB)
+
+Aggregate Root 2: QuizExam (Section-based Dual-Mode Exam Engine)
+Root: QuizExam
+Child Entities: QuizSection
+Invariants:
+- Ujian bersifat independen (tidak terikat langsung pada CourseId di level aggregate), memungkinkan satu ujian dipakai pada banyak kursus atau sebagai ujian sertifikasi mandiri.
+- Memiliki audit trail (CreatedBy, UpdatedBy, CreatedAtUtc, UpdatedAtUtc).
+- Ujian tersusun atas satu atau lebih QuizSection. Setiap section mereferensikan QuestionBank (paket soal) dengan nomor urut, opsi batasan jumlah soal (QuestionCount), dan bobot poin yang dapat dioverride (PointsOverride).
+- Tipe mode (QuizMode):
+  - Simulation: Kuis latihan, tidak ada pembatasan ganti tab, pelanggaran tidak dihitung, kunci jawaban langsung dapat dilihat setelah submit.
+  - RealExam: Ujian formal berintegritas tinggi. Wajib mode Fullscreen, oncam & onmic (client-side), anti switch-tab aktif, dan batasan maksimal pelanggaran sebelum diskualifikasi.
+- Ujian berstatus Published tidak dapat diubah daftar section/soal atau bobot nilainya.
+
+[QuizExam Aggregate Root]
+  - Id: UUID
+  - InstructorId: UUID
+  - Title: String
+  - Description: String?
+  - Mode: QuizMode (Simulation, RealExam)
+  - DurationMinutes: Int
+  - PassingScore: Decimal
+  - MaxAllowedViolations: Int
+  - MaxAttempts: Int
+  - AvailableFromUtc: DateTime?
+  - AvailableToUtc: DateTime?
+  - IsPublished: Boolean
+  - ShuffleQuestions: Boolean
+  - ShuffleOptions: Boolean
+  - CreatedBy: UUID
+  - UpdatedBy: UUID?
+  - CreatedAtUtc: DateTime
+  - UpdatedAtUtc: DateTime?
+  └── QuizSection (Entity) [1..*]
+        - Id: UUID
+        - ExamId: UUID
+        - QuestionBankId: UUID (FK -> QuestionBank)
+        - Title: String
+        - Description: String?
+        - OrderIndex: Int
+        - PointsOverride: Decimal?
+        - QuestionCount: Int?
+
+Aggregate Root 3: QuizSubmission
+Root: QuizSubmission
+Child Entities / Value Objects: StudentAnswer, ProctoringViolation (VO), ProctoringSnapshot (Entity)
+Invariants:
+- MaxAllowedEndTimeUtc dihitung mutlak saat inisiasi sesi: $\text{StartedAtUtc} + \text{Duration}$.
+- One-Time Token: Setiap submission aktif memegang satu ActiveSessionToken. Jika token di Redis berbeda dengan payload request, akses ditolak (kicked).
+- Deterministic Shuffle Seed: Setiap submission menyimpan RandomSeed. Soal dari section diacak menggunakan algoritma Fisher-Yates berbasis PRNG dengan seed tersebut.
+- Auto-Disqualification: Jika Mode == RealExam dan jumlah Violations $\ge \text{MaxAllowedViolations}$, status submission seketika bertransisi ke Disqualified.
+
+[QuizSubmission Aggregate Root]
+  - Id: UUID
+  - ExamId: UUID
   - StudentId: UUID
   - Mode: QuizMode (Simulation, RealExam)
   - StartedAtUtc: DateTime
   - MaxAllowedEndTimeUtc: DateTime
   - FinishedAtUtc: DateTime?
   - Status: SubmissionStatus (InProgress, Completed, Disqualified, TimedOut)
-  - TotalScore: Decimal
+  - Score: Decimal?
+  - IsPassed: Boolean?
   - RandomSeed: Int
-  - ActiveSessionToken: UUID
-  - Violations: List<ProctoringViolation> (JSONB)
-  └── QuizAnswer (Entity) [0..*]
+  - ActiveSessionToken: String
+  - Violations: List<ViolationRecord> (JSONB)
+  └── StudentAnswer (Entity) [0..*]
         - Id: UUID
-        - QuestionId: UUID
-        - SelectedOptionIds: List<UUID> (JSONB / Array)
+        - SubmissionId: UUID
+        - QuestionId: UUID (FK -> QuestionBank)
+        - SelectedOptionIds: List<UUID> (JSONB)
         - EssayText: String?
         - AwardedScore: Decimal?
+        - AnsweredAtUtc: DateTime
+  └── ProctoringSnapshot (Entity) [0..*]
+        - Id: UUID
+        - SubmissionId: UUID
+        - StorageKey: String
+        - CapturedAtUtc: DateTime
 3.4 Module: Assessments (Async Grading & Certification)Aggregate Root: GradeRecord & CertificateInvariants:Penilaian otomatis dikonsumsi dari Redis Stream stream:grading-queue.Jika proses evaluasi gagal hingga 3 kali percobaan, event dipindahkan ke stream:grading-dlq dan dicatat ke tabel grading_dead_letters.Certificate Integrity: Sertifikat memuat CertificateHash yang dihitung secara kriptografis menggunakan algoritma SHA-256:$$\text{Hash} = \text{SHA256}(\text{CertNumber} \parallel \text{StudentId} \parallel \text{CourseId} \parallel \text{FinalScore} \parallel \text{IssuedAtUtc})$$3.5 Module: CommunicationsAggregate Root: Announcement & DiscussionThreadInvariants:Pengumuman global memiliki CourseId = NULL, sedangkan pengumuman spesifik merujuk pada CourseId tertentu.Thread diskusi yang berstatus IsClosed = TRUE menolak penambahan komentar baru.4. PostgreSQL Multi-Schema Database DDL (Latest)SQL-- 1. SETUP SCHEMAS & EXTENSIONS
 CREATE SCHEMA IF NOT EXISTS identity;
 CREATE SCHEMA IF NOT EXISTS payments;
@@ -190,55 +304,105 @@ CREATE TABLE courses.course_enrollments (
 );
 CREATE UNIQUE INDEX uq_enrollment_user_course ON courses.course_enrollments(user_id, course_id);
 
+CREATE TABLE courses.course_exams (
+    id UUID PRIMARY KEY,
+    course_id UUID NOT NULL REFERENCES courses.courses(id) ON DELETE CASCADE,
+    exam_id UUID NOT NULL,
+    order_index INT NOT NULL DEFAULT 1,
+    is_mandatory BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at_utc TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX idx_course_exams_course ON courses.course_exams(course_id);
+CREATE INDEX idx_course_exams_exam ON courses.course_exams(exam_id);
+
 -- ============================================================================
 -- SCHEMA: exams
 -- ============================================================================
+CREATE TABLE exams.question_banks (
+    id UUID PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    category VARCHAR(100),
+    tags TEXT[] NOT NULL DEFAULT '{}',
+    created_by UUID NOT NULL,
+    updated_by UUID,
+    created_at_utc TIMESTAMPTZ NOT NULL,
+    updated_at_utc TIMESTAMPTZ
+);
+CREATE INDEX idx_question_banks_created_by ON exams.question_banks(created_by);
+CREATE INDEX idx_question_banks_category ON exams.question_banks(category);
+
+CREATE TABLE exams.bank_questions (
+    id UUID PRIMARY KEY,
+    bank_id UUID NOT NULL REFERENCES exams.question_banks(id) ON DELETE CASCADE,
+    question_text TEXT NOT NULL,
+    type VARCHAR(50) NOT NULL, -- SingleChoice, MultipleChoice, Essay, TrueFalse
+    points NUMERIC(5, 2) NOT NULL DEFAULT 1.00,
+    order_index INT NOT NULL DEFAULT 1,
+    explanation TEXT,
+    options JSONB NOT NULL DEFAULT '[]' -- Array of { id: UUID, text: string, isCorrect: boolean }
+);
+CREATE INDEX idx_bank_questions_bank ON exams.bank_questions(bank_id);
+
 CREATE TABLE exams.quiz_exams (
     id UUID PRIMARY KEY,
-    course_id UUID NOT NULL,
+    instructor_id UUID NOT NULL,
     title VARCHAR(255) NOT NULL,
+    description TEXT,
     mode VARCHAR(50) NOT NULL, -- Simulation, RealExam
-    duration_minutes INT NOT NULL,
-    passing_score NUMERIC(5, 2) NOT NULL,
-    max_allowed_violations INT NOT NULL DEFAULT 0,
-    settings JSONB NOT NULL DEFAULT '{}',
+    duration_minutes INT NOT NULL DEFAULT 60,
+    passing_score NUMERIC(5, 2) NOT NULL DEFAULT 70.00,
+    max_allowed_violations INT NOT NULL DEFAULT 3,
+    max_attempts INT NOT NULL DEFAULT 1,
+    available_from_utc TIMESTAMPTZ,
+    available_to_utc TIMESTAMPTZ,
     is_published BOOLEAN NOT NULL DEFAULT FALSE,
+    shuffle_questions BOOLEAN NOT NULL DEFAULT TRUE,
+    shuffle_options BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by UUID NOT NULL,
+    updated_by UUID,
+    created_at_utc TIMESTAMPTZ NOT NULL,
+    updated_at_utc TIMESTAMPTZ,
     xmin XID
 );
-CREATE INDEX idx_exams_course ON exams.quiz_exams(course_id);
+CREATE INDEX idx_exams_instructor ON exams.quiz_exams(instructor_id);
+CREATE INDEX idx_exams_is_published ON exams.quiz_exams(is_published);
+CREATE INDEX idx_exams_created_by ON exams.quiz_exams(created_by);
 
-CREATE TABLE exams.quiz_questions (
+CREATE TABLE exams.quiz_sections (
     id UUID PRIMARY KEY,
-    quiz_id UUID NOT NULL REFERENCES exams.quiz_exams(id) ON DELETE CASCADE,
-    text TEXT NOT NULL,
-    type VARCHAR(50) NOT NULL, -- SingleChoice, MultipleChoice, Essay, TrueFalse
-    points NUMERIC(5, 2) NOT NULL,
-    order_index INT NOT NULL,
-    options JSONB NOT NULL, -- Array of { id: UUID, text: string, isCorrect: boolean }
-    explanation TEXT
+    exam_id UUID NOT NULL REFERENCES exams.quiz_exams(id) ON DELETE CASCADE,
+    question_bank_id UUID NOT NULL REFERENCES exams.question_banks(id) ON DELETE RESTRICT,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    order_index INT NOT NULL DEFAULT 1,
+    points_override NUMERIC(5, 2),
+    question_count INT
 );
-CREATE INDEX idx_questions_quiz ON exams.quiz_questions(quiz_id, order_index);
+CREATE INDEX idx_quiz_sections_exam ON exams.quiz_sections(exam_id);
+CREATE INDEX idx_quiz_sections_bank ON exams.quiz_sections(question_bank_id);
 
 CREATE TABLE exams.quiz_submissions (
     id UUID PRIMARY KEY,
-    quiz_id UUID NOT NULL REFERENCES exams.quiz_exams(id) ON DELETE CASCADE,
+    exam_id UUID NOT NULL REFERENCES exams.quiz_exams(id) ON DELETE CASCADE,
     student_id UUID NOT NULL,
     mode VARCHAR(50) NOT NULL,
     started_at_utc TIMESTAMPTZ NOT NULL,
     max_allowed_end_time_utc TIMESTAMPTZ NOT NULL,
     finished_at_utc TIMESTAMPTZ,
     status VARCHAR(50) NOT NULL, -- InProgress, Completed, Disqualified, TimedOut
-    total_score NUMERIC(5, 2) NOT NULL DEFAULT 0.00,
+    score NUMERIC(5, 2),
+    is_passed BOOLEAN,
     random_seed INT NOT NULL DEFAULT 0,
-    active_session_token UUID,
+    active_session_token VARCHAR(255) NOT NULL,
     violations JSONB NOT NULL DEFAULT '[]'
 );
-CREATE INDEX idx_submissions_quiz_student ON exams.quiz_submissions(quiz_id, student_id);
+CREATE INDEX idx_submissions_exam_student ON exams.quiz_submissions(exam_id, student_id);
 
 CREATE TABLE exams.student_answers (
     id UUID PRIMARY KEY,
     submission_id UUID NOT NULL REFERENCES exams.quiz_submissions(id) ON DELETE CASCADE,
-    question_id UUID NOT NULL,
+    question_id UUID NOT NULL REFERENCES exams.question_banks(id) ON DELETE RESTRICT,
     selected_option_ids UUID[] NOT NULL DEFAULT '{}',
     essay_text TEXT,
     awarded_score NUMERIC(5, 2),
@@ -249,7 +413,7 @@ CREATE UNIQUE INDEX uq_student_submission_question ON exams.student_answers(subm
 CREATE TABLE exams.proctoring_snapshots (
     id UUID PRIMARY KEY,
     submission_id UUID NOT NULL REFERENCES exams.quiz_submissions(id) ON DELETE CASCADE,
-    storage_object_key VARCHAR(500) NOT NULL,
+    storage_object_key VARCHAR(1000) NOT NULL,
     captured_at_utc TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX idx_snapshots_sub ON exams.proctoring_snapshots(submission_id);

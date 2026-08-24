@@ -7,8 +7,6 @@ namespace MonoSlice.Modules.Exams.Features.CreateExam;
 
 public sealed partial class CreateExamCommand : ICommand<ApiResponse<ExamDetailDto>>
 {
-    public Guid? CourseId { get; init; }
-
     [Required]
     [StringLength(255)]
     public string Title { get; init; } = string.Empty;
@@ -36,7 +34,6 @@ public sealed partial class CreateExamCommand : ICommand<ApiResponse<ExamDetailD
 
 public sealed record ExamDetailDto(
     Guid Id,
-    Guid? CourseId,
     Guid InstructorId,
     string Title,
     string? Description,
@@ -50,4 +47,6 @@ public sealed record ExamDetailDto(
     bool IsPublished,
     bool ShuffleQuestions,
     bool ShuffleOptions,
+    Guid CreatedBy,
+    Guid? UpdatedBy,
     DateTime CreatedAtUtc);

@@ -6,9 +6,20 @@ namespace MonoSlice.Modules.Exams.Features.GetExam;
 
 public sealed record GetExamQuery(Guid Id) : IQuery<ApiResponse<ExamFullDetailDto>>;
 
+public sealed record QuizSectionDetailDto(
+    Guid Id,
+    Guid ExamId,
+    Guid QuestionBankId,
+    string? QuestionBankTitle,
+    string Title,
+    string? Description,
+    int OrderIndex,
+    decimal? PointsOverride,
+    int? QuestionCount,
+    IReadOnlyList<QuestionResultDto> Questions);
+
 public sealed record ExamFullDetailDto(
     Guid Id,
-    Guid? CourseId,
     Guid InstructorId,
     string Title,
     string? Description,
@@ -22,5 +33,8 @@ public sealed record ExamFullDetailDto(
     bool IsPublished,
     bool ShuffleQuestions,
     bool ShuffleOptions,
+    Guid CreatedBy,
+    Guid? UpdatedBy,
     DateTime CreatedAtUtc,
+    IReadOnlyList<QuizSectionDetailDto> Sections,
     IReadOnlyList<QuestionResultDto> Questions);

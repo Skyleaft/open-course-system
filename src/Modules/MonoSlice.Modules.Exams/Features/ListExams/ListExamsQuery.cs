@@ -7,7 +7,6 @@ namespace MonoSlice.Modules.Exams.Features.ListExams;
 
 public sealed partial class ListExamsQuery : IQuery<ApiResponse<PaginatedList<ExamSummaryDto>>>
 {
-    public Guid? CourseId { get; init; } = null;
     public QuizMode? Mode { get; init; } = null;
     public bool? IsPublished { get; init; } = null;
     public string? SearchTerm { get; init; } = null;
@@ -19,14 +18,12 @@ public sealed partial class ListExamsQuery : IQuery<ApiResponse<PaginatedList<Ex
     public ListExamsQuery() { }
 
     public ListExamsQuery(
-        Guid? courseId = null,
         QuizMode? mode = null,
         bool? isPublished = null,
         string? searchTerm = null,
         int pageIndex = 1,
         int pageSize = 20)
     {
-        CourseId = courseId;
         Mode = mode;
         IsPublished = isPublished;
         SearchTerm = searchTerm;
@@ -37,7 +34,6 @@ public sealed partial class ListExamsQuery : IQuery<ApiResponse<PaginatedList<Ex
 
 public sealed record ExamSummaryDto(
     Guid Id,
-    Guid? CourseId,
     Guid InstructorId,
     string Title,
     string? Description,
@@ -49,5 +45,8 @@ public sealed record ExamSummaryDto(
     DateTime? AvailableFromUtc,
     DateTime? AvailableToUtc,
     bool IsPublished,
+    int SectionsCount,
     int QuestionsCount,
+    Guid CreatedBy,
+    Guid? UpdatedBy,
     DateTime CreatedAtUtc);

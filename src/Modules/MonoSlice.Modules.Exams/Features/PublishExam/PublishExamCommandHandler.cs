@@ -21,7 +21,9 @@ public sealed class PublishExamCommandHandler : ICommandHandler<PublishExamComma
         CancellationToken cancellationToken)
     {
         var exam = await _dbContext.Exams
-            .Include(e => e.Questions)
+            .Include(e => e.Sections)
+                .ThenInclude(s => s.QuestionBank)
+                .ThenInclude(qb => qb!.Questions)
             .FirstOrDefaultAsync(e => e.Id == command.Id, cancellationToken);
 
         if (exam is null)

@@ -40,9 +40,9 @@ public sealed class CreateExamCommandHandler : ICommandHandler<CreateExamCommand
             command.MaxAttempts,
             command.AvailableFromUtc,
             command.AvailableToUtc,
-            command.CourseId,
             command.ShuffleQuestions,
-            command.ShuffleOptions);
+            command.ShuffleOptions,
+            createdBy: _currentUser.UserId.Value);
 
         await _dbContext.Exams.AddAsync(exam, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);

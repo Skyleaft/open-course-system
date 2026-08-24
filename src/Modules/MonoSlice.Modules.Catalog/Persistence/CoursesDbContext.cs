@@ -13,6 +13,7 @@ public sealed class CoursesDbContext : DbContext
     public DbSet<Assignment> Assignments => Set<Assignment>();
     public DbSet<AssignmentSubmission> Submissions => Set<AssignmentSubmission>();
     public DbSet<CourseEnrollment> Enrollments => Set<CourseEnrollment>();
+    public DbSet<CourseExam> CourseExams => Set<CourseExam>();
 
     public CoursesDbContext(DbContextOptions<CoursesDbContext> options) : base(options)
     {
@@ -54,6 +55,11 @@ public sealed class CoursesDbContext : DbContext
             builder.HasMany(c => c.Assignments)
                 .WithOne()
                 .HasForeignKey(a => a.CourseId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasMany(c => c.Exams)
+                .WithOne()
+                .HasForeignKey(e => e.CourseId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             builder.HasIndex(c => c.InstructorId);
@@ -148,6 +154,23 @@ public sealed class CoursesDbContext : DbContext
             builder.HasIndex(e => new { e.UserId, e.CourseId }).IsUnique();
             builder.HasIndex(e => e.UserId);
             builder.HasIndex(e => e.CourseId);
+        });
+
+        // CourseExam
+        modelBuilder.Entity<CourseExam>(builder =>
+        {
+            builder.ToTable("course_exams", DefaultSchema);
+            builder.HasKey(ce => ce.Id);
+            builder.Property(ce => ce.Id).ValueGeneratedNever();
+
+            builder.Property(ce => ce.CourseId).IsRequired();
+            builder.Property(ce => ce.ExamId).IsRequired();
+            builder.Property(ce => ce.OrderIndex).HasDefaultValue(1).IsRequired();
+            builder.Property(ce => ce.IsMandatory).HasDefaultValue(true).IsRequired();
+            builder.Property(ce => ce.CreatedAtUtc).IsRequired();
+
+            builder.HasIndex(ce => ce.CourseId);
+            builder.HasIndex(ce => ce.ExamId);
         });
     }
 }

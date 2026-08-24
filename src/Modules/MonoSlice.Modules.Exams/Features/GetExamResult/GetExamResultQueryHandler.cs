@@ -47,7 +47,9 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
 
         var exam = await _dbContext.Exams
             .AsNoTracking()
-            .Include(e => e.Questions.OrderBy(q => q.OrderIndex))
+            .Include(e => e.Sections)
+                .ThenInclude(s => s.QuestionBank)
+                .ThenInclude(qb => qb!.Questions)
             .FirstOrDefaultAsync(e => e.Id == submission.ExamId, cancellationToken);
 
         if (exam is null)
@@ -57,8 +59,26 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
 
         var canViewExplanations = exam.Mode == QuizMode.Simulation || submission.Status == SubmissionStatus.Completed;
 
-        var questionReviews = exam.Questions.Select(q =>
+        var resolvedQuestions = new List<(BankQuestion Question, decimal Points)>();
+
+        foreach (var section in exam.Sections.OrderBy(s => s.OrderIndex))
         {
+            if (section.QuestionBank is null) continue;
+            var questions = section.QuestionBank.Questions.OrderBy(q => q.OrderIndex).ToList();
+            if (section.QuestionCount.HasValue && section.QuestionCount.Value > 0)
+            {
+                questions = questions.Take(section.QuestionCount.Value).ToList();
+            }
+
+            foreach (var q in questions)
+            {
+                resolvedQuestions.Add((q, section.PointsOverride ?? q.Points));
+            }
+        }
+
+        var questionReviews = resolvedQuestions.Select(item =>
+        {
+            var q = item.Question;
             var answer = submission.Answers.FirstOrDefault(a => a.QuestionId == q.Id);
             var selectedIds = answer?.SelectedOptionIds ?? [];
             var essayText = answer?.EssayText;
@@ -74,7 +94,7 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
                 q.Id,
                 q.QuestionText,
                 q.Type.ToString(),
-                q.Points,
+                item.Points,
                 awarded,
                 selectedIds,
                 essayText,

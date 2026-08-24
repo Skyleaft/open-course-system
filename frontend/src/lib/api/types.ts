@@ -91,6 +91,16 @@ export interface Assignment {
 	maxScore: number;
 }
 
+export interface CourseExam {
+	id: string;
+	courseId: string;
+	examId: string;
+	orderIndex: number;
+	isMandatory: boolean;
+	createdAtUtc: string;
+	examTitle?: string;
+}
+
 export interface Course {
 	id: string;
 	instructorId?: string;
@@ -103,6 +113,7 @@ export interface Course {
 	createdAtUtc?: string;
 	sections?: CourseSection[];
 	assignments?: Assignment[];
+	exams?: CourseExam[];
 	isEnrolled?: boolean;
 }
 
@@ -159,17 +170,43 @@ export interface QuestionOption {
 	isCorrect?: boolean;
 }
 
-export interface QuizQuestion {
+export interface QuestionBankItem {
 	id: string;
 	examId?: string;
-	quizId?: string;
+	sectionId?: string;
 	questionText?: string;
 	text?: string;
 	type: QuestionType;
 	points: number;
-	orderIndex: number;
-	options: QuestionOption[];
+	orderIndex?: number;
 	explanation?: string;
+	category?: string;
+	tags?: string[];
+	options: QuestionOption[];
+	createdBy?: string;
+	updatedBy?: string | null;
+	createdAtUtc?: string;
+	updatedAtUtc?: string | null;
+}
+
+export type QuizQuestion = QuestionBankItem;
+
+export interface QuizSectionQuestion {
+	id: string;
+	sectionId: string;
+	questionId: string;
+	orderIndex: number;
+	pointsOverride?: number | null;
+	question?: QuestionBankItem;
+}
+
+export interface QuizSection {
+	id: string;
+	examId: string;
+	title: string;
+	description?: string | null;
+	orderIndex: number;
+	questions: QuizSectionQuestion[] | QuestionBankItem[];
 }
 
 export interface StudentAnswer {
@@ -179,7 +216,6 @@ export interface StudentAnswer {
 }
 
 export interface ListExamsParams {
-	courseId?: string;
 	mode?: QuizMode | string;
 	isPublished?: boolean;
 	search?: string;
@@ -190,7 +226,6 @@ export interface ListExamsParams {
 
 export interface ExamSummaryDto {
 	id: string;
-	courseId?: string | null;
 	instructorId: string;
 	title: string;
 	description?: string | null;
@@ -199,13 +234,15 @@ export interface ExamSummaryDto {
 	passingScore: number;
 	maxAllowedViolations: number;
 	isPublished: boolean;
+	sectionsCount?: number;
 	questionsCount: number;
+	createdBy?: string;
+	updatedBy?: string | null;
 	createdAtUtc: string;
 }
 
 export interface QuizExam {
 	id: string;
-	courseId?: string | null;
 	instructorId?: string;
 	title: string;
 	description?: string | null;
@@ -219,8 +256,12 @@ export interface QuizExam {
 	isPublished: boolean;
 	shuffleQuestions?: boolean;
 	shuffleOptions?: boolean;
+	sectionsCount?: number;
 	questionsCount?: number;
+	sections?: QuizSection[];
 	questions?: QuizQuestion[];
+	createdBy?: string;
+	updatedBy?: string | null;
 	createdAtUtc?: string;
 }
 

@@ -151,9 +151,9 @@ public sealed class GradingBackgroundWorker : BackgroundService
             if (examsApi is not null)
             {
                 var examDetails = await examsApi.GetExamByIdAsync(examEvent.ExamId, cancellationToken);
-                if (examDetails is not null && examDetails.CourseId != Guid.Empty)
+                if (examDetails is not null && examDetails.CourseId.HasValue && examDetails.CourseId.Value != Guid.Empty)
                 {
-                    courseId = examDetails.CourseId;
+                    courseId = examDetails.CourseId.Value;
                 }
             }
 

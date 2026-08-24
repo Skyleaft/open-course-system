@@ -56,7 +56,9 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
 
         var exam = await _dbContext.Exams
             .AsNoTracking()
-            .Include(e => e.Questions)
+            .Include(e => e.Sections)
+                .ThenInclude(s => s.QuestionBank)
+                .ThenInclude(qb => qb!.Questions)
             .FirstOrDefaultAsync(e => e.Id == submission.ExamId, cancellationToken);
 
         if (exam is null)
@@ -68,22 +70,36 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
         var cachedAnswers = await _cacheService.GetAsync<Dictionary<Guid, CachedAnswerDto>>(
             $"exam_answers:{submission.Id}", cancellationToken) ?? [];
 
+        // Flatten questions across sections
+        var resolvedQuestions = new List<(BankQuestion Question, decimal Points)>();
+
+        foreach (var section in exam.Sections.OrderBy(s => s.OrderIndex))
+        {
+            if (section.QuestionBank is null) continue;
+            var questions = section.QuestionBank.Questions.OrderBy(q => q.OrderIndex).ToList();
+            if (section.QuestionCount.HasValue && section.QuestionCount.Value > 0)
+            {
+                questions = questions.Take(section.QuestionCount.Value).ToList();
+            }
+
+            foreach (var q in questions)
+            {
+                resolvedQuestions.Add((q, section.PointsOverride ?? q.Points));
+            }
+        }
+
         // Apply Fisher-Yates shuffle deterministically
-        var questions = exam.Questions.ToList();
         if (exam.ShuffleQuestions)
         {
-            questions = ExamShuffler.Shuffle(questions, submission.RandomSeed);
-        }
-        else
-        {
-            questions = questions.OrderBy(q => q.OrderIndex).ToList();
+            resolvedQuestions = ExamShuffler.Shuffle(resolvedQuestions, submission.RandomSeed);
         }
 
         var displayOrder = 1;
         var questionDtos = new List<StudentQuestionDto>();
 
-        foreach (var q in questions)
+        foreach (var item in resolvedQuestions)
         {
+            var q = item.Question;
             var options = q.Options.ToList();
             if (exam.ShuffleOptions && options.Count > 0)
             {
@@ -99,7 +115,7 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
                 q.Id,
                 q.QuestionText,
                 q.Type.ToString(),
-                q.Points,
+                item.Points,
                 displayOrder++,
                 savedAnswer?.SelectedOptionIds,
                 savedAnswer?.EssayText,

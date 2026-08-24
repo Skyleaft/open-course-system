@@ -10,8 +10,6 @@ public sealed partial class UpdateExamCommand : ICommand<ApiResponse<ExamDetailD
 {
     public Guid Id { get; init; }
 
-    public Guid? CourseId { get; init; }
-
     [Required]
     [StringLength(255)]
     public string Title { get; init; } = string.Empty;

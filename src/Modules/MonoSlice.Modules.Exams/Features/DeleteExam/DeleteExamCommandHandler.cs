@@ -34,7 +34,7 @@ public sealed class DeleteExamCommandHandler : ICommandHandler<DeleteExamCommand
     public async ValueTask<ApiResponse<bool>> Handle(DeleteExamCommand command, CancellationToken cancellationToken)
     {
         var exam = await _dbContext.Exams
-            .Include(e => e.Questions)
+            .Include(e => e.Sections)
             .FirstOrDefaultAsync(e => e.Id == command.ExamId, cancellationToken);
 
         if (exam is null)
@@ -67,7 +67,7 @@ public sealed class DeleteExamCommandHandler : ICommandHandler<DeleteExamCommand
         await _cacheService.RemoveAsync($"exam:list:*", cancellationToken);
 
         await _eventBus.PublishAsync(
-            new ExamDeletedIntegrationEvent(exam.Id, exam.InstructorId, exam.CourseId),
+            new ExamDeletedIntegrationEvent(exam.Id, exam.InstructorId),
             cancellationToken);
 
         return ApiResponse.Ok(true, "Exam and all associated data deleted successfully.");

@@ -54,7 +54,9 @@ public sealed class ExamFinalizerService : IExamFinalizerService
         }
 
         var exam = await _dbContext.Exams
-            .Include(e => e.Questions)
+            .Include(e => e.Sections)
+                .ThenInclude(s => s.QuestionBank)
+                .ThenInclude(qb => qb!.Questions)
             .FirstOrDefaultAsync(e => e.Id == submission.ExamId, ct);
 
         if (exam is null)
@@ -77,53 +79,71 @@ public sealed class ExamFinalizerService : IExamFinalizerService
         // 2. Perform Automated Objective Grading
         decimal totalPossiblePoints = 0m;
         decimal earnedPoints = 0m;
+        var totalQuestionsCount = 0;
 
-        foreach (var question in exam.Questions)
+        foreach (var section in exam.Sections.OrderBy(s => s.OrderIndex))
         {
-            totalPossiblePoints += question.Points;
-
-            var answer = submission.Answers.FirstOrDefault(a => a.QuestionId == question.Id);
-            if (answer is null)
+            if (section.QuestionBank is null)
             {
                 continue;
             }
 
-            var correctOptionIds = question.Options
-                .Where(o => o.IsCorrect)
-                .Select(o => o.Id)
-                .ToHashSet();
-
-            switch (question.Type)
+            var questions = section.QuestionBank.Questions.OrderBy(q => q.OrderIndex).ToList();
+            if (section.QuestionCount.HasValue && section.QuestionCount.Value > 0)
             {
-                case QuestionType.SingleChoice:
-                case QuestionType.TrueFalse:
-                    if (answer.SelectedOptionIds.Count == 1 && correctOptionIds.Contains(answer.SelectedOptionIds[0]))
-                    {
-                        answer.SetAwardedScore(question.Points);
-                        earnedPoints += question.Points;
-                    }
-                    else
-                    {
-                        answer.SetAwardedScore(0m);
-                    }
-                    break;
+                questions = questions.Take(section.QuestionCount.Value).ToList();
+            }
 
-                case QuestionType.MultipleChoice:
-                    var selected = answer.SelectedOptionIds.ToHashSet();
-                    if (selected.SetEquals(correctOptionIds))
-                    {
-                        answer.SetAwardedScore(question.Points);
-                        earnedPoints += question.Points;
-                    }
-                    else
-                    {
-                        answer.SetAwardedScore(0m);
-                    }
-                    break;
+            totalQuestionsCount += questions.Count;
 
-                case QuestionType.Essay:
-                    // Essay score remains pending manual grading
-                    break;
+            foreach (var question in questions)
+            {
+                var points = section.PointsOverride ?? question.Points;
+                totalPossiblePoints += points;
+
+                var answer = submission.Answers.FirstOrDefault(a => a.QuestionId == question.Id);
+                if (answer is null)
+                {
+                    continue;
+                }
+
+                var correctOptionIds = question.Options
+                    .Where(o => o.IsCorrect)
+                    .Select(o => o.Id)
+                    .ToHashSet();
+
+                switch (question.Type)
+                {
+                    case QuestionType.SingleChoice:
+                    case QuestionType.TrueFalse:
+                        if (answer.SelectedOptionIds.Count == 1 && correctOptionIds.Contains(answer.SelectedOptionIds[0]))
+                        {
+                            answer.SetAwardedScore(points);
+                            earnedPoints += points;
+                        }
+                        else
+                        {
+                            answer.SetAwardedScore(0m);
+                        }
+                        break;
+
+                    case QuestionType.MultipleChoice:
+                        var selected = answer.SelectedOptionIds.ToHashSet();
+                        if (selected.SetEquals(correctOptionIds))
+                        {
+                            answer.SetAwardedScore(points);
+                            earnedPoints += points;
+                        }
+                        else
+                        {
+                            answer.SetAwardedScore(0m);
+                        }
+                        break;
+
+                    case QuestionType.Essay:
+                        // Essay score remains pending manual grading
+                        break;
+                }
             }
         }
 
@@ -173,7 +193,7 @@ public sealed class ExamFinalizerService : IExamFinalizerService
             submission.Score ?? 0m,
             submission.IsPassed ?? false,
             submission.SubmittedAtUtc ?? DateTime.UtcNow,
-            exam.Questions.Count,
+            totalQuestionsCount,
             submission.Answers.Count);
     }
 }

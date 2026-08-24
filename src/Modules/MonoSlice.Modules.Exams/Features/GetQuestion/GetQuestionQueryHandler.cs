@@ -18,24 +18,35 @@ public sealed class GetQuestionQueryHandler : IQueryHandler<GetQuestionQuery, Ap
 
     public async ValueTask<ApiResponse<QuestionResultDto>> Handle(GetQuestionQuery query, CancellationToken cancellationToken)
     {
-        var question = await _dbContext.Questions
+        var question = await _dbContext.BankQuestions
             .AsNoTracking()
             .FirstOrDefaultAsync(q => q.Id == query.QuestionId, cancellationToken);
 
         if (question is null)
         {
-            throw new NotFoundException("Quiz question not found.");
+            throw new NotFoundException("Question not found in question bank.");
         }
+
+        var bank = await _dbContext.QuestionBanks
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b => b.Id == question.BankId, cancellationToken);
 
         var result = new QuestionResultDto(
             question.Id,
-            question.ExamId,
+            null,
+            null,
             question.QuestionText,
             question.Type.ToString(),
             question.Points,
             question.OrderIndex,
             question.Explanation,
-            question.Options.Select(o => new QuestionOptionDto(o.Id, o.Text, o.IsCorrect)).ToList()
+            bank?.Category,
+            bank?.Tags ?? [],
+            question.Options.Select(o => new QuestionOptionDto(o.Id, o.Text, o.IsCorrect)).ToList(),
+            bank?.CreatedBy ?? Guid.Empty,
+            bank?.UpdatedBy,
+            bank?.CreatedAtUtc ?? DateTime.UtcNow,
+            question.BankId
         );
 
         return ApiResponse.Ok(result);

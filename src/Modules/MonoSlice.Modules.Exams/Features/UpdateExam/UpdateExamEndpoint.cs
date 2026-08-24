@@ -18,7 +18,6 @@ public static class UpdateExamEndpoint
                 var enrichedCommand = new UpdateExamCommand
                 {
                     Id = id,
-                    CourseId = command.CourseId,
                     Title = command.Title,
                     Description = command.Description,
                     Mode = command.Mode,

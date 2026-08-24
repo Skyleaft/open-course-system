@@ -5,7 +5,6 @@ namespace MonoSlice.Modules.Exams.Domain;
 
 public sealed class QuizExam : AggregateRoot<Guid>
 {
-    public Guid? CourseId { get; private set; }
     public Guid InstructorId { get; private set; }
     public string Title { get; private set; } = string.Empty;
     public string? Description { get; private set; }
@@ -19,11 +18,13 @@ public sealed class QuizExam : AggregateRoot<Guid>
     public bool IsPublished { get; private set; }
     public bool ShuffleQuestions { get; private set; } = true;
     public bool ShuffleOptions { get; private set; } = true;
+    public Guid CreatedBy { get; private set; }
+    public Guid? UpdatedBy { get; private set; }
     public DateTime CreatedAtUtc { get; private set; } = DateTime.UtcNow;
     public DateTime? UpdatedAtUtc { get; private set; }
 
-    private readonly List<QuizQuestion> _questions = [];
-    public IReadOnlyList<QuizQuestion> Questions => _questions.AsReadOnly();
+    private readonly List<QuizSection> _sections = [];
+    public IReadOnlyList<QuizSection> Sections => _sections.AsReadOnly();
 
     private QuizExam() : base(Guid.CreateVersion7()) { }
 
@@ -38,9 +39,9 @@ public sealed class QuizExam : AggregateRoot<Guid>
         int maxAttempts = 1,
         DateTime? availableFromUtc = null,
         DateTime? availableToUtc = null,
-        Guid? courseId = null,
         bool shuffleQuestions = true,
-        bool shuffleOptions = true)
+        bool shuffleOptions = true,
+        Guid? createdBy = null)
     {
         if (instructorId == Guid.Empty)
         {
@@ -72,6 +73,8 @@ public sealed class QuizExam : AggregateRoot<Guid>
             throw new BusinessRuleException("Exam closing time (AvailableToUtc) must be after opening time (AvailableFromUtc).");
         }
 
+        var creator = createdBy ?? instructorId;
+
         return new QuizExam
         {
             Id = Guid.CreateVersion7(),
@@ -85,10 +88,10 @@ public sealed class QuizExam : AggregateRoot<Guid>
             MaxAttempts = maxAttempts,
             AvailableFromUtc = availableFromUtc,
             AvailableToUtc = availableToUtc,
-            CourseId = courseId,
             ShuffleQuestions = shuffleQuestions,
             ShuffleOptions = shuffleOptions,
             IsPublished = false,
+            CreatedBy = creator,
             CreatedAtUtc = DateTime.UtcNow
         };
     }
@@ -103,9 +106,9 @@ public sealed class QuizExam : AggregateRoot<Guid>
         int maxAttempts,
         DateTime? availableFromUtc,
         DateTime? availableToUtc,
-        Guid? courseId,
         bool shuffleQuestions,
-        bool shuffleOptions)
+        bool shuffleOptions,
+        Guid? updatedBy = null)
     {
         if (string.IsNullOrWhiteSpace(title))
         {
@@ -141,17 +144,17 @@ public sealed class QuizExam : AggregateRoot<Guid>
         MaxAttempts = maxAttempts;
         AvailableFromUtc = availableFromUtc;
         AvailableToUtc = availableToUtc;
-        CourseId = courseId;
         ShuffleQuestions = shuffleQuestions;
         ShuffleOptions = shuffleOptions;
+        UpdatedBy = updatedBy ?? InstructorId;
         UpdatedAtUtc = DateTime.UtcNow;
     }
 
     public void Publish()
     {
-        if (_questions.Count == 0)
+        if (_sections.Count == 0)
         {
-            throw new BusinessRuleException("Cannot publish an exam without questions.");
+            throw new BusinessRuleException("Cannot publish an exam without sections.");
         }
 
         IsPublished = true;
@@ -164,33 +167,33 @@ public sealed class QuizExam : AggregateRoot<Guid>
         UpdatedAtUtc = DateTime.UtcNow;
     }
 
-    public QuizQuestion AddQuestion(
-        string questionText,
-        QuestionType type,
-        decimal points,
-        string? explanation,
-        IEnumerable<QuestionOption>? options = null)
+    public QuizSection AddSection(
+        Guid questionBankId,
+        string title,
+        decimal? pointsOverride = null,
+        int? questionCount = null,
+        string? description = null)
     {
-        var question = QuizQuestion.Create(
+        var section = QuizSection.Create(
             Id,
-            questionText,
-            type,
-            points,
-            _questions.Count + 1,
-            explanation,
-            options);
+            questionBankId,
+            title,
+            _sections.Count + 1,
+            pointsOverride,
+            questionCount,
+            description);
 
-        _questions.Add(question);
+        _sections.Add(section);
         UpdatedAtUtc = DateTime.UtcNow;
-        return question;
+        return section;
     }
 
-    public void RemoveQuestion(Guid questionId)
+    public void RemoveSection(Guid sectionId)
     {
-        var question = _questions.FirstOrDefault(q => q.Id == questionId);
-        if (question is not null)
+        var section = _sections.FirstOrDefault(s => s.Id == sectionId);
+        if (section is not null)
         {
-            _questions.Remove(question);
+            _sections.Remove(section);
             UpdatedAtUtc = DateTime.UtcNow;
         }
     }

@@ -19,5 +19,9 @@ public sealed partial class UpdateQuestionCommand : ICommand<ApiResponse<Questio
 
     public string? Explanation { get; init; }
 
+    public string? Category { get; init; }
+
+    public List<string> Tags { get; init; } = [];
+
     public List<QuestionOptionDto> Options { get; init; } = [];
 }

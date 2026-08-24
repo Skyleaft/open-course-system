@@ -27,25 +27,30 @@ public sealed class UpdateQuestionCommandHandler : ICommandHandler<UpdateQuestio
 
     public async ValueTask<ApiResponse<QuestionResultDto>> Handle(UpdateQuestionCommand command, CancellationToken cancellationToken)
     {
-        var question = await _dbContext.Questions
+        if (!_currentUser.IsAuthenticated || !_currentUser.UserId.HasValue)
+        {
+            throw new UnauthorizedAccessException("Authentication required to update questions.");
+        }
+
+        var question = await _dbContext.BankQuestions
             .FirstOrDefaultAsync(q => q.Id == command.QuestionId, cancellationToken);
 
         if (question is null)
         {
-            throw new NotFoundException("Quiz question not found.");
+            throw new NotFoundException("Question not found in question bank.");
         }
 
-        var exam = await _dbContext.Exams
-            .FirstOrDefaultAsync(e => e.Id == question.ExamId, cancellationToken);
+        var bank = await _dbContext.QuestionBanks
+            .FirstOrDefaultAsync(b => b.Id == question.BankId, cancellationToken);
 
-        if (exam is null)
+        if (bank is null)
         {
-            throw new NotFoundException("Parent examination not found.");
+            throw new NotFoundException("Parent Question Bank not found.");
         }
 
-        if (!_currentUser.IsInRole("Admin") && _currentUser.UserId != exam.InstructorId)
+        if (!_currentUser.IsInRole("Admin") && _currentUser.UserId != bank.CreatedBy)
         {
-            throw new BusinessRuleException("You do not have permission to modify questions in this exam.");
+            throw new BusinessRuleException("You do not have permission to modify this question in the bank.");
         }
 
         var domainOptions = command.Options.Select(o => new QuestionOption(
@@ -61,21 +66,26 @@ public sealed class UpdateQuestionCommandHandler : ICommandHandler<UpdateQuestio
             command.Explanation,
             domainOptions);
 
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        bank.Update(_currentUser.UserId.Value, bank.Title, bank.Description, command.Category ?? bank.Category, command.Tags.Count > 0 ? command.Tags : bank.Tags);
 
-        // Invalidate caches
-        await _cacheService.RemoveAsync($"exam:{exam.Id}", cancellationToken);
-        await _cacheService.RemoveAsync($"exam:questions:{exam.Id}", cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         var result = new QuestionResultDto(
             question.Id,
-            question.ExamId,
+            null,
+            null,
             question.QuestionText,
             question.Type.ToString(),
             question.Points,
             question.OrderIndex,
             question.Explanation,
-            question.Options.Select(o => new QuestionOptionDto(o.Id, o.Text, o.IsCorrect)).ToList()
+            bank.Category,
+            bank.Tags,
+            question.Options.Select(o => new QuestionOptionDto(o.Id, o.Text, o.IsCorrect)).ToList(),
+            bank.CreatedBy,
+            bank.UpdatedBy,
+            bank.CreatedAtUtc,
+            bank.Id
         );
 
         return ApiResponse.Ok(result, "Question updated successfully.");
