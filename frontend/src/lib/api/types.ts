@@ -180,6 +180,7 @@ export interface QuestionBank {
 	updatedBy?: string | null;
 	createdAtUtc: string;
 	updatedAtUtc?: string | null;
+	questionCount?: number;
 	questions?: QuestionBankItem[];
 }
 

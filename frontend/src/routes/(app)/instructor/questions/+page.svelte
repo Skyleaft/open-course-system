@@ -1,46 +1,62 @@
 <script lang="ts">
-	import { examsApi } from '#lib/api/exams.ts';
-	import type { QuestionBank, BankQuestion, QuestionType } from '#lib/api/types.ts';
-	import GlassCard from '#lib/components/ui/GlassCard.svelte';
-	import GlassModal from '#lib/components/ui/GlassModal.svelte';
-	import ConfirmModal from '#lib/components/ui/ConfirmModal.svelte';
-	import RichEditor from '#lib/components/editor/RichEditor.svelte';
-	import RichRenderer from '#lib/components/editor/RichRenderer.svelte';
-	import { toast } from '#lib/stores/toast.svelte.ts';
-	import {
-		Plus,
-		Search,
-		HelpCircle,
-		CheckCircle2,
-		CheckSquare,
-		ListFilter,
-		AlignLeft,
-		Trash2,
-		Edit3,
-		Copy,
-		Sparkles,
-		Layers,
-		Check,
-		Filter,
-		ArrowRight,
-		BookOpen,
-		FolderPlus,
-		Tag
-	} from '@lucide/svelte';
 	import { onMount } from 'svelte';
+	import {
+		BookOpen,
+		Plus,
+		FolderPlus,
+		Search,
+		Layers,
+		Sparkles,
+		Tag,
+		ArrowRight,
+		Edit3,
+		Trash2,
+		Check,
+		Clock,
+		AlertCircle,
+		HelpCircle
+	} from 'lucide-svelte';
+	import { examsApi } from '$lib/api/exams.ts';
+	import type { QuestionBank } from '$lib/api/types.ts';
+	import { toast } from '$lib/stores/toast.svelte.ts';
+	import GlassCard from '$lib/components/ui/GlassCard.svelte';
 
 	let questionBanks = $state<QuestionBank[]>([]);
-	let selectedBankId = $state<string>('All');
-	let selectedType = $state<string>('All');
 	let selectedCategory = $state<string>('All');
 	let searchTerm = $state('');
 	let isLoading = $state(true);
 	let isActionLoading = $state(false);
 
-	// All gathered questions across banks
-	let allQuestions = $state<BankQuestion[]>([]);
+	// Create / Edit Bank Modal
+	let isBankModalOpen = $state(false);
+	let modalMode = $state<'create' | 'edit'>('create');
+	let editingBankId = $state<string | null>(null);
+	let bankTitle = $state('');
+	let bankCategory = $state('');
+	let bankDescription = $state('');
+	let bankTags = $state('');
 
-	// Categories
+	// Delete Bank Modal
+	let isDeleteModalOpen = $state(false);
+	let deletingBank = $state<QuestionBank | null>(null);
+
+	onMount(async () => {
+		await loadQuestionBanks();
+	});
+
+	async function loadQuestionBanks() {
+		isLoading = true;
+		try {
+			const res = await examsApi.listQuestionBanks({ pageSize: 100 });
+			questionBanks = res.items || [];
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to load question banks.');
+		} finally {
+			isLoading = false;
+		}
+	}
+
+	// Categories derived from banks
 	const categories = $derived([
 		'All',
 		...Array.from(
@@ -52,519 +68,303 @@
 		)
 	]);
 
-	// Filtered questions
-	const filteredQuestions = $derived(
-		allQuestions.filter((q) => {
-			const matchBank = selectedBankId === 'All' || q.bankId === selectedBankId;
-			const matchType = selectedType === 'All' || q.type === selectedType;
-			const matchCategory = selectedCategory === 'All' || q.bankCategory === selectedCategory;
-			const text = (q.questionText || q.text || '').toLowerCase();
+	// Filtered banks
+	const filteredBanks = $derived(
+		questionBanks.filter((b) => {
+			const matchCategory = selectedCategory === 'All' || b.category === selectedCategory;
 			const matchSearch =
 				!searchTerm.trim() ||
-				text.includes(searchTerm.toLowerCase().trim()) ||
-				(q.bankTitle && q.bankTitle.toLowerCase().includes(searchTerm.toLowerCase().trim()));
-			return matchBank && matchType && matchCategory && matchSearch;
+				b.title.toLowerCase().includes(searchTerm.toLowerCase().trim()) ||
+				(b.description && b.description.toLowerCase().includes(searchTerm.toLowerCase().trim())) ||
+				(b.tags && b.tags.some((t) => t.toLowerCase().includes(searchTerm.toLowerCase().trim())));
+			return matchCategory && matchSearch;
 		})
 	);
 
 	// Stats
-	const totalPoints = $derived(filteredQuestions.reduce((acc, q) => acc + (q.points || 0), 0));
-	const singleChoiceCount = $derived(filteredQuestions.filter((q) => q.type === 'SingleChoice').length);
-	const multipleChoiceCount = $derived(filteredQuestions.filter((q) => q.type === 'MultipleChoice').length);
-	const essayCount = $derived(filteredQuestions.filter((q) => q.type === 'Essay').length);
-
-	// Question Types List
-	const questionTypes: { id: QuestionType; label: string; icon: any }[] = [
-		{ id: 'SingleChoice', label: 'Single Choice', icon: CheckCircle2 },
-		{ id: 'MultipleChoice', label: 'Multiple Choice', icon: CheckSquare },
-		{ id: 'TrueFalse', label: 'True / False', icon: ListFilter },
-		{ id: 'Essay', label: 'Essay', icon: AlignLeft }
-	];
-
-	// Create Question Bank Package Modal
-	let isCreateBankModalOpen = $state(false);
-	let newBankTitle = $state('');
-	let newBankCategory = $state('');
-	let newBankDescription = $state('');
-	let newBankTags = $state('');
-
-	// Create Question Modal
-	let isCreateQuestionModalOpen = $state(false);
-	let targetBankId = $state<string>('');
-	let newQuestionText = $state('');
-	let newQuestionType = $state<QuestionType>('SingleChoice');
-	let newQuestionPoints = $state(5);
-	let newQuestionExplanation = $state('');
-	let newQuestionOptions = $state<Array<{ text: string; isCorrect: boolean }>>([
-		{ text: 'Option A', isCorrect: true },
-		{ text: 'Option B', isCorrect: false },
-		{ text: 'Option C', isCorrect: false },
-		{ text: 'Option D', isCorrect: false }
-	]);
-
-	// Edit Question Modal
-	let isEditQuestionModalOpen = $state(false);
-	let editingQuestionId = $state<string | null>(null);
-	let editQuestionText = $state('');
-	let editQuestionType = $state<QuestionType>('SingleChoice');
-	let editQuestionPoints = $state(5);
-	let editQuestionExplanation = $state('');
-	let editQuestionOptions = $state<Array<{ id?: string; text: string; isCorrect: boolean }>>([]);
-
-	// Delete Question Modal
-	let isDeleteQuestionModalOpen = $state(false);
-	let deletingQuestionId = $state<string | null>(null);
-
-	onMount(async () => {
-		await loadAllData();
-	});
-
-	async function loadAllData() {
-		isLoading = true;
-		try {
-			const [banksRes, questionsRes] = await Promise.all([
-				examsApi.listQuestionBanks({ pageSize: 100 }),
-				examsApi.listQuestions({ pageSize: 100 })
-			]);
-
-			questionBanks = banksRes.items || [];
-			allQuestions = questionsRes.items || [];
-
-			if (questionBanks.length > 0 && !targetBankId) {
-				targetBankId = questionBanks[0].id;
-			}
-		} catch (err: any) {
-			toast.error(err?.message || 'Failed to load question repository.');
-		} finally {
-			isLoading = false;
-		}
-	}
+	const totalPools = $derived(questionBanks.length);
+	const totalQuestions = $derived(
+		questionBanks.reduce((acc, b) => acc + (b.questionCount || (b.questions ? b.questions.length : 0)), 0)
+	);
+	const totalCategories = $derived(Math.max(0, categories.length - 1));
 
 	function openCreateBank() {
-		newBankTitle = '';
-		newBankCategory = '';
-		newBankDescription = '';
-		newBankTags = '';
-		isCreateBankModalOpen = true;
+		modalMode = 'create';
+		editingBankId = null;
+		bankTitle = '';
+		bankCategory = '';
+		bankDescription = '';
+		bankTags = '';
+		isBankModalOpen = true;
 	}
 
-	async function handleCreateBank() {
-		if (!newBankTitle.trim()) {
+	function openEditBank(bank: QuestionBank) {
+		modalMode = 'edit';
+		editingBankId = bank.id;
+		bankTitle = bank.title;
+		bankCategory = bank.category || '';
+		bankDescription = bank.description || '';
+		bankTags = (bank.tags || []).join(', ');
+		isBankModalOpen = true;
+	}
+
+	async function handleSaveBank() {
+		if (!bankTitle.trim()) {
 			toast.warning('Please enter a question pool title.');
 			return;
 		}
 
-		const tagsList = newBankTags
+		const tagsList = bankTags
 			.split(',')
 			.map((t) => t.trim())
 			.filter(Boolean);
 
 		isActionLoading = true;
 		try {
-			await examsApi.createQuestionBank({
-				title: newBankTitle.trim(),
-				category: newBankCategory.trim() || undefined,
-				description: newBankDescription.trim() || undefined,
-				tags: tagsList
-			});
-
-			toast.success(`Question Bank pool '${newBankTitle.trim()}' created successfully!`);
-			isCreateBankModalOpen = false;
-			await loadAllData();
+			if (modalMode === 'create') {
+				await examsApi.createQuestionBank({
+					title: bankTitle.trim(),
+					category: bankCategory.trim() || undefined,
+					description: bankDescription.trim() || undefined,
+					tags: tagsList
+				});
+				toast.success(`Question Bank '${bankTitle.trim()}' created successfully!`);
+			} else if (editingBankId) {
+				await examsApi.updateQuestionBank(editingBankId, {
+					title: bankTitle.trim(),
+					category: bankCategory.trim() || undefined,
+					description: bankDescription.trim() || undefined,
+					tags: tagsList
+				});
+				toast.success(`Question Bank '${bankTitle.trim()}' updated successfully!`);
+			}
+			isBankModalOpen = false;
+			await loadQuestionBanks();
 		} catch (err: any) {
-			toast.error(err?.message || 'Failed to create question pool.');
+			toast.error(err?.message || 'Failed to save question bank.');
 		} finally {
 			isActionLoading = false;
 		}
 	}
 
-	function openCreateQuestion() {
-		newQuestionText = '';
-		newQuestionType = 'SingleChoice';
-		newQuestionPoints = 5;
-		newQuestionExplanation = '';
-		newQuestionOptions = [
-			{ text: 'Option A', isCorrect: true },
-			{ text: 'Option B', isCorrect: false },
-			{ text: 'Option C', isCorrect: false },
-			{ text: 'Option D', isCorrect: false }
-		];
-		if (!targetBankId && questionBanks.length > 0) {
-			targetBankId = questionBanks[0].id;
-		}
-		isCreateQuestionModalOpen = true;
+	function openDeleteModal(bank: QuestionBank) {
+		deletingBank = bank;
+		isDeleteModalOpen = true;
 	}
 
-	async function handleSaveNewQuestion(e: Event) {
-		e.preventDefault();
-		if (!newQuestionText.trim()) {
-			toast.warning('Question prompt cannot be empty.');
-			return;
-		}
-
-		// Validate options for choice types
-		if (newQuestionType === 'SingleChoice' || newQuestionType === 'MultipleChoice' || newQuestionType === 'TrueFalse') {
-			const hasCorrect = newQuestionOptions.some((o) => o.isCorrect);
-			if (!hasCorrect) {
-				toast.warning('Please mark at least one option as the correct answer.');
-				return;
-			}
-			const hasEmpty = newQuestionOptions.some((o) => !o.text.trim());
-			if (hasEmpty) {
-				toast.warning('All option choices must have text.');
-				return;
-			}
-		}
-
+	async function handleDeleteBank() {
+		if (!deletingBank) return;
 		isActionLoading = true;
 		try {
-			await examsApi.addQuestion(targetBankId || undefined, {
-				bankId: targetBankId || undefined,
-				questionText: newQuestionText.trim(),
-				type: newQuestionType,
-				points: Number(newQuestionPoints),
-				explanation: newQuestionExplanation.trim() || undefined,
-				options: newQuestionOptions.map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect }))
-			});
-
-			toast.success('Question added to Question Bank successfully!');
-			isCreateQuestionModalOpen = false;
-			await loadAllData();
+			await examsApi.deleteQuestionBank(deletingBank.id);
+			toast.success(`Question Bank '${deletingBank.title}' deleted successfully.`);
+			isDeleteModalOpen = false;
+			deletingBank = null;
+			await loadQuestionBanks();
 		} catch (err: any) {
-			toast.error(err?.message || 'Failed to save question to pool.');
+			toast.error(err?.message || 'Failed to delete question bank.');
 		} finally {
 			isActionLoading = false;
-		}
-	}
-
-	function openEditQuestion(question: BankQuestion) {
-		editingQuestionId = question.id;
-		editQuestionText = question.questionText || question.text || '';
-		editQuestionType = question.type;
-		editQuestionPoints = question.points || 5;
-		editQuestionExplanation = question.explanation || '';
-		editQuestionOptions = (question.options || []).map((o) => ({
-			id: o.id,
-			text: o.text,
-			isCorrect: Boolean(o.isCorrect)
-		}));
-		isEditQuestionModalOpen = true;
-	}
-
-	async function handleSaveEditQuestion(e: Event) {
-		e.preventDefault();
-		if (!editingQuestionId || !editQuestionText.trim()) {
-			toast.warning('Question prompt cannot be empty.');
-			return;
-		}
-
-		isActionLoading = true;
-		try {
-			await examsApi.updateQuestion(editingQuestionId, {
-				questionText: editQuestionText.trim(),
-				type: editQuestionType,
-				points: Number(editQuestionPoints),
-				explanation: editQuestionExplanation.trim() || undefined,
-				options: editQuestionOptions.map((o) => ({
-					id: o.id,
-					text: o.text.trim(),
-					isCorrect: o.isCorrect
-				}))
-			});
-
-			toast.success('Question updated successfully!');
-			isEditQuestionModalOpen = false;
-			await loadAllData();
-		} catch (err: any) {
-			toast.error(err?.message || 'Failed to update question.');
-		} finally {
-			isActionLoading = false;
-		}
-	}
-
-	function confirmDeleteQuestion(id: string) {
-		deletingQuestionId = id;
-		isDeleteQuestionModalOpen = true;
-	}
-
-	async function handleDeleteQuestion() {
-		if (!deletingQuestionId) return;
-		isActionLoading = true;
-		try {
-			await examsApi.deleteQuestion(deletingQuestionId);
-			toast.success('Question removed from bank successfully.');
-			isDeleteQuestionModalOpen = false;
-			await loadAllData();
-		} catch (err: any) {
-			toast.error(err?.message || 'Failed to delete question from bank.');
-		} finally {
-			isActionLoading = false;
-		}
-	}
-
-	// Helper for Option management
-	function addOption(target: 'new' | 'edit') {
-		if (target === 'new') {
-			newQuestionOptions = [...newQuestionOptions, { text: `Option ${String.fromCharCode(65 + newQuestionOptions.length)}`, isCorrect: false }];
-		} else {
-			editQuestionOptions = [...editQuestionOptions, { text: `Option ${String.fromCharCode(65 + editQuestionOptions.length)}`, isCorrect: false }];
-		}
-	}
-
-	function removeOption(target: 'new' | 'edit', index: number) {
-		if (target === 'new') {
-			if (newQuestionOptions.length <= 2) return;
-			newQuestionOptions = newQuestionOptions.filter((_, i) => i !== index);
-		} else {
-			if (editQuestionOptions.length <= 2) return;
-			editQuestionOptions = editQuestionOptions.filter((_, i) => i !== index);
-		}
-	}
-
-	function setCorrectOption(target: 'new' | 'edit', index: number, isMulti: boolean) {
-		if (target === 'new') {
-			if (isMulti) {
-				newQuestionOptions[index].isCorrect = !newQuestionOptions[index].isCorrect;
-			} else {
-				newQuestionOptions = newQuestionOptions.map((opt, i) => ({
-					...opt,
-					isCorrect: i === index
-				}));
-			}
-		} else {
-			if (isMulti) {
-				editQuestionOptions[index].isCorrect = !editQuestionOptions[index].isCorrect;
-			} else {
-				editQuestionOptions = editQuestionOptions.map((opt, i) => ({
-					...opt,
-					isCorrect: i === index
-				}));
-			}
 		}
 	}
 </script>
 
 <div class="space-y-6 max-w-7xl mx-auto pb-12">
-	<!-- Header -->
+	<!-- Page Header -->
 	<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
 		<div>
 			<h1 class="text-2xl sm:text-3xl font-extrabold text-base-content tracking-tight flex items-center gap-2.5">
 				<BookOpen class="w-8 h-8 text-primary" />
-				Question Bank Repository
+				Question Bank Pools
 			</h1>
 			<p class="text-sm text-base-content/70 mt-1">
-				Author, organize, and manage reusable question pools and packages across examinations and courses.
+				Author, organize, and manage reusable question pools and packages for your examinations and courses.
 			</p>
 		</div>
 
-		<div class="flex items-center gap-2">
-			<button
-				type="button"
-				class="btn btn-sm btn-outline btn-primary gap-1.5"
-				onclick={openCreateBank}
-			>
-				<FolderPlus class="w-4 h-4" />
-				New Question Pool
-			</button>
-
-			<button
-				type="button"
-				class="btn btn-sm btn-primary gap-1.5 shadow-md shadow-primary/20"
-				onclick={openCreateQuestion}
-			>
-				<Plus class="w-4 h-4" />
-				Add Question
-			</button>
-		</div>
+		<button
+			type="button"
+			class="btn btn-sm btn-primary gap-1.5 shadow-md shadow-primary/20"
+			onclick={openCreateBank}
+		>
+			<FolderPlus class="w-4 h-4" />
+			New Question Pool
+		</button>
 	</div>
 
-	<!-- Stats Overview Cards -->
-	<div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+	<!-- Stats Overview -->
+	<div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
 		<GlassCard class="p-4 flex items-center gap-3.5">
 			<div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-				<Layers class="w-5 h-5" />
+				<FolderPlus class="w-5 h-5" />
 			</div>
 			<div>
-				<p class="text-xs text-base-content/60 font-semibold">Total Questions</p>
-				<p class="text-xl font-black text-base-content">{filteredQuestions.length}</p>
+				<p class="text-xs text-base-content/60 font-semibold">Total Question Pools</p>
+				<p class="text-xl font-black text-base-content">{totalPools}</p>
 			</div>
 		</GlassCard>
 
 		<GlassCard class="p-4 flex items-center gap-3.5">
 			<div class="w-10 h-10 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center flex-shrink-0">
-				<Sparkles class="w-5 h-5" />
+				<Layers class="w-5 h-5" />
 			</div>
 			<div>
-				<p class="text-xs text-base-content/60 font-semibold">Total Pool Points</p>
-				<p class="text-xl font-black text-base-content">{totalPoints} pts</p>
-			</div>
-		</GlassCard>
-
-		<GlassCard class="p-4 flex items-center gap-3.5">
-			<div class="w-10 h-10 rounded-xl bg-success/10 text-success flex items-center justify-center flex-shrink-0">
-				<CheckCircle2 class="w-5 h-5" />
-			</div>
-			<div>
-				<p class="text-xs text-base-content/60 font-semibold">Single Choice</p>
-				<p class="text-xl font-black text-base-content">{singleChoiceCount}</p>
+				<p class="text-xs text-base-content/60 font-semibold">Total Questions Available</p>
+				<p class="text-xl font-black text-base-content">{totalQuestions}</p>
 			</div>
 		</GlassCard>
 
 		<GlassCard class="p-4 flex items-center gap-3.5">
 			<div class="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center flex-shrink-0">
-				<CheckSquare class="w-5 h-5" />
+				<Sparkles class="w-5 h-5" />
 			</div>
 			<div>
-				<p class="text-xs text-base-content/60 font-semibold">Multiple Choice</p>
-				<p class="text-xl font-black text-base-content">{multipleChoiceCount}</p>
+				<p class="text-xs text-base-content/60 font-semibold">Categories Covered</p>
+				<p class="text-xl font-black text-base-content">{totalCategories}</p>
 			</div>
 		</GlassCard>
 	</div>
 
-	<!-- Filter & Search Controls -->
+	<!-- Search & Filter Controls -->
 	<GlassCard class="p-4">
-		<div class="flex flex-col lg:flex-row gap-3 items-center justify-between">
-			<div class="relative w-full lg:w-96">
+		<div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
+			<div class="relative w-full sm:w-96">
 				<Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" />
 				<input
 					type="text"
 					bind:value={searchTerm}
-					placeholder="Search questions or keywords..."
+					placeholder="Search pools by title, description, or tag..."
 					class="input input-bordered input-sm w-full pl-10 bg-base-100/50"
 				/>
 			</div>
 
-			<div class="flex items-center gap-2 w-full lg:w-auto overflow-x-auto pb-1 lg:pb-0">
-				<!-- Category Filter -->
+			<div class="flex items-center gap-2 w-full sm:w-auto">
 				<select
 					bind:value={selectedCategory}
-					class="select select-bordered select-sm bg-base-100/50 text-xs font-semibold"
+					class="select select-bordered select-sm bg-base-100/50 text-xs font-semibold w-full sm:w-auto"
 				>
 					{#each categories as cat}
 						<option value={cat}>{cat === 'All' ? 'All Categories' : cat}</option>
 					{/each}
 				</select>
-
-				<!-- Type Filter -->
-				<select
-					bind:value={selectedType}
-					class="select select-bordered select-sm bg-base-100/50 text-xs font-semibold"
-				>
-					<option value="All">All Types</option>
-					<option value="SingleChoice">Single Choice</option>
-					<option value="MultipleChoice">Multiple Choice</option>
-					<option value="TrueFalse">True / False</option>
-					<option value="Essay">Essay</option>
-				</select>
 			</div>
 		</div>
 	</GlassCard>
 
-	<!-- Questions List -->
+	<!-- Question Bank Cards Grid -->
 	{#if isLoading}
 		<div class="py-16 text-center">
 			<span class="loading loading-spinner loading-lg text-primary"></span>
-			<p class="text-xs text-base-content/60 mt-3 font-semibold">Loading question repository...</p>
+			<p class="text-xs text-base-content/60 mt-3 font-semibold">Loading question pools...</p>
 		</div>
-	{:else if filteredQuestions.length === 0}
-		<div class="py-16 text-center bg-base-200/40 rounded-3xl border border-dashed border-base-300">
-			<BookOpen class="w-12 h-12 text-base-content/30 mx-auto mb-3" />
-			<h3 class="text-base font-bold text-base-content">No Questions Found</h3>
-			<p class="text-xs text-base-content/60 max-w-sm mx-auto mt-1">
-				{searchTerm || selectedType !== 'All' ? 'Try adjusting your search criteria or filters.' : 'Add questions to the bank to start building reusable exam sections.'}
+	{:else if filteredBanks.length === 0}
+		<div class="py-16 text-center bg-base-200/40 rounded-3xl border border-dashed border-base-300 p-8">
+			<div class="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+				<FolderPlus class="w-8 h-8" />
+			</div>
+			<h3 class="text-lg font-bold text-base-content">
+				{questionBanks.length === 0 ? 'No Question Bank Pools Yet' : 'No Pools Match Filter'}
+			</h3>
+			<p class="text-xs text-base-content/70 max-w-md mx-auto mt-2 leading-relaxed">
+				{questionBanks.length === 0
+					? 'Create your first Question Bank pool to start organizing and storing reusable examination questions.'
+					: 'Try adjusting your search query or selected category filter.'}
 			</p>
-			<button
-				type="button"
-				class="btn btn-sm btn-primary gap-1.5 mt-4"
-				onclick={openCreateQuestion}
-			>
-				<Plus class="w-4 h-4" />
-				Add First Question
-			</button>
+			{#if questionBanks.length === 0}
+				<button
+					type="button"
+					class="btn btn-sm btn-primary gap-1.5 mt-5 shadow-lg shadow-primary/20"
+					onclick={openCreateBank}
+				>
+					<FolderPlus class="w-4 h-4" />
+					Create Your First Pool
+				</button>
+			{/if}
 		</div>
 	{:else}
-		<div class="space-y-3.5">
-			{#each filteredQuestions as q, idx (q.id || idx)}
-				<GlassCard class="p-4 sm:p-5 hover:border-primary/30 transition-all">
-					<div class="flex items-start justify-between gap-4">
-						<div class="flex items-start gap-3 min-w-0 flex-1">
-							<span class="w-7 h-7 rounded-xl bg-base-200 text-base-content/70 font-mono font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
-								{idx + 1}
-							</span>
+		<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+			{#each filteredBanks as bank (bank.id)}
+				<GlassCard class="p-5 h-full flex flex-col justify-between hover:border-primary/40 hover:shadow-xl hover:shadow-primary/5 transition-all duration-200">
+					<div>
+						<!-- Card Top Badges & Actions -->
+						<div class="flex items-center justify-between gap-2 mb-3">
+							{#if bank.category}
+								<span class="badge badge-sm badge-primary badge-outline text-[11px] font-bold">
+									{bank.category}
+								</span>
+							{:else}
+								<span class="badge badge-sm badge-ghost text-[11px]">
+									General Pool
+								</span>
+							{/if}
 
-							<div class="min-w-0 flex-1">
-								<div class="flex items-center gap-2 flex-wrap mb-2">
-									<span class="badge badge-sm badge-outline badge-primary font-bold text-[10px]">
-										{q.type}
-									</span>
-									<span class="badge badge-sm badge-neutral font-mono text-[10px] font-bold">
-										{q.points} pts
-									</span>
-									{#if q.bankTitle}
-										<span class="badge badge-sm badge-ghost text-[10px] flex items-center gap-1">
-											<Layers class="w-3 h-3 text-primary" />
-											{q.bankTitle}
-										</span>
-									{/if}
-									{#if q.category}
-										<span class="badge badge-sm badge-secondary badge-outline text-[10px]">
-											{q.category}
-										</span>
-									{/if}
-								</div>
-
-								<!-- Question Prompt -->
-								<div class="text-sm font-semibold text-base-content">
-									<RichRenderer content={q.questionText || q.text || ''} />
-								</div>
-
-								<!-- Options Preview for Choice Types -->
-								{#if q.options && q.options.length > 0}
-									<div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 pt-3 border-t border-base-content/10">
-										{#each q.options as opt, optIdx}
-											<div class="p-2 rounded-lg text-xs flex items-center gap-2 {opt.isCorrect ? 'bg-success/10 border border-success/30 text-success font-semibold' : 'bg-base-200/40 text-base-content/70'}">
-												<span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold {opt.isCorrect ? 'bg-success text-success-content' : 'bg-base-300 text-base-content/60'}">
-													{String.fromCharCode(65 + optIdx)}
-												</span>
-												<span class="truncate">{opt.text}</span>
-												{#if opt.isCorrect}
-													<Check class="w-3.5 h-3.5 ml-auto text-success" />
-												{/if}
-											</div>
-										{/each}
-									</div>
-								{/if}
-
-								<!-- Explanation if available -->
-								{#if q.explanation}
-									<div class="mt-2.5 p-2 rounded-lg bg-base-200/40 text-xs text-base-content/70 flex items-start gap-1.5">
-										<HelpCircle class="w-3.5 h-3.5 text-primary flex-shrink-0 mt-0.5" />
-										<span class="italic"><strong class="not-italic">Explanation:</strong> {q.explanation}</span>
-									</div>
-								{/if}
+							<div class="flex items-center gap-1">
+								<button
+									type="button"
+									class="btn btn-xs btn-ghost btn-square text-base-content/60 hover:text-base-content hover:bg-base-200"
+									onclick={() => openEditBank(bank)}
+									title="Edit Pool Info"
+								>
+									<Edit3 class="w-3.5 h-3.5" />
+								</button>
+								<button
+									type="button"
+									class="btn btn-xs btn-ghost btn-square text-error hover:bg-error/10"
+									onclick={() => openDeleteModal(bank)}
+									title="Delete Pool"
+								>
+									<Trash2 class="w-3.5 h-3.5" />
+								</button>
 							</div>
 						</div>
 
-						<!-- Actions -->
-						<div class="flex items-center gap-1 flex-shrink-0">
-							<button
-								type="button"
-								class="btn btn-xs btn-ghost btn-square"
-								onclick={() => openEditQuestion(q)}
-								title="Edit Question"
-							>
-								<Edit3 class="w-3.5 h-3.5" />
-							</button>
+						<!-- Title & Description -->
+						<a
+							href="/instructor/questions/{bank.id}"
+							class="block group"
+						>
+							<h2 class="text-base font-bold text-base-content group-hover:text-primary transition-colors line-clamp-1">
+								{bank.title}
+							</h2>
+							<p class="text-xs text-base-content/70 mt-1.5 line-clamp-2 min-h-[2rem]">
+								{bank.description || 'No description provided for this question pool.'}
+							</p>
+						</a>
 
-							<button
-								type="button"
-								class="btn btn-xs btn-ghost btn-square text-error hover:bg-error/10"
-								onclick={() => confirmDeleteQuestion(q.id)}
-								title="Delete Question"
-							>
-								<Trash2 class="w-3.5 h-3.5" />
-							</button>
+						<!-- Tags -->
+						{#if bank.tags && bank.tags.length > 0}
+							<div class="flex items-center gap-1.5 flex-wrap mt-3">
+								{#each bank.tags.slice(0, 3) as tag}
+									<span class="badge badge-xs badge-neutral text-[10px] gap-1">
+										<Tag class="w-2.5 h-2.5 opacity-60" />
+										{tag}
+									</span>
+								{/each}
+								{#if bank.tags.length > 3}
+									<span class="text-[10px] text-base-content/50 font-semibold">
+										+{bank.tags.length - 3} more
+									</span>
+								{/if}
+							</div>
+						{/if}
+					</div>
+
+					<!-- Card Footer Meta & CTA -->
+					<div class="pt-4 mt-4 border-t border-base-content/10 flex items-center justify-between text-xs">
+						<div class="flex items-center gap-1.5 text-base-content/80 font-bold">
+							<Layers class="w-4 h-4 text-primary" />
+							<span>
+								{bank.questionCount ?? (bank.questions ? bank.questions.length : 0)} questions
+							</span>
 						</div>
+
+						<a
+							href="/instructor/questions/{bank.id}"
+							class="flex items-center gap-1 text-primary font-bold text-xs hover:underline hover:translate-x-0.5 transition-all"
+						>
+							<span>Manage Pool</span>
+							<ArrowRight class="w-3.5 h-3.5" />
+						</a>
 					</div>
 				</GlassCard>
 			{/each}
@@ -572,19 +372,24 @@
 	{/if}
 </div>
 
-<!-- Create Question Pool / Bank Modal -->
-{#if isCreateBankModalOpen}
+<!-- Create / Edit Question Bank Modal -->
+{#if isBankModalOpen}
 	<div class="modal modal-open z-50">
 		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-md">
 			<h3 class="font-bold text-base text-base-content flex items-center gap-2">
-				<FolderPlus class="w-5 h-5 text-primary" />
-				Create Question Bank Pool
+				{#if modalMode === 'create'}
+					<FolderPlus class="w-5 h-5 text-primary" />
+					Create Question Bank Pool
+				{:else}
+					<Edit3 class="w-5 h-5 text-primary" />
+					Edit Question Bank Pool
+				{/if}
 			</h3>
 
 			<form
 				onsubmit={(e) => {
 					e.preventDefault();
-					handleCreateBank();
+					handleSaveBank();
 				}}
 				class="space-y-4 mt-4"
 			>
@@ -595,8 +400,8 @@
 					<input
 						id="bank-title-input"
 						type="text"
-						bind:value={newBankTitle}
-						placeholder="e.g. C# Certification Question Pool"
+						bind:value={bankTitle}
+						placeholder="e.g. C# .NET 10 Core Certification Pool"
 						class="input input-bordered input-sm w-full bg-base-200/50"
 						required
 					/>
@@ -609,7 +414,7 @@
 					<input
 						id="bank-cat-input"
 						type="text"
-						bind:value={newBankCategory}
+						bind:value={bankCategory}
 						placeholder="e.g. Software Engineering"
 						class="input input-bordered input-sm w-full bg-base-200/50"
 					/>
@@ -621,9 +426,9 @@
 					</label>
 					<textarea
 						id="bank-desc-input"
-						bind:value={newBankDescription}
+						bind:value={bankDescription}
 						rows="2"
-						placeholder="Purpose or syllabus coverage..."
+						placeholder="Coverage, purpose, or learning objectives..."
 						class="textarea textarea-bordered textarea-sm w-full bg-base-200/50"
 					></textarea>
 				</div>
@@ -635,8 +440,8 @@
 					<input
 						id="bank-tags-input"
 						type="text"
-						bind:value={newBankTags}
-						placeholder="e.g. csharp, dotnet, backend"
+						bind:value={bankTags}
+						placeholder="e.g. csharp, efcore, architecture"
 						class="input input-bordered input-sm w-full bg-base-200/50"
 					/>
 				</div>
@@ -645,328 +450,65 @@
 					<button
 						type="button"
 						class="btn btn-sm btn-ghost"
-						onclick={() => (isCreateBankModalOpen = false)}
+						onclick={() => (isBankModalOpen = false)}
+						disabled={isActionLoading}
 					>
 						Cancel
 					</button>
 					<button
 						type="submit"
 						class="btn btn-sm btn-primary gap-1.5"
-						disabled={!newBankTitle.trim()}
-					>
-						<Check class="w-4 h-4" />
-						Create Pool
-					</button>
-				</div>
-			</form>
-		</div>
-		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isCreateBankModalOpen = false)}></div>
-	</div>
-{/if}
-
-<!-- Add Question Modal -->
-{#if isCreateQuestionModalOpen}
-	<div class="modal modal-open z-50">
-		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-2xl">
-			<h3 class="font-bold text-base text-base-content flex items-center gap-2">
-				<Plus class="w-5 h-5 text-primary" />
-				Add Question to Repository
-			</h3>
-
-			<form onsubmit={handleSaveNewQuestion} class="space-y-4 mt-4">
-				<!-- Question Type Selector -->
-				<div>
-					<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Question Type
-					</label>
-					<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-						{#each questionTypes as qt}
-							<button
-								type="button"
-								class="p-2.5 rounded-xl border text-left flex items-center gap-2 text-xs font-bold transition-all {newQuestionType === qt.id ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-base-content/10 bg-base-200/50 text-base-content/70'}"
-								onclick={() => (newQuestionType = qt.id)}
-							>
-								<qt.icon class="w-4 h-4" />
-								<span>{qt.label}</span>
-							</button>
-						{/each}
-					</div>
-				</div>
-
-				<!-- Prompt Editor -->
-				<div>
-					<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Question Prompt <span class="text-error">*</span>
-					</label>
-					<RichEditor
-						bind:content={newQuestionText}
-						placeholder="Write question statement, scenario, or mathematical equation..."
-					/>
-				</div>
-
-				<!-- Points -->
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-					<div>
-						<label for="q-points-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Default Points <span class="text-error">*</span>
-						</label>
-						<input
-							id="q-points-input"
-							type="number"
-							step="0.5"
-							min="0.5"
-							bind:value={newQuestionPoints}
-							class="input input-bordered input-sm w-full bg-base-200/50"
-							required
-						/>
-					</div>
-
-					<div>
-						<label for="q-exp-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Explanation / Key Note
-						</label>
-						<input
-							id="q-exp-input"
-							type="text"
-							bind:value={newQuestionExplanation}
-							placeholder="Feedback shown to candidate..."
-							class="input input-bordered input-sm w-full bg-base-200/50"
-						/>
-					</div>
-				</div>
-
-				<!-- Options for Choices -->
-				{#if newQuestionType !== 'Essay'}
-					<div class="space-y-2 pt-2 border-t border-base-content/10">
-						<div class="flex items-center justify-between">
-							<span class="text-xs font-bold uppercase tracking-wider text-base-content/70">
-								Options & Answers
-							</span>
-							{#if newQuestionType !== 'TrueFalse'}
-								<button
-									type="button"
-									class="btn btn-xs btn-ghost gap-1 text-primary"
-									onclick={() => addOption('new')}
-								>
-									<Plus class="w-3.5 h-3.5" />
-									Add Option
-								</button>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							{#each newQuestionOptions as opt, oIdx}
-								<div class="flex items-center gap-2 p-2 rounded-xl bg-base-200/50 border border-base-content/5">
-									<button
-										type="button"
-										class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all {opt.isCorrect ? 'bg-success text-success-content shadow-sm' : 'bg-base-300 text-base-content/50'}"
-										onclick={() => setCorrectOption('new', oIdx, newQuestionType === 'MultipleChoice')}
-										title="Toggle as Correct Answer"
-									>
-										{#if opt.isCorrect}
-											<Check class="w-3.5 h-3.5" />
-										{:else}
-											{String.fromCharCode(65 + oIdx)}
-										{/if}
-									</button>
-
-									<input
-										type="text"
-										bind:value={opt.text}
-										placeholder={`Choice ${String.fromCharCode(65 + oIdx)}`}
-										class="input input-bordered input-xs flex-1 bg-base-100"
-										required
-									/>
-
-									{#if newQuestionType !== 'TrueFalse' && newQuestionOptions.length > 2}
-										<button
-											type="button"
-											class="btn btn-xs btn-ghost btn-square text-error"
-											onclick={() => removeOption('new', oIdx)}
-										>
-											<Trash2 class="w-3.5 h-3.5" />
-										</button>
-									{/if}
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Modal Actions -->
-				<div class="modal-action pt-3 border-t border-base-content/10">
-					<button
-						type="button"
-						class="btn btn-sm btn-ghost"
-						onclick={() => (isCreateQuestionModalOpen = false)}
-						disabled={isActionLoading}
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						class="btn btn-sm btn-primary gap-1.5 shadow-md"
-						disabled={isActionLoading}
+						disabled={isActionLoading || !bankTitle.trim()}
 					>
 						{#if isActionLoading}
 							<span class="loading loading-spinner loading-xs"></span>
 						{:else}
 							<Check class="w-4 h-4" />
 						{/if}
-						Save Question
+						{modalMode === 'create' ? 'Create Pool' : 'Save Changes'}
 					</button>
 				</div>
 			</form>
 		</div>
-		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isCreateQuestionModalOpen = false)}></div>
+		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isBankModalOpen = false)}></div>
 	</div>
 {/if}
 
-<!-- Edit Question Modal -->
-{#if isEditQuestionModalOpen}
+<!-- Delete Bank Confirmation Modal -->
+{#if isDeleteModalOpen && deletingBank}
 	<div class="modal modal-open z-50">
-		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-2xl">
-			<h3 class="font-bold text-base text-base-content flex items-center gap-2">
-				<Edit3 class="w-5 h-5 text-primary" />
-				Edit Question
+		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-error/20 shadow-2xl max-w-sm">
+			<h3 class="font-bold text-base text-error flex items-center gap-2">
+				<AlertCircle class="w-5 h-5" />
+				Delete Question Bank
 			</h3>
-
-			<form onsubmit={handleSaveEditQuestion} class="space-y-4 mt-4">
-				<!-- Prompt Editor -->
-				<div>
-					<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Question Prompt <span class="text-error">*</span>
-					</label>
-					<RichEditor
-						bind:content={editQuestionText}
-						placeholder="Write question statement, scenario, or mathematical equation..."
-					/>
-				</div>
-
-				<!-- Points -->
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-					<div>
-						<label for="edit-q-points" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Points <span class="text-error">*</span>
-						</label>
-						<input
-							id="edit-q-points"
-							type="number"
-							step="0.5"
-							min="0.5"
-							bind:value={editQuestionPoints}
-							class="input input-bordered input-sm w-full bg-base-200/50"
-							required
-						/>
-					</div>
-
-					<div>
-						<label for="edit-q-exp" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Explanation
-						</label>
-						<input
-							id="edit-q-exp"
-							type="text"
-							bind:value={editQuestionExplanation}
-							class="input input-bordered input-sm w-full bg-base-200/50"
-						/>
-					</div>
-				</div>
-
-				<!-- Options for Choices -->
-				{#if editQuestionType !== 'Essay'}
-					<div class="space-y-2 pt-2 border-t border-base-content/10">
-						<div class="flex items-center justify-between">
-							<span class="text-xs font-bold uppercase tracking-wider text-base-content/70">
-								Options & Answers
-							</span>
-							{#if editQuestionType !== 'TrueFalse'}
-								<button
-									type="button"
-									class="btn btn-xs btn-ghost gap-1 text-primary"
-									onclick={() => addOption('edit')}
-								>
-									<Plus class="w-3.5 h-3.5" />
-									Add Option
-								</button>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							{#each editQuestionOptions as opt, oIdx}
-								<div class="flex items-center gap-2 p-2 rounded-xl bg-base-200/50 border border-base-content/5">
-									<button
-										type="button"
-										class="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all {opt.isCorrect ? 'bg-success text-success-content shadow-sm' : 'bg-base-300 text-base-content/50'}"
-										onclick={() => setCorrectOption('edit', oIdx, editQuestionType === 'MultipleChoice')}
-										title="Toggle as Correct Answer"
-									>
-										{#if opt.isCorrect}
-											<Check class="w-3.5 h-3.5" />
-										{:else}
-											{String.fromCharCode(65 + oIdx)}
-										{/if}
-									</button>
-
-									<input
-										type="text"
-										bind:value={opt.text}
-										class="input input-bordered input-xs flex-1 bg-base-100"
-										required
-									/>
-
-									{#if editQuestionType !== 'TrueFalse' && editQuestionOptions.length > 2}
-										<button
-											type="button"
-											class="btn btn-xs btn-ghost btn-square text-error"
-											onclick={() => removeOption('edit', oIdx)}
-										>
-											<Trash2 class="w-3.5 h-3.5" />
-										</button>
-									{/if}
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<!-- Actions -->
-				<div class="modal-action pt-3 border-t border-base-content/10">
-					<button
-						type="button"
-						class="btn btn-sm btn-ghost"
-						onclick={() => (isEditQuestionModalOpen = false)}
-						disabled={isActionLoading}
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						class="btn btn-sm btn-primary gap-1.5 shadow-md"
-						disabled={isActionLoading}
-					>
-						{#if isActionLoading}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							<Check class="w-4 h-4" />
-						{/if}
-						Save Changes
-					</button>
-				</div>
-			</form>
+			<p class="text-xs text-base-content/80 mt-3 leading-relaxed">
+				Are you sure you want to delete <strong>"{deletingBank.title}"</strong>? Questions contained within this pool will be permanently removed.
+			</p>
+			<div class="modal-action pt-2">
+				<button
+					type="button"
+					class="btn btn-sm btn-ghost"
+					onclick={() => (isDeleteModalOpen = false)}
+					disabled={isActionLoading}
+				>
+					Cancel
+				</button>
+				<button
+					type="button"
+					class="btn btn-sm btn-error gap-1.5"
+					onclick={handleDeleteBank}
+					disabled={isActionLoading}
+				>
+					{#if isActionLoading}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else}
+						<Trash2 class="w-4 h-4" />
+					{/if}
+					Delete Pool
+				</button>
+			</div>
 		</div>
-		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isEditQuestionModalOpen = false)}></div>
+		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isDeleteModalOpen = false)}></div>
 	</div>
 {/if}
-
-<!-- Delete Question Confirm Modal -->
-<ConfirmModal
-	isOpen={isDeleteQuestionModalOpen}
-	title="Delete Question from Repository"
-	message="Are you sure you want to remove this question from the Question Bank repository? It cannot be undone."
-	confirmText="Delete Question"
-	isDanger={true}
-	isLoading={isActionLoading}
-	onConfirm={handleDeleteQuestion}
-	onCancel={() => (isDeleteQuestionModalOpen = false)}
-/>
