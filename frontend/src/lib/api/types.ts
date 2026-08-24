@@ -170,10 +170,24 @@ export interface QuestionOption {
 	isCorrect?: boolean;
 }
 
-export interface QuestionBankItem {
+export interface QuestionBank {
 	id: string;
+	title: string;
+	description?: string | null;
+	category?: string | null;
+	tags?: string[];
+	createdBy: string;
+	updatedBy?: string | null;
+	createdAtUtc: string;
+	updatedAtUtc?: string | null;
+	questions?: QuestionBankItem[];
+}
+
+export interface BankQuestion {
+	id: string;
+	bankId?: string;
+	quizId?: string;
 	examId?: string;
-	sectionId?: string;
 	questionText?: string;
 	text?: string;
 	type: QuestionType;
@@ -189,24 +203,21 @@ export interface QuestionBankItem {
 	updatedAtUtc?: string | null;
 }
 
-export type QuizQuestion = QuestionBankItem;
-
-export interface QuizSectionQuestion {
-	id: string;
-	sectionId: string;
-	questionId: string;
-	orderIndex: number;
-	pointsOverride?: number | null;
-	question?: QuestionBankItem;
-}
+export type QuestionBankItem = BankQuestion;
+export type QuizQuestion = BankQuestion;
 
 export interface QuizSection {
 	id: string;
 	examId: string;
+	questionBankId: string;
+	questionBankTitle?: string;
 	title: string;
 	description?: string | null;
 	orderIndex: number;
-	questions: QuizSectionQuestion[] | QuestionBankItem[];
+	pointsOverride?: number | null;
+	questionCount?: number | null;
+	questions?: BankQuestion[];
+	questionBank?: QuestionBank;
 }
 
 export interface StudentAnswer {

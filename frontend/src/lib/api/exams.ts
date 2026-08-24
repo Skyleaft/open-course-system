@@ -13,7 +13,6 @@ import type {
 export const examsApi = {
 	async listExams(params?: ListExamsParams, customFetch?: typeof fetch): Promise<PaginatedList<QuizExam>> {
 		const searchParams = new URLSearchParams();
-		if (params?.courseId) searchParams.set('courseId', params.courseId);
 		if (params?.mode) searchParams.set('mode', params.mode);
 		if (params?.isPublished !== undefined && params.isPublished !== null) {
 			searchParams.set('isPublished', String(params.isPublished));
@@ -33,7 +32,7 @@ export const examsApi = {
 	},
 
 	async getExamsByCourse(courseId: string, customFetch?: typeof fetch): Promise<PaginatedList<QuizExam>> {
-		return this.listExams({ courseId }, customFetch);
+		return apiClient.get<PaginatedList<QuizExam>>(`/api/v1/courses/${courseId}/exams`, undefined, customFetch);
 	},
 
 	async getExamById(id: string, customFetch?: typeof fetch): Promise<QuizExam> {

@@ -188,6 +188,23 @@ export const coursesApi = {
 		return apiClient.post<SubmissionResultDto>(`/api/v1/courses/assignments/${assignmentId}/submit`, {
 			fileUrl
 		});
+	},
+
+	async attachExam(
+		courseId: string,
+		examId: string,
+		data?: { orderIndex?: number; isMandatory?: boolean }
+	): Promise<void> {
+		return apiClient.post<void>(`/api/v1/courses/${courseId}/exams`, {
+			examId,
+			orderIndex: data?.orderIndex ?? 1,
+			isMandatory: data?.isMandatory ?? true
+		});
+	},
+
+	async detachExam(courseId: string, examId: string): Promise<void> {
+		return apiClient.delete<void>(`/api/v1/courses/${courseId}/exams/${examId}`);
 	}
 };
+
 

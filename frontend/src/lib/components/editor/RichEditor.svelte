@@ -13,7 +13,7 @@
 	}
 
 	let {
-		content = '',
+		content = $bindable(''),
 		placeholder = 'Write something or press "/" for commands...',
 		readonly = false,
 		minHeight = '220px',
@@ -24,10 +24,13 @@
 	const editor = createEditor({
 		onFileUpload: (file) => (onFileUpload ? onFileUpload(file) : Promise.resolve('')),
 		onUpdate: () => {
-			if (onUpdate && editor) {
+			if (editor) {
 				const json = JSON.stringify(editor.getJSON());
 				const html = editor.getHTML();
-				onUpdate(json, html);
+				content = html || json;
+				if (onUpdate) {
+					onUpdate(json, html);
+				}
 			}
 		}
 	});
