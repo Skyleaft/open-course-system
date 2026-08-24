@@ -1,0 +1,187 @@
+services:
+  # =========================================================================
+  # 1. DATABASE ENGINE (PostgreSQL - Latest)
+  # =========================================================================
+  postgres:
+    image: postgres:alpine
+    container_name: lms-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lms_db}
+      POSTGRES_USER: ${POSTGRES_USER:-lms_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lms_secret_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    networks:
+      - lms-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lms_user} -d ${POSTGRES_DB:-lms_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # =========================================================================
+  # 2. IN-MEMORY & STREAM ENGINE (Redis - Latest)
+  # =========================================================================
+  redis:
+    image: redis:alpine
+    container_name: lms-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-redis_secret_password}"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - lms-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secret_password}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # =========================================================================
+  # 3. S3 OBJECT STORAGE (MinIO)
+  # =========================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: lms-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web Console UI
+    volumes:
+      - minio_data:/data
+    networks:
+      - lms-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: lms-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks:
+      - lms-network
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin123};
+      mc mb --ignore-existing myminio/exam-snapshots;
+      mc mb --ignore-existing myminio/course-materials;
+      mc mb --ignore-existing myminio/assignment-submissions;
+      mc anonymous set none myminio/exam-snapshots;
+      mc anonymous set none myminio/course-materials;
+      mc anonymous set none myminio/assignment-submissions;
+      exit 0;
+      "
+
+  # =========================================================================
+  # 4. OBSERVABILITY (Jaeger & OpenTelemetry Collector)
+  # =========================================================================
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: lms-jaeger
+    restart: unless-stopped
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686" # Jaeger Web UI
+      - "4317:4317"   # Internal gRPC
+    networks:
+      - lms-network
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: lms-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    volumes:
+      - ./otel/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC Ingest from API Host
+      - "4318:4318" # OTLP HTTP Ingest
+    depends_on:
+      - jaeger
+    networks:
+      - lms-network
+
+  # =========================================================================
+  # 5. BACKEND HOST (.NET 10 Modular Monolith)
+  # =========================================================================
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: lms-backend:latest
+    container_name: lms-api
+    restart: unless-stopped
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_HTTP_PORTS=8080
+      - ConnectionStrings__Database=Host=postgres;Port=5432;Database=${POSTGRES_DB:-lms_db};Username=${POSTGRES_USER:-lms_user};Password=${POSTGRES_PASSWORD:-lms_secret_password};
+      - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-redis_secret_password}
+      - Minio__Endpoint=minio:9000
+      - Minio__PublicEndpoint=http://localhost:9000
+      - Minio__AccessKey=${MINIO_ROOT_USER:-minioadmin}
+      - Minio__SecretKey=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - Minio__UseSSL=false
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+      - OTEL_SERVICE_NAME=lms-modular-api
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    networks:
+      - lms-network
+
+  # =========================================================================
+  # 6. FRONTEND APPLICATION (SvelteKit V3 RC)
+  # =========================================================================
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    image: lms-frontend:latest
+    container_name: lms-web
+    restart: unless-stopped
+    environment:
+      - PUBLIC_API_URL=http://localhost:8080
+      - PUBLIC_SIGNALR_URL=http://localhost:8080/hubs
+      - PUBLIC_MINIO_URL=http://localhost:9000
+      - PORT=3001
+      - HOST=0.0.0.0
+    ports:
+      - "3001:3001"
+    depends_on:
+      - backend
+    networks:
+      - lms-network
+
+networks:
+  lms-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
