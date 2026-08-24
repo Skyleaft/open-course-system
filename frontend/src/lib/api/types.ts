@@ -186,6 +186,8 @@ export interface QuestionBank {
 export interface BankQuestion {
 	id: string;
 	bankId?: string;
+	bankTitle?: string;
+	bankCategory?: string;
 	quizId?: string;
 	examId?: string;
 	questionText?: string;

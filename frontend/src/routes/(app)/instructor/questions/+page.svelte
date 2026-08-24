@@ -38,7 +38,7 @@
 	let isActionLoading = $state(false);
 
 	// All gathered questions across banks
-	let allQuestions = $state<Array<BankQuestion & { bankTitle?: string; bankCategory?: string; bankId: string }>>([]);
+	let allQuestions = $state<BankQuestion[]>([]);
 
 	// Categories
 	const categories = $derived([
@@ -122,56 +122,19 @@
 	async function loadAllData() {
 		isLoading = true;
 		try {
-			// Fetch exams to collect linked QuestionBanks and questions
-			const examListRes = await examsApi.listExams({ pageSize: 100 });
-			const exams = examListRes.items || [];
+			const [banksRes, questionsRes] = await Promise.all([
+				examsApi.listQuestionBanks({ pageSize: 100 }),
+				examsApi.listQuestions({ pageSize: 100 })
+			]);
 
-			const banksMap = new Map<string, QuestionBank>();
-			const questionsList: Array<BankQuestion & { bankTitle?: string; bankCategory?: string; bankId: string }> = [];
-
-			for (const ex of exams) {
-				try {
-					const fullExam = await examsApi.getExamById(ex.id);
-					if (fullExam && fullExam.sections) {
-						for (const sec of fullExam.sections) {
-							if (sec.questionBankId) {
-								if (!banksMap.has(sec.questionBankId)) {
-									banksMap.set(sec.questionBankId, {
-										id: sec.questionBankId,
-										title: sec.questionBankTitle || sec.title || 'General Question Pool',
-										description: sec.description,
-										createdBy: fullExam.createdBy || '',
-										createdAtUtc: fullExam.createdAtUtc || '',
-										questions: sec.questions || []
-									});
-								}
-							}
-
-							if (sec.questions) {
-								for (const q of sec.questions) {
-									questionsList.push({
-										...q,
-										bankId: sec.questionBankId || 'default',
-										bankTitle: sec.questionBankTitle || sec.title || 'General Question Pool',
-										bankCategory: q.category || undefined
-									});
-								}
-							}
-						}
-					}
-				} catch {
-					// continue
-				}
-			}
-
-			questionBanks = Array.from(banksMap.values());
-			allQuestions = questionsList;
+			questionBanks = banksRes.items || [];
+			allQuestions = questionsRes.items || [];
 
 			if (questionBanks.length > 0 && !targetBankId) {
 				targetBankId = questionBanks[0].id;
 			}
 		} catch (err: any) {
-			toast.error(err?.message || 'Failed to load question banks.');
+			toast.error(err?.message || 'Failed to load question repository.');
 		} finally {
 			isLoading = false;
 		}
@@ -185,7 +148,7 @@
 		isCreateBankModalOpen = true;
 	}
 
-	function handleCreateBank() {
+	async function handleCreateBank() {
 		if (!newBankTitle.trim()) {
 			toast.warning('Please enter a question pool title.');
 			return;
@@ -196,21 +159,23 @@
 			.map((t) => t.trim())
 			.filter(Boolean);
 
-		const newBank: QuestionBank = {
-			id: crypto.randomUUID(),
-			title: newBankTitle.trim(),
-			category: newBankCategory.trim() || undefined,
-			description: newBankDescription.trim() || undefined,
-			tags: tagsList,
-			createdBy: '',
-			createdAtUtc: new Date().toISOString(),
-			questions: []
-		};
+		isActionLoading = true;
+		try {
+			await examsApi.createQuestionBank({
+				title: newBankTitle.trim(),
+				category: newBankCategory.trim() || undefined,
+				description: newBankDescription.trim() || undefined,
+				tags: tagsList
+			});
 
-		questionBanks = [...questionBanks, newBank];
-		targetBankId = newBank.id;
-		isCreateBankModalOpen = false;
-		toast.success(`Question Bank '${newBank.title}' created successfully!`);
+			toast.success(`Question Bank pool '${newBankTitle.trim()}' created successfully!`);
+			isCreateBankModalOpen = false;
+			await loadAllData();
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to create question pool.');
+		} finally {
+			isActionLoading = false;
+		}
 	}
 
 	function openCreateQuestion() {
@@ -224,6 +189,9 @@
 			{ text: 'Option C', isCorrect: false },
 			{ text: 'Option D', isCorrect: false }
 		];
+		if (!targetBankId && questionBanks.length > 0) {
+			targetBankId = questionBanks[0].id;
+		}
 		isCreateQuestionModalOpen = true;
 	}
 
@@ -250,7 +218,8 @@
 
 		isActionLoading = true;
 		try {
-			const created = await examsApi.addQuestion(undefined, {
+			await examsApi.addQuestion(targetBankId || undefined, {
+				bankId: targetBankId || undefined,
 				questionText: newQuestionText.trim(),
 				type: newQuestionType,
 				points: Number(newQuestionPoints),

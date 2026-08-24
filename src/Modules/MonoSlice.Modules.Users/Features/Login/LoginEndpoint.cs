@@ -43,16 +43,5 @@ public static class LoginEndpoint
         .Produces<ApiResponse<LoginResponseDto>>(StatusCodes.Status200OK)
         .Produces<ApiResponse>(StatusCodes.Status400BadRequest)
         .AllowAnonymous();
-
-        app.MapPost("/logout", async (
-            SignInManager<ApplicationUser> signInManager,
-            HttpContext httpContext) =>
-        {
-            await signInManager.SignOutAsync();
-            return Results.Ok(ApiResponse.Ok("Logged out successfully."));
-        })
-        .WithName("LogoutUser")
-        .WithSummary("Logs out the current user")
-        .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin", "Proctor"));
     }
 }

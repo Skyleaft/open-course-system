@@ -7,7 +7,9 @@ import type {
 	QuizQuestion,
 	QuizSubmission,
 	StudentAnswer,
-	QuestionType
+	QuestionType,
+	QuestionBank,
+	BankQuestion
 } from './types.ts';
 
 export const examsApi = {
@@ -79,19 +81,101 @@ export const examsApi = {
 		return apiClient.post(`/api/v1/exams/${id}/publish`);
 	},
 
-	// Question Bank CRUD
-	async addQuestion(examId: string | undefined, data: {
-		questionText: string;
-		type: QuestionType | string;
-		points: number;
-		explanation?: string;
+	// Question Bank Packages CRUD
+	async listQuestionBanks(
+		params?: { search?: string; category?: string; pageIndex?: number; pageSize?: number },
+		customFetch?: typeof fetch
+	): Promise<PaginatedList<QuestionBank>> {
+		const searchParams = new URLSearchParams();
+		if (params?.category) searchParams.set('category', params.category);
+		if (params?.search) searchParams.set('search', params.search);
+		if (params?.pageIndex) searchParams.set('pageIndex', String(params.pageIndex));
+		if (params?.pageSize) searchParams.set('pageSize', String(params.pageSize));
+
+		const queryStr = searchParams.toString();
+		return apiClient.get<PaginatedList<QuestionBank>>(
+			`/api/v1/exams/question-banks${queryStr ? `?${queryStr}` : ''}`,
+			undefined,
+			customFetch
+		);
+	},
+
+	async createQuestionBank(data: {
+		title: string;
+		description?: string;
 		category?: string;
 		tags?: string[];
-		options?: Array<{ id?: string; text: string; isCorrect: boolean }>;
-		sectionId?: string;
-	}): Promise<QuizQuestion> {
-		const endpoint = examId ? `/api/v1/exams/${examId}/questions` : '/api/v1/exams/questions';
-		return apiClient.post<QuizQuestion>(endpoint, { ...data, examId });
+	}): Promise<string> {
+		return apiClient.post<string>('/api/v1/exams/question-banks', data);
+	},
+
+	async getQuestionBank(id: string, customFetch?: typeof fetch): Promise<QuestionBank> {
+		return apiClient.get<QuestionBank>(`/api/v1/exams/question-banks/${id}`, undefined, customFetch);
+	},
+
+	async updateQuestionBank(
+		id: string,
+		data: {
+			title: string;
+			description?: string;
+			category?: string;
+			tags?: string[];
+		}
+	): Promise<boolean> {
+		return apiClient.put<boolean>(`/api/v1/exams/question-banks/${id}`, data);
+	},
+
+	async deleteQuestionBank(id: string): Promise<boolean> {
+		return apiClient.delete<boolean>(`/api/v1/exams/question-banks/${id}`);
+	},
+
+	// Bank Questions Query & CRUD
+	async listQuestions(
+		params?: {
+			bankId?: string;
+			search?: string;
+			type?: string;
+			category?: string;
+			pageIndex?: number;
+			pageSize?: number;
+		},
+		customFetch?: typeof fetch
+	): Promise<PaginatedList<BankQuestion>> {
+		const searchParams = new URLSearchParams();
+		if (params?.bankId) searchParams.set('bankId', params.bankId);
+		if (params?.search) searchParams.set('search', params.search);
+		if (params?.type) searchParams.set('type', params.type);
+		if (params?.category) searchParams.set('category', params.category);
+		if (params?.pageIndex) searchParams.set('pageIndex', String(params.pageIndex));
+		if (params?.pageSize) searchParams.set('pageSize', String(params.pageSize));
+
+		const queryStr = searchParams.toString();
+		return apiClient.get<PaginatedList<BankQuestion>>(
+			`/api/v1/exams/questions${queryStr ? `?${queryStr}` : ''}`,
+			undefined,
+			customFetch
+		);
+	},
+
+	async addQuestion(
+		bankOrExamId: string | undefined,
+		data: {
+			bankId?: string;
+			questionText: string;
+			type: QuestionType | string;
+			points: number;
+			explanation?: string;
+			category?: string;
+			tags?: string[];
+			options?: Array<{ id?: string; text: string; isCorrect: boolean }>;
+			sectionId?: string;
+		}
+	): Promise<QuizQuestion> {
+		const targetBankId = data.bankId || bankOrExamId;
+		const endpoint = targetBankId
+			? `/api/v1/exams/question-banks/${targetBankId}/questions`
+			: '/api/v1/exams/questions';
+		return apiClient.post<QuizQuestion>(endpoint, { ...data, bankId: targetBankId });
 	},
 
 	async addQuestions(
