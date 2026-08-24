@@ -4,7 +4,7 @@
 	import { goto } from '$app/navigation';
 	import { coursesApi } from '$lib/api/courses.ts';
 	import { examsApi } from '$lib/api/exams.ts';
-	import type { Course, CourseSection, Lesson, LessonType, CourseExam, QuizExam } from '$lib/api/types.ts';
+	import type { Course, CourseSection, Lesson, LessonType, CourseExam, QuizExam, CourseStudentEnrollmentDto } from '$lib/api/types.ts';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import RichEditor from '$lib/components/editor/RichEditor.svelte';
@@ -32,7 +32,12 @@
 		AlignLeft,
 		BookOpen,
 		EyeOff,
-		X
+		X,
+		Users,
+		UserPlus,
+		UserMinus,
+		Search,
+		GraduationCap
 	} from 'lucide-svelte';
 
 	const courseId = (page.params.id || '') as string;
@@ -41,8 +46,21 @@
 	let isLoading = $state(true);
 	let isActionLoading = $state(false);
 
-	// Tabs: 'curriculum' | 'exams' | 'settings'
-	let activeTab = $state<'curriculum' | 'exams' | 'settings'>('curriculum');
+	// Tabs: 'curriculum' | 'students' | 'exams' | 'settings'
+	let activeTab = $state<'curriculum' | 'students' | 'exams' | 'settings'>('curriculum');
+
+	// Students Enrollment Management State
+	let enrolledStudents = $state<CourseStudentEnrollmentDto[]>([]);
+	let totalEnrollments = $state(0);
+	let isEnrollmentsLoading = $state(false);
+	let studentSearchTerm = $state('');
+	let studentPageIndex = $state(1);
+	let isEnrollModalOpen = $state(false);
+	let newStudentEmail = $state('');
+	let isEnrollingStudent = $state(false);
+	let isUnenrollModalOpen = $state(false);
+	let removingEnrollment = $state<CourseStudentEnrollmentDto | null>(null);
+	let isRemovingEnrollment = $state(false);
 
 	// Course Settings State
 	let editCourseTitle = $state('');
@@ -130,9 +148,70 @@
 	async function loadAllData() {
 		isLoading = true;
 		try {
-			await Promise.all([loadCourse(), loadExams()]);
+			await Promise.all([loadCourse(), loadExams(), loadEnrollments()]);
 		} finally {
 			isLoading = false;
+		}
+	}
+
+	async function loadEnrollments() {
+		isEnrollmentsLoading = true;
+		try {
+			const res = await coursesApi.getCourseEnrollments(courseId, {
+				pageIndex: studentPageIndex,
+				search: studentSearchTerm.trim() || undefined
+			});
+			enrolledStudents = res.items || [];
+			totalEnrollments = res.totalCount || 0;
+		} catch (err: any) {
+			console.error('Failed to load course enrollments:', err);
+			enrolledStudents = [];
+			totalEnrollments = 0;
+		} finally {
+			isEnrollmentsLoading = false;
+		}
+	}
+
+	async function handleAdminEnrollStudent() {
+		if (!newStudentEmail.trim()) {
+			toast.warning('Please provide a valid email address or student identifier.');
+			return;
+		}
+
+		isEnrollingStudent = true;
+		try {
+			const res = await coursesApi.adminEnrollStudent(courseId, {
+				email: newStudentEmail.trim()
+			});
+			toast.success(`Successfully enrolled ${res.studentName} (${res.studentEmail})!`);
+			isEnrollModalOpen = false;
+			newStudentEmail = '';
+			await loadEnrollments();
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to enroll student.');
+		} finally {
+			isEnrollingStudent = false;
+		}
+	}
+
+	function openUnenrollModal(student: CourseStudentEnrollmentDto) {
+		removingEnrollment = student;
+		isUnenrollModalOpen = true;
+	}
+
+	async function handleAdminRemoveEnrollment() {
+		if (!removingEnrollment) return;
+		isRemovingEnrollment = true;
+		try {
+			await coursesApi.adminRemoveEnrollment(courseId, removingEnrollment.enrollmentId);
+			toast.success(`Removed ${removingEnrollment.fullName} from course.`);
+			isUnenrollModalOpen = false;
+			removingEnrollment = null;
+			await loadEnrollments();
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to un-enroll student.');
+		} finally {
+			isRemovingEnrollment = false;
 		}
 	}
 
@@ -526,6 +605,19 @@
 						</button>
 						<button
 							type="button"
+							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'students'
+								? 'btn-primary text-primary-content shadow-xs'
+								: 'btn-ghost text-base-content/70'}"
+							onclick={() => {
+								activeTab = 'students';
+								loadEnrollments();
+							}}
+						>
+							<Users class="w-3.5 h-3.5" />
+							Students ({totalEnrollments})
+						</button>
+						<button
+							type="button"
 							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'exams'
 								? 'btn-primary text-primary-content shadow-xs'
 								: 'btn-ghost text-base-content/70'}"
@@ -554,6 +646,15 @@
 						>
 							<Plus class="w-3.5 h-3.5" />
 							Add Section
+						</button>
+					{:else if activeTab === 'students'}
+						<button
+							type="button"
+							class="btn btn-primary btn-xs rounded-xl text-primary-content font-bold shadow-sm gap-1"
+							onclick={() => (isEnrollModalOpen = true)}
+						>
+							<UserPlus class="w-3.5 h-3.5" />
+							Enroll Student
 						</button>
 					{/if}
 				</div>
@@ -704,6 +805,156 @@
 								</div>
 							</div>
 						{/each}
+					</div>
+				{/if}
+			</GlassCard>
+		{:else if activeTab === 'students'}
+			<!-- Tab: Enrolled Students Management -->
+			<GlassCard class="p-6 space-y-6">
+				<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+					<div>
+						<h3 class="text-base font-bold text-base-content flex items-center gap-2">
+							<Users class="w-5 h-5 text-primary" />
+							Enrolled Students & Progression ({totalEnrollments})
+						</h3>
+						<p class="text-xs text-base-content/70">
+							Track student completion rates, inspect lesson milestones, and manage enrollment roster.
+						</p>
+					</div>
+
+					<div class="flex items-center gap-3">
+						<div class="relative w-full sm:w-64">
+							<Search class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-base-content/50" />
+							<input
+								type="text"
+								placeholder="Search student by name or email..."
+								bind:value={studentSearchTerm}
+								oninput={() => {
+									studentPageIndex = 1;
+									loadEnrollments();
+								}}
+								class="input input-sm w-full rounded-xl bg-base-200/50 pl-8 text-xs border-white/10"
+							/>
+						</div>
+
+						<button
+							type="button"
+							class="btn btn-sm btn-primary gap-1.5 shadow-sm rounded-xl font-bold shrink-0"
+							onclick={() => (isEnrollModalOpen = true)}
+						>
+							<UserPlus class="w-4 h-4" />
+							Enroll Student
+						</button>
+					</div>
+				</div>
+
+				{#if isEnrollmentsLoading}
+					<div class="space-y-3">
+						{#each Array(3) as _}
+							<div class="h-16 rounded-2xl bg-base-200/50 animate-pulse"></div>
+						{/each}
+					</div>
+				{:else if enrolledStudents.length === 0}
+					<div class="py-12 text-center bg-base-200/40 rounded-2xl border border-dashed border-base-300 space-y-3">
+						<Users class="w-10 h-10 text-base-content/30 mx-auto" />
+						<div class="space-y-1">
+							<p class="text-sm font-semibold text-base-content/80">
+								{studentSearchTerm ? 'No students match your search' : 'No students enrolled yet'}
+							</p>
+							<p class="text-xs text-base-content/50 max-w-sm mx-auto">
+								{studentSearchTerm
+									? 'Try adjusting your search criteria.'
+									: 'Enrolled students will appear here with real-time course progression details.'}
+							</p>
+						</div>
+						<button
+							type="button"
+							class="btn btn-sm btn-primary gap-1.5 mt-2"
+							onclick={() => (isEnrollModalOpen = true)}
+						>
+							<UserPlus class="w-4 h-4" />
+							Enroll First Student
+						</button>
+					</div>
+				{:else}
+					<div class="overflow-x-auto rounded-2xl border border-base-content/10">
+						<table class="table table-sm w-full text-xs">
+							<thead class="bg-base-200/70 text-base-content/70">
+								<tr>
+									<th>Student</th>
+									<th>Enrolled Date</th>
+									<th>Course Progression</th>
+									<th>Lessons</th>
+									<th>Assignments</th>
+									<th>Last Active</th>
+									<th class="text-right">Actions</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-base-content/5">
+								{#each enrolledStudents as student (student.enrollmentId)}
+									{@const isFinished = student.progressPercent >= 100}
+									<tr class="hover:bg-base-100/40 transition-colors">
+										<td>
+											<div class="flex items-center gap-3">
+												<div class="avatar placeholder">
+													<div class="w-8 h-8 rounded-xl bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">
+														{student.fullName ? student.fullName.substring(0, 2).toUpperCase() : 'ST'}
+													</div>
+												</div>
+												<div>
+													<div class="font-bold text-base-content">{student.fullName}</div>
+													<div class="text-[10px] text-base-content/50">{student.email}</div>
+												</div>
+											</div>
+										</td>
+										<td class="text-base-content/70">
+											{new Date(student.enrolledAtUtc).toLocaleDateString()}
+										</td>
+										<td>
+											<div class="space-y-1 w-32">
+												<div class="flex items-center justify-between text-[10px] font-bold">
+													<span class="{isFinished ? 'text-success' : 'text-primary'}">
+														{student.progressPercent}%
+													</span>
+												</div>
+												<div class="h-1.5 w-full overflow-hidden rounded-full bg-base-200">
+													<div
+														class="h-full transition-all duration-300 {isFinished ? 'bg-success' : 'gradient-accent'}"
+														style="width: {student.progressPercent}%"
+													></div>
+												</div>
+											</div>
+										</td>
+										<td>
+											<span class="badge badge-ghost badge-xs font-semibold">
+												{student.completedLessonsCount} / {student.totalLessonsCount}
+											</span>
+										</td>
+										<td>
+											<span class="badge badge-ghost badge-xs font-semibold">
+												{student.completedAssignmentsCount} / {student.totalAssignmentsCount}
+											</span>
+										</td>
+										<td class="text-base-content/60 text-[11px]">
+											{student.lastAccessedAtUtc
+												? new Date(student.lastAccessedAtUtc).toLocaleString()
+												: 'Never'}
+										</td>
+										<td class="text-right">
+											<button
+												type="button"
+												class="btn btn-ghost btn-xs text-error hover:bg-error/10 rounded-lg gap-1"
+												onclick={() => openUnenrollModal(student)}
+												title="Unenroll student"
+											>
+												<UserMinus class="w-3.5 h-3.5" />
+												Unenroll
+											</button>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
 					</div>
 				{/if}
 			</GlassCard>
@@ -1159,4 +1410,69 @@
 	isLoading={isActionLoading}
 	onConfirm={handleDeleteCourse}
 	onCancel={() => (isDeleteCourseModalOpen = false)}
+/>
+
+<!-- Manual Enroll Student Modal -->
+{#if isEnrollModalOpen}
+	<div class="modal modal-open">
+		<div class="modal-box max-w-md rounded-3xl border border-white/10 bg-base-100/90 backdrop-blur-2xl p-6 space-y-4 shadow-2xl">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
+				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
+					<UserPlus class="w-5 h-5 text-primary" />
+					Enroll Student Manually
+				</h3>
+				<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => (isEnrollModalOpen = false)}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			<form onsubmit={(e) => { e.preventDefault(); handleAdminEnrollStudent(); }} class="space-y-4">
+				<div class="space-y-1.5">
+					<label for="enroll-student-email" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80 block">
+						Student Email or User ID <span class="text-error">*</span>
+					</label>
+					<input
+						id="enroll-student-email"
+						type="text"
+						bind:value={newStudentEmail}
+						placeholder="e.g. student@example.com or GUID"
+						class="input input-bordered w-full rounded-xl bg-base-200/50 text-sm font-semibold"
+						required
+					/>
+					<p class="text-[11px] text-base-content/60 leading-relaxed">
+						Enrolling will immediately grant the student access to all lessons, assignments, and examinations in this course.
+					</p>
+				</div>
+
+				<div class="flex justify-end gap-2 pt-2 border-t border-base-content/10">
+					<button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick={() => (isEnrollModalOpen = false)}>Cancel</button>
+					<button
+						type="submit"
+						class="btn btn-sm btn-primary gradient-accent text-white font-bold rounded-xl gap-1.5 border-0 shadow-md"
+						disabled={isEnrollingStudent || !newStudentEmail.trim()}
+					>
+						{#if isEnrollingStudent}
+							<span class="loading loading-spinner loading-xs"></span>
+						{:else}
+							<UserPlus class="w-4 h-4" />
+							Enroll Student
+						{/if}
+					</button>
+				</div>
+			</form>
+		</div>
+		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isEnrollModalOpen = false)}></div>
+	</div>
+{/if}
+
+<!-- Unenroll Confirmation Modal -->
+<ConfirmModal
+	isOpen={isUnenrollModalOpen}
+	title="Un-enroll Student"
+	message={`Are you sure you want to remove student "${removingEnrollment?.fullName || 'Selected Student'}" (${removingEnrollment?.email || ''}) from this course? Their progress data for this course will be cleared.`}
+	confirmText="Un-enroll Student"
+	isDanger={true}
+	isLoading={isRemovingEnrollment}
+	onConfirm={handleAdminRemoveEnrollment}
+	onCancel={() => { isUnenrollModalOpen = false; removingEnrollment = null; }}
 />

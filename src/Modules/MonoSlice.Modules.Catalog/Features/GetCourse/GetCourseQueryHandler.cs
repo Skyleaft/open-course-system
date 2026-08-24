@@ -98,7 +98,7 @@ public sealed class GetCourseQueryHandler : IQueryHandler<GetCourseQuery, ApiRes
             await _cacheService.SetAsync(cacheKey, dto, TimeSpan.FromHours(1), cancellationToken);
         }
 
-        // Check user enrollment
+        // Check user enrollment & count
         var isEnrolled = false;
         if (_currentUser.IsAuthenticated && _currentUser.UserId.HasValue)
         {
@@ -107,7 +107,15 @@ public sealed class GetCourseQueryHandler : IQueryHandler<GetCourseQuery, ApiRes
                 .AnyAsync(e => e.UserId == _currentUser.UserId.Value && e.CourseId == query.Id, cancellationToken);
         }
 
-        var resultDto = dto with { IsEnrolled = isEnrolled };
+        var enrolledStudentsCount = await _dbContext.Enrollments
+            .AsNoTracking()
+            .CountAsync(e => e.CourseId == query.Id, cancellationToken);
+
+        var resultDto = dto with
+        {
+            IsEnrolled = isEnrolled,
+            EnrolledStudentsCount = enrolledStudentsCount
+        };
         return ApiResponse.Ok(resultDto);
     }
 }

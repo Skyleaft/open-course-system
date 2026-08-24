@@ -3,7 +3,7 @@
 	import { page } from '$app/state';
 	import { coursesApi } from '$lib/api/courses.ts';
 	import { communicationsApi } from '$lib/api/communications.ts';
-	import type { Course, Lesson, Assignment, CourseExam, DiscussionThread } from '$lib/api/types.ts';
+	import type { Course, Lesson, Assignment, CourseExam, DiscussionThread, CourseProgressDto } from '$lib/api/types.ts';
 	import LessonPlayer from '$lib/components/course/LessonPlayer.svelte';
 	import SyllabusTree from '$lib/components/course/SyllabusTree.svelte';
 	import RichEditor from '$lib/components/editor/RichEditor.svelte';
@@ -23,11 +23,17 @@
 		ShieldAlert,
 		ArrowRight,
 		ExternalLink,
-		Sparkles
+		Sparkles,
+		Check,
+		RotateCcw
 	} from 'lucide-svelte';
 
 	const courseId = (page.params.id || '') as string;
+	const targetLessonId = page.url.searchParams.get('lessonId');
+
 	let course = $state<Course | null>(null);
+	let courseProgress = $state<CourseProgressDto | null>(null);
+
 	let activeLesson = $state<Lesson | null>(null);
 	let activeAssignment = $state<Assignment | null>(null);
 	let activeExam = $state<CourseExam | null>(null);
@@ -35,27 +41,56 @@
 
 	let threads = $state<DiscussionThread[]>([]);
 	let isLoading = $state(true);
+	let isCompletingLesson = $state(false);
 
 	let newThreadTitle = $state('');
 	let newThreadContent = $state('');
 	let isPostingThread = $state(false);
 
+	const isLessonCompleted = $derived(
+		activeLesson ? (courseProgress?.completedLessonIds || []).includes(activeLesson.id) : false
+	);
+
 	onMount(async () => {
 		try {
-			course = await coursesApi.getCourseById(courseId);
-			if (course?.sections?.[0]?.lessons?.[0]) {
-				activeLesson = course.sections[0].lessons[0];
-				activeMode = 'lesson';
-				await loadThreads(activeLesson.id);
+			const [courseRes, progressRes] = await Promise.all([
+				coursesApi.getCourseById(courseId),
+				coursesApi.getCourseProgress(courseId).catch(() => null)
+			]);
+
+			course = courseRes;
+			courseProgress = progressRes;
+
+			const allLessons = (course?.sections || []).flatMap((s) => s.lessons || []);
+
+			// If specific lessonId requested via query string
+			if (targetLessonId) {
+				const found = allLessons.find((l) => l.id === targetLessonId);
+				if (found) {
+					await selectLesson(found);
+					return;
+				}
+			}
+
+			// If last accessed lesson exists
+			if (progressRes?.lastAccessedLessonId) {
+				const found = allLessons.find((l) => l.id === progressRes.lastAccessedLessonId);
+				if (found) {
+					await selectLesson(found);
+					return;
+				}
+			}
+
+			// Default selection fallback
+			if (allLessons.length > 0) {
+				await selectLesson(allLessons[0]);
 			} else if (course?.assignments?.[0]) {
-				activeAssignment = course.assignments[0];
-				activeMode = 'assignment';
+				selectAssignment(course.assignments[0]);
 			} else if (course?.exams?.[0]) {
-				activeExam = course.exams[0];
-				activeMode = 'exam';
+				selectExam(course.exams[0]);
 			}
 		} catch (err) {
-			console.error(err);
+			console.error('Failed to initialize course player:', err);
 		} finally {
 			isLoading = false;
 		}
@@ -81,6 +116,44 @@
 		activeLesson = null;
 		activeAssignment = null;
 		activeMode = 'exam';
+	}
+
+	async function handleToggleLessonComplete() {
+		if (!activeLesson) return;
+		isCompletingLesson = true;
+		const targetStatus = !isLessonCompleted;
+
+		try {
+			const res = await coursesApi.completeLesson(courseId, activeLesson.id, targetStatus);
+			if (res) {
+				if (courseProgress) {
+					const set = new Set(courseProgress.completedLessonIds);
+					if (res.isCompleted) {
+						set.add(activeLesson.id);
+						toast.success('Lesson marked as completed!');
+					} else {
+						set.delete(activeLesson.id);
+						toast.info('Lesson marked as incomplete.');
+					}
+					courseProgress.completedLessonIds = Array.from(set);
+					courseProgress.progressPercent = res.updatedCourseProgressPercent;
+				} else {
+					courseProgress = {
+						courseId,
+						completedLessonIds: res.isCompleted ? [activeLesson.id] : [],
+						completedAssignmentIds: [],
+						completedExamIds: [],
+						progressPercent: res.updatedCourseProgressPercent,
+						lastAccessedLessonId: activeLesson.id
+					};
+					toast.success(res.isCompleted ? 'Lesson marked as completed!' : 'Lesson marked as incomplete.');
+				}
+			}
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to update lesson completion status.');
+		} finally {
+			isCompletingLesson = false;
+		}
 	}
 
 	async function loadThreads(lessonId: string) {
@@ -120,18 +193,44 @@
 </script>
 
 <div class="space-y-6 max-w-7xl mx-auto pb-16">
-	<!-- Top Bar -->
-	<div class="flex items-center justify-between border-b border-base-content/10 pb-4">
-		<a
-			href="/courses/{courseId}"
-			class="btn btn-sm btn-ghost gap-2 text-base-content/70 hover:text-base-content"
-		>
-			<ArrowLeft class="w-4 h-4" />
-			<span>Course Overview</span>
-		</a>
+	<!-- Top Navigation & Progress Bar -->
+	<div class="glass-panel rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border border-white/10 shadow-xl">
+		<div class="flex items-center gap-3">
+			<a
+				href="/courses/{courseId}"
+				class="btn btn-sm btn-ghost rounded-2xl gap-1.5 text-base-content/70 hover:text-base-content"
+			>
+				<ArrowLeft class="w-4 h-4" />
+				<span>Overview</span>
+			</a>
 
-		<div class="flex items-center gap-2">
-			<span class="text-xs font-bold text-base-content">{course?.title || 'Loading...'}</span>
+			<div class="h-4 w-px bg-white/10 hidden sm:block"></div>
+
+			<div class="space-y-0.5">
+				<h1 class="text-sm sm:text-base font-bold text-base-content truncate max-w-md">
+					{course?.title || 'Loading...'}
+				</h1>
+				<div class="text-[11px] text-base-content/60 flex items-center gap-2">
+					<span>Course Progression:</span>
+					<span class="font-bold text-primary">{courseProgress?.progressPercent || 0}%</span>
+				</div>
+			</div>
+		</div>
+
+		<!-- Progress Bar & Certificate CTA -->
+		<div class="flex items-center gap-3 w-full sm:w-72">
+			<div class="h-2.5 flex-1 overflow-hidden rounded-full bg-base-200/80">
+				<div
+					class="h-full transition-all duration-500 {(courseProgress?.progressPercent || 0) >= 100 ? 'bg-success' : 'gradient-accent'}"
+					style="width: {courseProgress?.progressPercent || 0}%"
+				></div>
+			</div>
+
+			{#if (courseProgress?.progressPercent || 0) >= 100}
+				<a href="/certificates" class="btn btn-xs btn-success text-white font-bold rounded-xl shadow-md gap-1 shrink-0">
+					<Award class="w-3.5 h-3.5" /> Certificate
+				</a>
+			{/if}
 		</div>
 	</div>
 
@@ -146,6 +245,38 @@
 			<div class="space-y-6 lg:col-span-2">
 				{#if activeMode === 'lesson' && activeLesson}
 					<LessonPlayer lesson={activeLesson} />
+
+					<!-- Mark Completed Action Bar -->
+					<div class="glass-card rounded-2xl p-4 border border-white/10 flex items-center justify-between shadow-md">
+						<div class="flex items-center gap-2 text-xs">
+							{#if isLessonCompleted}
+								<span class="flex items-center gap-1.5 font-bold text-success">
+									<CheckCircle2 class="w-4 h-4" /> Lesson Completed
+								</span>
+							{:else}
+								<span class="text-base-content/60">
+									Finished reviewing this lesson?
+								</span>
+							{/if}
+						</div>
+
+						<button
+							type="button"
+							class="btn btn-sm rounded-xl font-bold gap-1.5 transition-all {isLessonCompleted
+								? 'btn-outline border-success text-success hover:bg-success hover:text-white'
+								: 'btn-primary gradient-accent text-white border-0 shadow-md'}"
+							onclick={handleToggleLessonComplete}
+							disabled={isCompletingLesson}
+						>
+							{#if isCompletingLesson}
+								<span class="loading loading-spinner loading-xs"></span>
+							{:else if isLessonCompleted}
+								<Check class="w-4 h-4" /> Completed
+							{:else}
+								<CheckCircle2 class="w-4 h-4" /> Mark as Complete
+							{/if}
+						</button>
+					</div>
 
 					<!-- Lesson Discussion Section -->
 					<div class="glass-card rounded-3xl border border-base-content/10 p-6 space-y-6 shadow-xl">
@@ -209,12 +340,19 @@
 						</div>
 					</div>
 				{:else if activeMode === 'exam' && activeExam}
+					{@const isExamCompleted = (courseProgress?.completedExamIds || []).includes(activeExam.examId) || (courseProgress?.completedExamIds || []).includes(activeExam.id)}
 					<!-- Course Exam Launchpad Card -->
-					<div class="glass-panel rounded-3xl border border-primary/30 p-8 shadow-2xl space-y-6">
+					<div class="glass-panel rounded-3xl border {isExamCompleted ? 'border-success/40 bg-success/5' : 'border-primary/30'} p-8 shadow-2xl space-y-6">
 						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-2">
-								<span class="badge badge-primary badge-sm font-bold uppercase">Course Examination</span>
-								{#if activeExam.isMandatory}
+								<span class="badge {isExamCompleted ? 'badge-success text-white' : 'badge-primary'} badge-sm font-bold uppercase">
+									{isExamCompleted ? 'Exam Completed' : 'Course Examination'}
+								</span>
+								{#if isExamCompleted}
+									<span class="badge badge-success badge-sm text-white font-bold gap-1">
+										<CheckCircle2 class="w-3.5 h-3.5" /> Passed
+									</span>
+								{:else if activeExam.isMandatory}
 									<span class="badge badge-error badge-sm text-white font-bold">Mandatory</span>
 								{:else}
 									<span class="badge badge-ghost badge-sm font-semibold">Optional</span>
@@ -228,16 +366,25 @@
 								{activeExam.examTitle || 'Course Assessment Examination'}
 							</h2>
 							<p class="text-xs text-base-content/70 max-w-xl leading-relaxed">
-								This examination is linked to this course curriculum. Passing this evaluation is required for your official verified course completion certificate.
+								{#if isExamCompleted}
+									You have successfully completed this examination milestone. Your score and verification hash have been recorded into your course progression.
+								{:else}
+									This examination is linked to this course curriculum. Passing this evaluation is required for your official verified course completion certificate.
+								{/if}
 							</p>
 						</div>
 
 						<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
 							<div class="p-4 rounded-2xl bg-base-200/50 border border-base-content/10 space-y-1">
-								<div class="text-[10px] font-bold uppercase tracking-wider text-base-content/60">Type</div>
-								<div class="text-sm font-bold text-base-content flex items-center gap-1.5">
-									<GraduationCap class="w-4 h-4 text-primary" />
-									Standard Evaluation
+								<div class="text-[10px] font-bold uppercase tracking-wider text-base-content/60">Status</div>
+								<div class="text-sm font-bold {isExamCompleted ? 'text-success' : 'text-base-content'} flex items-center gap-1.5">
+									{#if isExamCompleted}
+										<CheckCircle2 class="w-4 h-4 text-success" />
+										Passed
+									{:else}
+										<GraduationCap class="w-4 h-4 text-primary" />
+										Ready to Attempt
+									{/if}
 								</div>
 							</div>
 
@@ -260,14 +407,18 @@
 
 						<div class="pt-4 border-t border-base-content/10 flex items-center justify-between">
 							<span class="text-xs text-base-content/60">
-								Ensure your webcam & mic are functional before proceeding.
+								{#if isExamCompleted}
+									You may review your past submissions or retake if attempts remain.
+								{:else}
+									Ensure your webcam & mic are functional before proceeding.
+								{/if}
 							</span>
 
 							<a
 								href="/exams/{activeExam.examId}/start"
-								class="btn btn-primary gradient-accent rounded-2xl font-bold text-white shadow-lg border-0 gap-2 h-11 px-6 text-sm"
+								class="btn btn-primary {isExamCompleted ? 'btn-outline border-success text-success hover:bg-success hover:text-white' : 'gradient-accent text-white border-0 shadow-lg'} rounded-2xl font-bold gap-2 h-11 px-6 text-sm"
 							>
-								Launch Examination
+								{isExamCompleted ? 'Retake Examination' : 'Launch Examination'}
 								<ArrowRight class="w-4 h-4" />
 							</a>
 						</div>
@@ -328,6 +479,9 @@
 						activeLessonId={activeLesson?.id}
 						activeAssignmentId={activeAssignment?.id}
 						activeExamId={activeExam?.examId}
+						completedLessonIds={courseProgress?.completedLessonIds || []}
+						completedAssignmentIds={courseProgress?.completedAssignmentIds || []}
+						completedExamIds={courseProgress?.completedExamIds || []}
 						isEnrolled={true}
 						courseId={courseId}
 						onSelectLesson={selectLesson}

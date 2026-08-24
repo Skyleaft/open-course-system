@@ -76,4 +76,65 @@ public sealed class ExamsModuleApi : IExamsModuleApi
         return string.Equals(cachedToken, sessionToken.ToString("N"), StringComparison.OrdinalIgnoreCase) ||
                string.Equals(cachedToken, sessionToken.ToString(), StringComparison.OrdinalIgnoreCase);
     }
+
+    public async Task<IReadOnlyList<QuizSubmissionContractDto>> GetStudentSubmissionsForExamsAsync(
+        Guid studentId,
+        IEnumerable<Guid> examIds,
+        CancellationToken ct = default)
+    {
+        var examIdList = examIds.ToList();
+        if (examIdList.Count == 0) return [];
+
+        var submissions = await _dbContext.Submissions
+            .AsNoTracking()
+            .Where(s => s.StudentId == studentId && examIdList.Contains(s.ExamId))
+            .ToListAsync(ct);
+
+        return submissions.Select(s =>
+        {
+            Guid? parsedToken = Guid.TryParse(s.ActiveSessionToken, out var guidToken) ? guidToken : null;
+            return new QuizSubmissionContractDto(
+                s.Id,
+                s.ExamId,
+                s.StudentId,
+                "RealExam",
+                s.StartedAtUtc,
+                s.MaxAllowedEndTimeUtc,
+                s.SubmittedAtUtc,
+                s.Status.ToString(),
+                s.Score ?? 0m,
+                parsedToken);
+        }).ToList();
+    }
+
+    public async Task<IReadOnlyList<QuizSubmissionContractDto>> GetStudentsSubmissionsForExamsAsync(
+        IEnumerable<Guid> studentIds,
+        IEnumerable<Guid> examIds,
+        CancellationToken ct = default)
+    {
+        var studentIdList = studentIds.ToList();
+        var examIdList = examIds.ToList();
+        if (studentIdList.Count == 0 || examIdList.Count == 0) return [];
+
+        var submissions = await _dbContext.Submissions
+            .AsNoTracking()
+            .Where(s => studentIdList.Contains(s.StudentId) && examIdList.Contains(s.ExamId))
+            .ToListAsync(ct);
+
+        return submissions.Select(s =>
+        {
+            Guid? parsedToken = Guid.TryParse(s.ActiveSessionToken, out var guidToken) ? guidToken : null;
+            return new QuizSubmissionContractDto(
+                s.Id,
+                s.ExamId,
+                s.StudentId,
+                "RealExam",
+                s.StartedAtUtc,
+                s.MaxAllowedEndTimeUtc,
+                s.SubmittedAtUtc,
+                s.Status.ToString(),
+                s.Score ?? 0m,
+                parsedToken);
+        }).ToList();
+    }
 }

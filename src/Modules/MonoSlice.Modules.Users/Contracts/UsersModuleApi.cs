@@ -37,6 +37,28 @@ public sealed class UsersModuleApi : IIdentityModuleApi, IUsersModuleApi
             user.Picture);
     }
 
+    public async Task<UserContractDto?> GetUserByEmailAsync(
+        string email,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return null;
+
+        var user = await _userManager.FindByEmailAsync(email.Trim());
+        if (user is null) return null;
+
+        var roles = await _userManager.GetRolesAsync(user);
+        var isActive = user.LockoutEnd == null || user.LockoutEnd <= DateTimeOffset.UtcNow;
+
+        return new UserContractDto(
+            user.Id,
+            user.Email ?? string.Empty,
+            user.FullName,
+            roles.ToList(),
+            isActive,
+            user.UserName ?? string.Empty,
+            user.Picture);
+    }
+
     public async Task<bool> ValidateUserRoleAsync(
         Guid userId, 
         string role, 

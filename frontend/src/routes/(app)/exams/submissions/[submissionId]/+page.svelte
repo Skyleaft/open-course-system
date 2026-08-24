@@ -285,7 +285,7 @@
 			<h2 class="text-xl font-bold text-base-content">Unable to Load Examination</h2>
 			<p class="text-xs text-base-content/70">{loadError}</p>
 			<div class="pt-2 flex justify-center gap-3">
-				<a href="/exams" class="btn btn-ghost btn-sm rounded-xl">Back to Exams</a>
+				<a href="/my-courses" class="btn btn-ghost btn-sm rounded-xl">Back to My Courses</a>
 				<a href="/dashboard" class="btn btn-primary btn-sm rounded-xl">Dashboard</a>
 			</div>
 		</div>

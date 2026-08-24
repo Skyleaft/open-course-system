@@ -14,6 +14,7 @@ public sealed class CoursesDbContext : DbContext
     public DbSet<AssignmentSubmission> Submissions => Set<AssignmentSubmission>();
     public DbSet<CourseEnrollment> Enrollments => Set<CourseEnrollment>();
     public DbSet<CourseExam> CourseExams => Set<CourseExam>();
+    public DbSet<LessonProgress> LessonProgresses => Set<LessonProgress>();
 
     public CoursesDbContext(DbContextOptions<CoursesDbContext> options) : base(options)
     {
@@ -171,6 +172,24 @@ public sealed class CoursesDbContext : DbContext
 
             builder.HasIndex(ce => ce.CourseId);
             builder.HasIndex(ce => ce.ExamId);
+        });
+
+        // LessonProgress
+        modelBuilder.Entity<LessonProgress>(builder =>
+        {
+            builder.ToTable("lesson_progress", DefaultSchema);
+            builder.HasKey(lp => lp.Id);
+            builder.Property(lp => lp.Id).ValueGeneratedNever();
+
+            builder.Property(lp => lp.UserId).IsRequired();
+            builder.Property(lp => lp.CourseId).IsRequired();
+            builder.Property(lp => lp.LessonId).IsRequired();
+            builder.Property(lp => lp.IsCompleted).HasDefaultValue(true).IsRequired();
+            builder.Property(lp => lp.CompletedAtUtc);
+            builder.Property(lp => lp.LastAccessedAtUtc).IsRequired();
+
+            builder.HasIndex(lp => new { lp.UserId, lp.CourseId });
+            builder.HasIndex(lp => new { lp.UserId, lp.LessonId }).IsUnique();
         });
     }
 }

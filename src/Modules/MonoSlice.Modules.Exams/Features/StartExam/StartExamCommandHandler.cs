@@ -6,6 +6,8 @@ using MonoSlice.Shared.Abstractions.CQRS;
 using MonoSlice.Shared.Abstractions.Exceptions;
 using MonoSlice.Shared.Abstractions.Interfaces;
 
+using MonoSlice.Shared.Abstractions.Contracts;
+
 namespace MonoSlice.Modules.Exams.Features.StartExam;
 
 public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, ApiResponse<ExamAttemptDto>>
@@ -13,15 +15,18 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
     private readonly ExamsDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
     private readonly ICacheService _cacheService;
+    private readonly ICoursesModuleApi _coursesModuleApi;
 
     public StartExamCommandHandler(
         ExamsDbContext dbContext,
         ICurrentUser currentUser,
-        ICacheService cacheService)
+        ICacheService cacheService,
+        ICoursesModuleApi coursesModuleApi)
     {
         _dbContext = dbContext;
         _currentUser = currentUser;
         _cacheService = cacheService;
+        _coursesModuleApi = coursesModuleApi;
     }
 
     public async ValueTask<ApiResponse<ExamAttemptDto>> Handle(
@@ -49,6 +54,17 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
         if (!exam.IsPublished)
         {
             throw new BusinessRuleException("This exam is not yet published.");
+        }
+
+        // Validate course enrollment if exam is attached to a course
+        var courseId = await _coursesModuleApi.GetCourseIdForExamAsync(exam.Id, cancellationToken);
+        if (courseId.HasValue)
+        {
+            var isEnrolled = await _coursesModuleApi.IsStudentEnrolledAsync(studentId, courseId.Value, cancellationToken);
+            if (!isEnrolled)
+            {
+                throw new BusinessRuleException("You must be enrolled in the course associated with this examination to attempt it.");
+            }
         }
 
         // Check Exam Availability Schedule Window

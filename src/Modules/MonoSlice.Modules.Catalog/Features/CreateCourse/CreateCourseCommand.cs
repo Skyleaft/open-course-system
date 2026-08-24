@@ -31,4 +31,5 @@ public sealed record CourseDetailDto(
     decimal Price,
     bool IsPublished,
     string? ThumbnailUrl,
-    DateTime CreatedAtUtc);
+    DateTime CreatedAtUtc,
+    int EnrolledStudentsCount = 0);

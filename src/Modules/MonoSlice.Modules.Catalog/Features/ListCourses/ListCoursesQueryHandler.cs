@@ -108,9 +108,17 @@ public sealed class ListCoursesQueryHandler : IQueryHandler<ListCoursesQuery, Ap
             .Take(pageSize)
             .ToListAsync(cancellationToken);
 
+        var courseIds = courses.Select(c => c.Id).ToList();
+        var enrollmentCounts = await _dbContext.Enrollments
+            .Where(e => courseIds.Contains(e.CourseId))
+            .GroupBy(e => e.CourseId)
+            .Select(g => new { CourseId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.CourseId, x => x.Count, cancellationToken);
+
         var items = courses.Select(c => c.Adapt<CourseDetailDto>() with
         {
-            AccessType = c.AccessType.ToString()
+            AccessType = c.AccessType.ToString(),
+            EnrolledStudentsCount = enrollmentCounts.GetValueOrDefault(c.Id)
         }).ToList();
 
         var paginatedList = new PaginatedList<CourseDetailDto>(items, totalCount, pageIndex, pageSize);

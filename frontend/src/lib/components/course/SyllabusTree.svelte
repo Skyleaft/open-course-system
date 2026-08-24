@@ -12,7 +12,8 @@
 		ShieldAlert,
 		Sparkles,
 		Award,
-		Lock
+		Lock,
+		CheckCircle2
 	} from 'lucide-svelte';
 
 	interface Props {
@@ -24,6 +25,9 @@
 		activeExamId?: string;
 		isEnrolled?: boolean;
 		courseId?: string;
+		completedLessonIds?: string[];
+		completedAssignmentIds?: string[];
+		completedExamIds?: string[];
 		onSelectLesson?: (lesson: Lesson) => void;
 		onSelectAssignment?: (assignment: Assignment) => void;
 		onSelectExam?: (exam: CourseExam) => void;
@@ -38,6 +42,9 @@
 		activeExamId,
 		isEnrolled = false,
 		courseId,
+		completedLessonIds = [],
+		completedAssignmentIds = [],
+		completedExamIds = [],
 		onSelectLesson,
 		onSelectAssignment,
 		onSelectExam
@@ -75,6 +82,7 @@
 						{#each section.lessons || [] as lesson (lesson.id)}
 							{@const Icon = lessonIcons[lesson.type] || PlayCircle}
 							{@const isCurrent = lesson.id === activeLessonId}
+							{@const isCompleted = completedLessonIds.includes(lesson.id)}
 
 							<div
 								class="flex items-center justify-between px-4 py-3 text-xs transition-colors {isCurrent
@@ -86,8 +94,12 @@
 								onkeydown={(e) => isEnrolled && e.key === 'Enter' && onSelectLesson && onSelectLesson(lesson)}
 							>
 								<div class="flex items-center gap-2.5 overflow-hidden min-w-0">
-									<Icon class="w-4 h-4 shrink-0 {isCurrent ? 'text-primary' : 'text-base-content/50'}" />
-									<span class="truncate">{lesson.title}</span>
+									{#if isCompleted}
+										<CheckCircle2 class="w-4 h-4 shrink-0 text-success" />
+									{:else}
+										<Icon class="w-4 h-4 shrink-0 {isCurrent ? 'text-primary' : 'text-base-content/50'}" />
+									{/if}
+									<span class="truncate {isCompleted ? 'text-base-content/90 font-medium' : ''}">{lesson.title}</span>
 								</div>
 
 								<div class="flex items-center gap-2 text-[10px] text-base-content/50 shrink-0 ml-2">
@@ -98,7 +110,11 @@
 										</span>
 									{/if}
 									{#if isEnrolled}
-										<ChevronRight class="w-3.5 h-3.5 {isCurrent ? 'text-primary' : 'text-base-content/40'}" />
+										{#if isCompleted}
+											<span class="badge badge-success badge-xs text-white font-semibold">Done</span>
+										{:else}
+											<ChevronRight class="w-3.5 h-3.5 {isCurrent ? 'text-primary' : 'text-base-content/40'}" />
+										{/if}
 									{:else}
 										<Lock class="w-3.5 h-3.5 text-base-content/30" />
 									{/if}
@@ -124,6 +140,7 @@
 			<div class="divide-y divide-base-content/5">
 				{#each assignments as assignment (assignment.id)}
 					{@const isCurrent = assignment.id === activeAssignmentId}
+					{@const isCompleted = completedAssignmentIds.includes(assignment.id)}
 					<div
 						class="flex items-center justify-between px-4 py-3 text-xs transition-colors {isCurrent
 							? 'bg-warning/15 text-warning font-bold'
@@ -150,14 +167,22 @@
 						}}
 					>
 						<div class="flex items-center gap-2.5 overflow-hidden min-w-0">
-							<FileCheck class="w-4 h-4 shrink-0 {isCurrent ? 'text-warning' : 'text-base-content/50'}" />
-							<span class="truncate">{assignment.title}</span>
+							{#if isCompleted}
+								<CheckCircle2 class="w-4 h-4 shrink-0 text-success" />
+							{:else}
+								<FileCheck class="w-4 h-4 shrink-0 {isCurrent ? 'text-warning' : 'text-base-content/50'}" />
+							{/if}
+							<span class="truncate {isCompleted ? 'text-base-content/90 font-medium' : ''}">{assignment.title}</span>
 						</div>
 
 						<div class="flex items-center gap-2 text-[10px] text-base-content/50 shrink-0 ml-2">
 							<span class="badge badge-xs badge-ghost font-semibold">{assignment.maxScore} pts</span>
 							{#if isEnrolled}
-								<ChevronRight class="w-3.5 h-3.5 {isCurrent ? 'text-warning' : 'text-base-content/40'}" />
+								{#if isCompleted}
+									<span class="badge badge-success badge-xs text-white font-semibold">Submitted</span>
+								{:else}
+									<ChevronRight class="w-3.5 h-3.5 {isCurrent ? 'text-warning' : 'text-base-content/40'}" />
+								{/if}
 							{:else}
 								<Lock class="w-3.5 h-3.5 text-base-content/30" />
 							{/if}
@@ -182,6 +207,7 @@
 			<div class="divide-y divide-base-content/5">
 				{#each exams as exam (exam.id || exam.examId)}
 					{@const isCurrent = exam.examId === activeExamId || exam.id === activeExamId}
+					{@const isCompleted = completedExamIds.includes(exam.examId) || completedExamIds.includes(exam.id)}
 					<div
 						class="flex items-center justify-between px-4 py-3 text-xs transition-colors {isCurrent
 							? 'bg-primary/15 text-primary font-bold'
@@ -208,20 +234,30 @@
 						}}
 					>
 						<div class="flex items-center gap-2.5 overflow-hidden min-w-0">
-							<GraduationCap class="w-4 h-4 shrink-0 {isCurrent ? 'text-primary' : 'text-primary/70'}" />
+							{#if isCompleted}
+								<CheckCircle2 class="w-4 h-4 shrink-0 text-success" />
+							{:else}
+								<GraduationCap class="w-4 h-4 shrink-0 {isCurrent ? 'text-primary' : 'text-primary/70'}" />
+							{/if}
 							<div class="truncate">
-								<span>{exam.examTitle || 'Course Final Examination'}</span>
+								<span class="{isCompleted ? 'text-base-content/90 font-medium' : ''}">{exam.examTitle || 'Course Final Examination'}</span>
 							</div>
 						</div>
 
 						<div class="flex items-center gap-2 text-[10px] shrink-0 ml-2">
-							{#if exam.isMandatory}
+							{#if isCompleted}
+								<span class="badge badge-success badge-xs text-white font-semibold">Completed</span>
+							{:else if exam.isMandatory}
 								<span class="badge badge-error badge-xs text-white font-bold">Mandatory</span>
 							{:else}
 								<span class="badge badge-ghost badge-xs font-semibold">Optional</span>
 							{/if}
 							{#if isEnrolled}
-								<ChevronRight class="w-3.5 h-3.5 {isCurrent ? 'text-primary' : 'text-base-content/40'}" />
+								{#if isCompleted}
+									<!-- Already completed -->
+								{:else}
+									<ChevronRight class="w-3.5 h-3.5 {isCurrent ? 'text-primary' : 'text-base-content/40'}" />
+								{/if}
 							{:else}
 								<Lock class="w-3.5 h-3.5 text-base-content/30" />
 							{/if}

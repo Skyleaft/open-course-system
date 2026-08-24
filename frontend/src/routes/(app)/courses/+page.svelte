@@ -13,7 +13,8 @@
 		ChevronLeft,
 		ChevronRight,
 		RotateCcw,
-		Layers
+		Layers,
+		GraduationCap
 	} from 'lucide-svelte';
 
 	let courses = $state<Course[]>([]);
@@ -134,8 +135,14 @@
 						Master software engineering principles, prepare for examinations, and earn verifiable certificates.
 					</p>
 				</div>
-				<div class="badge badge-primary badge-outline text-xs px-3 py-3 font-bold self-start sm:self-auto">
-					{totalCount} {totalCount === 1 ? 'Course' : 'Courses'} Available
+				<div class="flex items-center gap-2 self-start sm:self-auto">
+					<a href="/my-courses" class="btn btn-primary gradient-accent btn-sm rounded-xl text-white font-bold border-0 shadow-md gap-1.5">
+						<GraduationCap class="h-4 w-4" />
+						My Enrolled Courses
+					</a>
+					<div class="badge badge-primary badge-outline text-xs px-3 py-3 font-bold">
+						{totalCount} {totalCount === 1 ? 'Course' : 'Courses'}
+					</div>
 				</div>
 			</div>
 		</div>

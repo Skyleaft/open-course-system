@@ -115,6 +115,7 @@ export interface Course {
 	assignments?: Assignment[];
 	exams?: CourseExam[];
 	isEnrolled?: boolean;
+	enrolledStudentsCount?: number;
 }
 
 export interface EnrollmentResultDto {
@@ -157,6 +158,71 @@ export interface SubmissionResultDto {
 	studentId: string;
 	fileUrl: string;
 	submittedAtUtc: string;
+}
+
+export interface EnrolledCourseDto {
+	id: string;
+	title: string;
+	description?: string | null;
+	thumbnailUrl?: string | null;
+	accessType: string;
+	instructorId: string;
+	enrolledAtUtc: string;
+	progressPercent: number;
+	totalLessonsCount: number;
+	completedLessonsCount: number;
+	totalAssignmentsCount: number;
+	completedAssignmentsCount: number;
+	totalExamsCount: number;
+	completedExamsCount: number;
+	lastAccessedLessonId?: string | null;
+	lastAccessedLessonTitle?: string | null;
+}
+
+export interface CourseProgressDto {
+	courseId: string;
+	completedLessonIds: string[];
+	completedAssignmentIds: string[];
+	completedExamIds: string[];
+	progressPercent: number;
+	lastAccessedLessonId?: string | null;
+}
+
+export interface LessonProgressResultDto {
+	courseId: string;
+	lessonId: string;
+	isCompleted: boolean;
+	completedAtUtc?: string | null;
+	updatedCourseProgressPercent: number;
+}
+
+export interface CourseStudentEnrollmentDto {
+	enrollmentId: string;
+	userId: string;
+	fullName: string;
+	email: string;
+	avatarUrl?: string | null;
+	enrolledAtUtc: string;
+	progressPercent: number;
+	completedLessonsCount: number;
+	totalLessonsCount: number;
+	completedAssignmentsCount: number;
+	totalAssignmentsCount: number;
+	lastAccessedAtUtc?: string | null;
+}
+
+export interface AdminEnrollStudentRequest {
+	userId?: string;
+	email?: string;
+}
+
+export interface AdminEnrollStudentResultDto {
+	enrollmentId: string;
+	courseId: string;
+	userId: string;
+	studentName: string;
+	studentEmail: string;
+	enrolledAtUtc: string;
 }
 
 // Exam Types

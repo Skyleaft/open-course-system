@@ -32,20 +32,15 @@
 			const startRes = await examsApi.startExam(examId);
 			if (startRes?.submissionId) {
 				// Store session token in sessionStorage for submission runner
-				sessionStorage.setItem(`exam_token_${startRes.submissionId}`, startRes.activeSessionToken);
+				if (startRes.activeSessionToken) {
+					sessionStorage.setItem(`exam_token_${startRes.submissionId}`, startRes.activeSessionToken);
+				}
 				goto(`/exams/submissions/${startRes.submissionId}`);
 			} else {
-				// Fallback demo submission ID
-				const demoSubId = 'sub-demo-123';
-				sessionStorage.setItem(`exam_token_${demoSubId}`, 'token-123');
-				goto(`/exams/submissions/${demoSubId}`);
+				toast.error('Failed to receive examination attempt session from server.');
 			}
 		} catch (err: any) {
-			toast.error(err?.message || 'Failed to initialize exam session.');
-			// Fallback demo redirect
-			const demoSubId = 'sub-demo-123';
-			sessionStorage.setItem(`exam_token_${demoSubId}`, 'token-123');
-			goto(`/exams/submissions/${demoSubId}`);
+			toast.error(err?.message || 'Failed to initialize examination attempt.');
 		}
 	}
 </script>

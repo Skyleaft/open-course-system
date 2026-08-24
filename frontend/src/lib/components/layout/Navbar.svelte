@@ -57,15 +57,17 @@
 
 		<!-- Center Navigation (Quick Links) -->
 		<nav class="hidden md:flex items-center gap-1">
+			{#if authStore.isAuthenticated}
+				<a href="/my-courses" class="btn btn-ghost btn-sm rounded-lg font-medium text-sm hover:bg-base-100/40">
+					<GraduationCap class="h-4 w-4 mr-1 text-primary opacity-90" />
+					My Courses
+				</a>
+			{/if}
 			<a href="/courses" class="btn btn-ghost btn-sm rounded-lg font-medium text-sm hover:bg-base-100/40">
 				<BookOpen class="h-4 w-4 mr-1 opacity-70" />
-				Courses
+				Catalog
 			</a>
 			{#if authStore.isAuthenticated}
-				<a href="/exams" class="btn btn-ghost btn-sm rounded-lg font-medium text-sm hover:bg-base-100/40">
-					<GraduationCap class="h-4 w-4 mr-1 opacity-70" />
-					Exams
-				</a>
 				{#if authStore.isInstructor || authStore.isAdmin}
 					<a href="/instructor/courses" class="btn btn-ghost btn-sm rounded-lg font-medium text-sm hover:bg-base-100/40">
 						Instructor Studio

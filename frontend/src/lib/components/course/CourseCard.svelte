@@ -1,7 +1,7 @@
 <script lang="ts">
 	import type { Course } from '$lib/api/types.ts';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
-	import { BookOpen, Key, DollarSign, CheckCircle2, ArrowRight, Layers } from 'lucide-svelte';
+	import { BookOpen, Key, DollarSign, CheckCircle2, ArrowRight, Layers, Users } from 'lucide-svelte';
 
 	interface Props {
 		course: Course;
@@ -93,10 +93,16 @@
 
 	<!-- Card Footer -->
 	<div class="pt-3 border-t border-base-content/10 flex items-center justify-between">
-		<span class="text-[11px] text-base-content/60 flex items-center gap-1.5">
-			<Layers class="w-3.5 h-3.5 text-primary" />
-			{course.sections?.length || 0} Sections
-		</span>
+		<div class="flex items-center gap-3 text-[11px] text-base-content/60">
+			<span class="flex items-center gap-1">
+				<Layers class="w-3.5 h-3.5 text-primary" />
+				{course.sections?.length || 0} Sections
+			</span>
+			<span class="flex items-center gap-1">
+				<Users class="w-3.5 h-3.5 text-secondary" />
+				{course.enrolledStudentsCount || 0} enrolled
+			</span>
+		</div>
 
 		<a
 			href="/courses/{course.id}"

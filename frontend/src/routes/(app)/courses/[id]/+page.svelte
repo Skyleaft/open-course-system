@@ -7,7 +7,7 @@
 	import SyllabusTree from '$lib/components/course/SyllabusTree.svelte';
 	import EnrollmentFlow from '$lib/components/course/EnrollmentFlow.svelte';
 	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
-	import { BookOpen, Layers, Clock, ArrowLeft, Sparkles, CheckCircle2, FileText, Award } from 'lucide-svelte';
+	import { BookOpen, Layers, Clock, ArrowLeft, Sparkles, CheckCircle2, FileText, Award, Users } from 'lucide-svelte';
 
 	const courseId = (page.params.id || '') as string;
 	let course = $state<Course | null>(null);
@@ -45,6 +45,10 @@
 						<span class="text-xs text-base-content/60 flex items-center gap-1">
 							<Layers class="w-3.5 h-3.5 text-primary" />
 							{course.sections?.length || 0} Sections
+						</span>
+						<span class="text-xs text-base-content/60 flex items-center gap-1">
+							<Users class="w-3.5 h-3.5 text-secondary" />
+							{course.enrolledStudentsCount || 0} Students Enrolled
 						</span>
 						{#if course.exams && course.exams.length > 0}
 							<span class="text-xs text-base-content/60 flex items-center gap-1">

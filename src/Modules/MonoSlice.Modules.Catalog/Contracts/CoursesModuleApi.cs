@@ -66,4 +66,13 @@ public sealed class CoursesModuleApi : ICoursesModuleApi
 
         return true;
     }
+
+    public async Task<Guid?> GetCourseIdForExamAsync(Guid examId, CancellationToken ct = default)
+    {
+        return await _dbContext.CourseExams
+            .AsNoTracking()
+            .Where(ce => ce.ExamId == examId)
+            .Select(ce => (Guid?)ce.CourseId)
+            .FirstOrDefaultAsync(ct);
+    }
 }

@@ -63,11 +63,11 @@
 			<div class="flex items-center gap-3">
 				<a href="/courses" class="btn btn-primary gradient-accent rounded-xl text-xs font-semibold text-white border-0 shadow-md">
 					<BookOpen class="h-4 w-4 mr-1" />
-					Explore Courses
+					Explore Catalog
 				</a>
-				<a href="/exams" class="btn btn-ghost glass-card rounded-xl text-xs font-medium border border-white/10 hover:bg-base-100/40">
-					<GraduationCap class="h-4 w-4 mr-1" />
-					Examinations
+				<a href="/my-courses" class="btn btn-ghost glass-card rounded-xl text-xs font-medium border border-white/10 hover:bg-base-100/40">
+					<GraduationCap class="h-4 w-4 mr-1 text-primary" />
+					My Courses
 				</a>
 			</div>
 		</div>
@@ -83,9 +83,9 @@
 			color="primary"
 		/>
 		<StatCard
-			title="Available Exams"
+			title="Curriculum Exams"
 			value={activeExams.length > 0 ? String(activeExams.length) : '6'}
-			description="Simulations & Proctored"
+			description="Integrated Course Milestones"
 			icon={GraduationCap}
 			color="secondary"
 		/>
@@ -98,45 +98,42 @@
 		/>
 		<StatCard
 			title="Study Hours"
-			value="28h"
-			description="+4h this week"
+			value="24.5"
+			description="Total time spent"
 			icon={Clock}
-			trend="12%"
-			trendUp={true}
 			color="info"
 		/>
 	</div>
 
-	<!-- Quick Jump Sections -->
+	<!-- Two-column Section: Enrolled Courses & Course Examinations -->
 	<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-		<!-- Active Courses -->
+		<!-- Enrolled Courses -->
 		<GlassCard>
 			<div class="space-y-4">
 				<div class="flex items-center justify-between border-b border-white/10 pb-3">
-					<h3 class="text-base font-bold text-base-content">Continue Learning</h3>
-					<a href="/courses" class="text-xs font-medium text-primary hover:underline flex items-center gap-1">
-						View All <ArrowRight class="h-3 w-3" />
+					<h3 class="text-base font-bold text-base-content">In-Progress Courses</h3>
+					<a href="/my-courses" class="text-xs font-medium text-primary hover:underline flex items-center gap-1">
+						My Courses <ArrowRight class="h-3 w-3" />
 					</a>
 				</div>
 
 				{#if isLoading}
 					<div class="space-y-3">
-						<div class="h-14 rounded-xl bg-base-200/50 animate-pulse"></div>
-						<div class="h-14 rounded-xl bg-base-200/50 animate-pulse"></div>
+						<div class="h-16 rounded-xl bg-base-200/50 animate-pulse"></div>
+						<div class="h-16 rounded-xl bg-base-200/50 animate-pulse"></div>
 					</div>
 				{:else if enrolledCourses.length > 0}
 					<div class="space-y-3">
 						{#each enrolledCourses.slice(0, 3) as course (course.id)}
-							<div class="flex items-center justify-between rounded-xl bg-base-100/40 p-3.5 border border-white/5 hover:border-primary/20 transition-all">
-								<div class="flex items-center gap-3 overflow-hidden">
-									<div class="gradient-accent flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white font-bold text-xs uppercase">
-										{course.title.slice(0, 2)}
+							<div class="flex items-center justify-between rounded-xl bg-base-100/40 border border-white/5 p-3.5 hover:border-primary/30 transition-colors">
+								<div class="flex items-center gap-3">
+									<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+										<BookOpen class="h-5 w-5" />
 									</div>
-									<div class="text-left overflow-hidden">
-										<div class="text-xs font-bold text-base-content truncate">{course.title}</div>
-										<div class="text-[10px] text-base-content/60 flex items-center gap-1">
-											<Layers class="w-3 h-3 text-primary" />
-											{course.sections?.length || 0} Sections
+									<div class="space-y-0.5 text-left">
+										<h4 class="text-xs font-bold text-base-content line-clamp-1">{course.title}</h4>
+										<div class="text-[10px] text-base-content/60">
+											{course.sections?.length || 0} Sections • {course.accessType}
 										</div>
 									</div>
 								</div>
@@ -154,13 +151,13 @@
 			</div>
 		</GlassCard>
 
-		<!-- Upcoming & Practice Exams -->
+		<!-- Course Exams -->
 		<GlassCard>
 			<div class="space-y-4">
 				<div class="flex items-center justify-between border-b border-white/10 pb-3">
-					<h3 class="text-base font-bold text-base-content">Available Examinations</h3>
-					<a href="/exams" class="text-xs font-medium text-primary hover:underline flex items-center gap-1">
-						All Exams <ArrowRight class="h-3 w-3" />
+					<h3 class="text-base font-bold text-base-content">Course Examinations</h3>
+					<a href="/my-courses" class="text-xs font-medium text-primary hover:underline flex items-center gap-1">
+						View in Courses <ArrowRight class="h-3 w-3" />
 					</a>
 				</div>
 

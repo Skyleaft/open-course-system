@@ -128,7 +128,7 @@
 			<h2 class="text-xl font-bold text-base-content">Result Not Found</h2>
 			<p class="text-xs text-base-content/70">{loadError}</p>
 			<div class="pt-2 flex justify-center gap-3">
-				<a href="/exams" class="btn btn-ghost btn-sm rounded-xl">Back to Exams</a>
+				<a href="/my-courses" class="btn btn-ghost btn-sm rounded-xl">Back to My Courses</a>
 				<a href="/dashboard" class="btn btn-primary btn-sm rounded-xl">Dashboard</a>
 			</div>
 		</div>
@@ -139,9 +139,9 @@
 				<div class="flex items-center gap-2 text-xs font-semibold text-base-content/60">
 					<a href="/dashboard" class="hover:text-primary transition-colors">Dashboard</a>
 					<span>/</span>
-					<a href="/exams" class="hover:text-primary transition-colors">Exams</a>
+					<a href="/my-courses" class="hover:text-primary transition-colors">My Courses</a>
 					<span>/</span>
-					<span class="text-base-content/90">Result</span>
+					<span class="text-base-content/90">Exam Result</span>
 				</div>
 				<h1 class="text-2xl sm:text-3xl font-extrabold text-base-content tracking-tight">
 					{result.examTitle}
@@ -219,14 +219,14 @@
 
 			<!-- Navigation Actions -->
 			<div class="flex flex-wrap justify-center gap-3 pt-2">
-				<a href="/exams" class="btn btn-ghost glass-card btn-sm rounded-xl border border-white/10 hover:bg-base-100/40">
-					All Exams
+				<a href="/my-courses" class="btn btn-ghost glass-card btn-sm rounded-xl border border-white/10 hover:bg-base-100/40">
+					My Courses
 				</a>
 				<a href="/dashboard" class="btn btn-ghost glass-card btn-sm rounded-xl border border-white/10 hover:bg-base-100/40">
 					Return to Dashboard
 				</a>
 				{#if isSimulation}
-					<a href="/exams/{result.examId}" class="btn btn-secondary btn-sm rounded-xl font-bold shadow-md gap-1.5">
+					<a href="/exams/{result.examId}/start" class="btn btn-secondary btn-sm rounded-xl font-bold shadow-md gap-1.5">
 						<RotateCcw class="h-4 w-4" />
 						Retake Simulation
 					</a>
