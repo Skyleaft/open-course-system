@@ -379,6 +379,28 @@ export interface ExamSummaryDto {
 	createdAtUtc: string;
 }
 
+export interface StudentExamOverviewDto {
+	id: string;
+	title: string;
+	description?: string | null;
+	mode: QuizMode | string;
+	durationMinutes: number;
+	passingScore: number;
+	maxAllowedViolations: number;
+	maxAttempts: number;
+	availableFromUtc?: string | null;
+	availableToUtc?: string | null;
+	isPublished: boolean;
+	totalQuestionsCount: number;
+	sectionsCount: number;
+	completedAttemptsCount: number;
+	remainingAttempts: number;
+	bestScore?: number | null;
+	isPassed: boolean;
+	hasActiveSession: boolean;
+	activeSubmissionId?: string | null;
+}
+
 export interface QuizExam {
 	id: string;
 	instructorId?: string;

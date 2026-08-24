@@ -1,14 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
+	import { goto } from '$app/navigation';
 	import { coursesApi } from '$lib/api/courses.ts';
+	import { examsApi } from '$lib/api/exams.ts';
 	import { communicationsApi } from '$lib/api/communications.ts';
-	import type { Course, Lesson, Assignment, CourseExam, DiscussionThread, CourseProgressDto } from '$lib/api/types.ts';
+	import type { Course, Lesson, Assignment, CourseExam, DiscussionThread, CourseProgressDto, StudentExamOverviewDto } from '$lib/api/types.ts';
 	import LessonPlayer from '$lib/components/course/LessonPlayer.svelte';
 	import SyllabusTree from '$lib/components/course/SyllabusTree.svelte';
 	import RichEditor from '$lib/components/editor/RichEditor.svelte';
 	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
+	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import { toast } from '$lib/stores/toast.svelte.ts';
 	import {
 		ArrowLeft,
@@ -25,7 +28,12 @@
 		ExternalLink,
 		Sparkles,
 		Check,
-		RotateCcw
+		RotateCcw,
+		AlertCircle,
+		HelpCircle,
+		PlayCircle,
+		Layers,
+		CheckCheck
 	} from 'lucide-svelte';
 
 	const courseId = (page.params.id || '') as string;
@@ -37,15 +45,40 @@
 	let activeLesson = $state<Lesson | null>(null);
 	let activeAssignment = $state<Assignment | null>(null);
 	let activeExam = $state<CourseExam | null>(null);
+	let activeExamOverview = $state<StudentExamOverviewDto | null>(null);
+	let isLoadingExamOverview = $state(false);
 	let activeMode = $state<'lesson' | 'assignment' | 'exam'>('lesson');
 
 	let threads = $state<DiscussionThread[]>([]);
 	let isLoading = $state(true);
 	let isCompletingLesson = $state(false);
 
+	let isRetakeModalOpen = $state(false);
+	let pendingRetakeExam = $state<CourseExam | null>(null);
+
 	let newThreadTitle = $state('');
 	let newThreadContent = $state('');
 	let isPostingThread = $state(false);
+
+	async function loadExamOverview(examId: string) {
+		isLoadingExamOverview = true;
+		try {
+			activeExamOverview = await examsApi.getStudentExamOverview(examId);
+		} catch (err: any) {
+			console.error('Failed to load exam overview:', err);
+		} finally {
+			isLoadingExamOverview = false;
+		}
+	}
+
+	function handleConfirmRetake() {
+		if (pendingRetakeExam) {
+			const examToRetake = pendingRetakeExam;
+			isRetakeModalOpen = false;
+			pendingRetakeExam = null;
+			goto(`/exams/${examToRetake.examId}/start`);
+		}
+	}
 
 	const isLessonCompleted = $derived(
 		activeLesson ? (courseProgress?.completedLessonIds || []).includes(activeLesson.id) : false
@@ -87,7 +120,7 @@
 			} else if (course?.assignments?.[0]) {
 				selectAssignment(course.assignments[0]);
 			} else if (course?.exams?.[0]) {
-				selectExam(course.exams[0]);
+				await selectExam(course.exams[0]);
 			}
 		} catch (err) {
 			console.error('Failed to initialize course player:', err);
@@ -111,11 +144,12 @@
 		activeMode = 'assignment';
 	}
 
-	function selectExam(exam: CourseExam) {
+	async function selectExam(exam: CourseExam) {
 		activeExam = exam;
 		activeLesson = null;
 		activeAssignment = null;
 		activeMode = 'exam';
+		await loadExamOverview(exam.examId);
 	}
 
 	async function handleToggleLessonComplete() {
@@ -340,88 +374,191 @@
 						</div>
 					</div>
 				{:else if activeMode === 'exam' && activeExam}
-					{@const isExamCompleted = (courseProgress?.completedExamIds || []).includes(activeExam.examId) || (courseProgress?.completedExamIds || []).includes(activeExam.id)}
+					{@const isExamCompleted = (courseProgress?.completedExamIds || []).includes(activeExam.examId) || (courseProgress?.completedExamIds || []).includes(activeExam.id) || activeExamOverview?.isPassed || (activeExamOverview?.completedAttemptsCount ?? 0) > 0}
 					<!-- Course Exam Launchpad Card -->
-					<div class="glass-panel rounded-3xl border {isExamCompleted ? 'border-success/40 bg-success/5' : 'border-primary/30'} p-8 shadow-2xl space-y-6">
-						<div class="flex items-center justify-between">
-							<div class="flex items-center gap-2">
-								<span class="badge {isExamCompleted ? 'badge-success text-white' : 'badge-primary'} badge-sm font-bold uppercase">
-									{isExamCompleted ? 'Exam Completed' : 'Course Examination'}
-								</span>
-								{#if isExamCompleted}
-									<span class="badge badge-success badge-sm text-white font-bold gap-1">
-										<CheckCircle2 class="w-3.5 h-3.5" /> Passed
+					<div class="glass-panel rounded-3xl border {isExamCompleted ? 'border-success/40 bg-success/5' : 'border-primary/30'} p-6 sm:p-8 shadow-2xl space-y-6">
+						{#if isLoadingExamOverview}
+							<div class="flex items-center justify-center py-12 gap-3">
+								<span class="loading loading-spinner loading-md text-primary"></span>
+								<span class="text-xs font-semibold text-base-content/60">Loading examination overview...</span>
+							</div>
+						{:else}
+							<div class="flex flex-wrap items-center justify-between gap-3">
+								<div class="flex flex-wrap items-center gap-2">
+									<span class="badge {activeExamOverview?.mode === 'RealExam' ? 'badge-primary' : 'badge-secondary'} badge-sm font-bold uppercase">
+										{activeExamOverview?.mode === 'RealExam' ? 'Proctored Exam' : 'Practice Simulation'}
 									</span>
-								{:else if activeExam.isMandatory}
-									<span class="badge badge-error badge-sm text-white font-bold">Mandatory</span>
+									{#if isExamCompleted}
+										<span class="badge badge-success badge-sm text-white font-bold gap-1">
+											<CheckCircle2 class="w-3.5 h-3.5" /> Passed
+										</span>
+									{:else if activeExam.isMandatory}
+										<span class="badge badge-error badge-sm text-white font-bold">Mandatory</span>
+									{:else}
+										<span class="badge badge-ghost badge-sm font-semibold">Optional</span>
+									{/if}
+									{#if activeExamOverview}
+										<span class="badge {activeExamOverview.remainingAttempts > 0 ? 'badge-outline border-primary text-primary' : 'badge-ghost text-base-content/60'} badge-sm font-bold">
+											{activeExamOverview.remainingAttempts} {activeExamOverview.remainingAttempts === 1 ? 'Retake' : 'Retakes'} Left
+										</span>
+									{/if}
+								</div>
+								<span class="text-xs text-base-content/60 font-medium">Curriculum Milestone #{activeExam.orderIndex}</span>
+							</div>
+
+							<div class="space-y-2">
+								<h2 class="text-2xl sm:text-3xl font-extrabold text-base-content tracking-tight">
+									{activeExamOverview?.title || activeExam.examTitle || 'Course Assessment Examination'}
+								</h2>
+								{#if activeExamOverview?.description}
+									<p class="text-xs text-base-content/80 max-w-2xl leading-relaxed whitespace-pre-line">
+										{activeExamOverview.description}
+									</p>
 								{:else}
-									<span class="badge badge-ghost badge-sm font-semibold">Optional</span>
+									<p class="text-xs text-base-content/70 max-w-xl leading-relaxed">
+										{#if isExamCompleted}
+											You have completed this examination milestone. Your score and verification hash are recorded into your course progression.
+										{:else}
+											This examination is linked to this course curriculum. Passing this evaluation is required for your official verified completion certificate.
+										{/if}
+									</p>
 								{/if}
 							</div>
-							<span class="text-xs text-base-content/60">Milestone #{activeExam.orderIndex}</span>
-						</div>
 
-						<div class="space-y-2">
-							<h2 class="text-2xl sm:text-3xl font-extrabold text-base-content tracking-tight">
-								{activeExam.examTitle || 'Course Assessment Examination'}
-							</h2>
-							<p class="text-xs text-base-content/70 max-w-xl leading-relaxed">
-								{#if isExamCompleted}
-									You have successfully completed this examination milestone. Your score and verification hash have been recorded into your course progression.
-								{:else}
-									This examination is linked to this course curriculum. Passing this evaluation is required for your official verified course completion certificate.
-								{/if}
-							</p>
-						</div>
+							<!-- 4-Card Exam Metrics Grid -->
+							<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+								<!-- Status & Best Score -->
+								<div class="p-4 rounded-2xl bg-base-200/50 border border-base-content/10 space-y-1">
+									<div class="text-[10px] font-bold uppercase tracking-wider text-base-content/60">Evaluation Status</div>
+									<div class="text-sm font-bold {isExamCompleted ? 'text-success' : 'text-base-content'} flex items-center gap-1.5">
+										{#if isExamCompleted}
+											<CheckCircle2 class="w-4 h-4 text-success" />
+											Passed
+										{:else}
+											<GraduationCap class="w-4 h-4 text-primary" />
+											Ready to Attempt
+										{/if}
+									</div>
+									<div class="text-[11px] text-base-content/60">
+										{#if activeExamOverview?.bestScore != null}
+											Best: <span class="font-semibold text-base-content">{Number(activeExamOverview.bestScore).toFixed(1)}%</span>
+										{:else}
+											Passing threshold: {activeExamOverview?.passingScore ?? 70}%
+										{/if}
+									</div>
+								</div>
 
-						<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-							<div class="p-4 rounded-2xl bg-base-200/50 border border-base-content/10 space-y-1">
-								<div class="text-[10px] font-bold uppercase tracking-wider text-base-content/60">Status</div>
-								<div class="text-sm font-bold {isExamCompleted ? 'text-success' : 'text-base-content'} flex items-center gap-1.5">
-									{#if isExamCompleted}
-										<CheckCircle2 class="w-4 h-4 text-success" />
-										Passed
+								<!-- Retakes & Attempts -->
+								<div class="p-4 rounded-2xl bg-base-200/50 border border-base-content/10 space-y-1">
+									<div class="text-[10px] font-bold uppercase tracking-wider text-base-content/60">Attempt Limits</div>
+									<div class="text-sm font-bold text-base-content flex items-center gap-1.5">
+										<RotateCcw class="w-4 h-4 text-secondary" />
+										<span>{activeExamOverview?.completedAttemptsCount ?? (isExamCompleted ? 1 : 0)} / {activeExamOverview?.maxAttempts ?? 1} Used</span>
+									</div>
+									<div class="text-[11px] {activeExamOverview && activeExamOverview.remainingAttempts > 0 ? 'text-success font-medium' : 'text-error font-medium'}">
+										{activeExamOverview?.remainingAttempts ?? 0} retakes available
+									</div>
+								</div>
+
+								<!-- Duration & Questions Format -->
+								<div class="p-4 rounded-2xl bg-base-200/50 border border-base-content/10 space-y-1">
+									<div class="text-[10px] font-bold uppercase tracking-wider text-base-content/60">Format & Duration</div>
+									<div class="text-sm font-bold text-base-content flex items-center gap-1.5">
+										<Clock class="w-4 h-4 text-primary" />
+										<span>{activeExamOverview?.durationMinutes ?? 60} mins</span>
+									</div>
+									<div class="text-[11px] text-base-content/60">
+										{activeExamOverview?.totalQuestionsCount ?? 0} Questions • {activeExamOverview?.sectionsCount ?? 1} Sections
+									</div>
+								</div>
+
+								<!-- Security & Anti-Cheat -->
+								<div class="p-4 rounded-2xl bg-base-200/50 border border-base-content/10 space-y-1">
+									<div class="text-[10px] font-bold uppercase tracking-wider text-base-content/60">Security & Integrity</div>
+									<div class="text-sm font-bold {activeExamOverview?.mode === 'RealExam' ? 'text-warning' : 'text-base-content'} flex items-center gap-1.5">
+										<ShieldAlert class="w-4 h-4" />
+										<span>{activeExamOverview?.mode === 'RealExam' ? 'AI Proctored' : 'Simulation'}</span>
+									</div>
+									<div class="text-[11px] text-base-content/60">
+										Max {activeExamOverview?.maxAllowedViolations ?? 3} violations allowed
+									</div>
+								</div>
+							</div>
+
+							<!-- Action Footer & Buttons -->
+							<div class="pt-4 border-t border-base-content/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+								<div class="text-xs text-base-content/70">
+									{#if activeExamOverview?.hasActiveSession}
+										<span class="text-warning font-semibold flex items-center gap-1">
+											<AlertCircle class="w-4 h-4" />
+											You have an active in-progress session. You can resume it now.
+										</span>
+									{:else if isExamCompleted}
+										{#if activeExamOverview && activeExamOverview.remainingAttempts <= 0}
+											<span class="text-base-content/60">You have used all attempts for this milestone examination.</span>
+										{:else}
+											<span class="text-base-content/60">You have {activeExamOverview?.remainingAttempts ?? 0} retake attempt(s) remaining.</span>
+										{/if}
 									{:else}
-										<GraduationCap class="w-4 h-4 text-primary" />
-										Ready to Attempt
+										<span>Ensure your webcam, microphone, and internet are functional before starting.</span>
+									{/if}
+								</div>
+
+								<div class="flex items-center gap-3">
+									{#if activeExamOverview?.hasActiveSession && activeExamOverview?.activeSubmissionId}
+										<a
+											href="/exams/submissions/{activeExamOverview.activeSubmissionId}"
+											class="btn btn-primary gradient-accent text-white border-0 shadow-lg rounded-2xl font-bold gap-2 h-11 px-6 text-sm animate-pulse"
+										>
+											<PlayCircle class="w-4 h-4" />
+											Resume Active Session
+										</a>
+									{:else if isExamCompleted}
+										{#if activeExamOverview && activeExamOverview.remainingAttempts <= 0}
+											<button
+												type="button"
+												class="btn btn-disabled rounded-2xl font-bold gap-2 h-11 px-6 text-sm opacity-60"
+												disabled
+											>
+												<AlertCircle class="w-4 h-4" />
+												No Retakes Left
+											</button>
+										{:else}
+											<button
+												type="button"
+												class="btn btn-primary btn-outline border-success text-success hover:bg-success hover:text-white rounded-2xl font-bold gap-2 h-11 px-6 text-sm"
+												onclick={() => {
+													pendingRetakeExam = activeExam;
+													isRetakeModalOpen = true;
+												}}
+											>
+												<RotateCcw class="w-4 h-4" />
+												Retake Examination ({activeExamOverview?.remainingAttempts ?? 0} Left)
+											</button>
+										{/if}
+									{:else}
+										{#if activeExamOverview && activeExamOverview.remainingAttempts <= 0}
+											<button
+												type="button"
+												class="btn btn-disabled rounded-2xl font-bold gap-2 h-11 px-6 text-sm opacity-60"
+												disabled
+											>
+												<AlertCircle class="w-4 h-4" />
+												No Attempts Left
+											</button>
+										{:else}
+											<a
+												href="/exams/{activeExam.examId}/start"
+												class="btn btn-primary gradient-accent text-white border-0 shadow-lg rounded-2xl font-bold gap-2 h-11 px-6 text-sm"
+											>
+												Launch Examination
+												<ArrowRight class="w-4 h-4" />
+											</a>
+										{/if}
 									{/if}
 								</div>
 							</div>
-
-							<div class="p-4 rounded-2xl bg-base-200/50 border border-base-content/10 space-y-1">
-								<div class="text-[10px] font-bold uppercase tracking-wider text-base-content/60">Certification</div>
-								<div class="text-sm font-bold text-success flex items-center gap-1.5">
-									<Award class="w-4 h-4" />
-									SHA-256 Hash
-								</div>
-							</div>
-
-							<div class="p-4 rounded-2xl bg-base-200/50 border border-base-content/10 space-y-1">
-								<div class="text-[10px] font-bold uppercase tracking-wider text-base-content/60">Anti-Cheat</div>
-								<div class="text-sm font-bold text-warning flex items-center gap-1.5">
-									<ShieldAlert class="w-4 h-4" />
-									Active Monitoring
-								</div>
-							</div>
-						</div>
-
-						<div class="pt-4 border-t border-base-content/10 flex items-center justify-between">
-							<span class="text-xs text-base-content/60">
-								{#if isExamCompleted}
-									You may review your past submissions or retake if attempts remain.
-								{:else}
-									Ensure your webcam & mic are functional before proceeding.
-								{/if}
-							</span>
-
-							<a
-								href="/exams/{activeExam.examId}/start"
-								class="btn btn-primary {isExamCompleted ? 'btn-outline border-success text-success hover:bg-success hover:text-white' : 'gradient-accent text-white border-0 shadow-lg'} rounded-2xl font-bold gap-2 h-11 px-6 text-sm"
-							>
-								{isExamCompleted ? 'Retake Examination' : 'Launch Examination'}
-								<ArrowRight class="w-4 h-4" />
-							</a>
-						</div>
+						{/if}
 					</div>
 				{:else if activeMode === 'assignment' && activeAssignment}
 					<!-- Course Assignment Overview Card -->
@@ -493,3 +630,17 @@
 		</div>
 	{/if}
 </div>
+
+<!-- Retake Examination Confirmation Modal -->
+<ConfirmModal
+	isOpen={isRetakeModalOpen}
+	title="Confirm Retake Examination"
+	message={`You have already completed "${pendingRetakeExam?.examTitle || 'Course Examination'}". Retaking this examination will consume an examination attempt and start a new proctored session. Are you sure you want to proceed?`}
+	confirmText="Proceed to Retake"
+	isDanger={false}
+	onConfirm={handleConfirmRetake}
+	onCancel={() => {
+		isRetakeModalOpen = false;
+		pendingRetakeExam = null;
+	}}
+/>

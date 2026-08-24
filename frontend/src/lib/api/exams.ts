@@ -11,7 +11,8 @@ import type {
 	QuestionBank,
 	BankQuestion,
 	StudentExamPaperDto,
-	ExamResultDetailsDto
+	ExamResultDetailsDto,
+	StudentExamOverviewDto
 } from './types.ts';
 
 export const examsApi = {
@@ -41,6 +42,10 @@ export const examsApi = {
 
 	async getExamById(id: string, customFetch?: typeof fetch): Promise<QuizExam> {
 		return apiClient.get<QuizExam>(`/api/v1/exams/${id}`, undefined, customFetch);
+	},
+
+	async getStudentExamOverview(id: string, customFetch?: typeof fetch): Promise<StudentExamOverviewDto> {
+		return apiClient.get<StudentExamOverviewDto>(`/api/v1/exams/${id}/overview`, undefined, customFetch);
 	},
 
 	async createExam(data: {

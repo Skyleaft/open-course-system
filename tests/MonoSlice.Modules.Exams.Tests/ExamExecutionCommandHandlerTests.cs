@@ -5,6 +5,7 @@ using MonoSlice.Modules.Exams.Features.SaveAnswer;
 using MonoSlice.Modules.Exams.Features.StartExam;
 using MonoSlice.Modules.Exams.Features.SubmitExam;
 using MonoSlice.Modules.Exams.Persistence;
+using MonoSlice.Shared.Abstractions.Contracts;
 using MonoSlice.Shared.Abstractions.Interfaces;
 using MonoSlice.Shared.Abstractions.Messaging;
 using NSubstitute;
@@ -19,6 +20,7 @@ public class ExamExecutionCommandHandlerTests
     private readonly ICacheService _cacheService;
     private readonly IEventStreamPublisher _eventPublisher;
     private readonly IExamFinalizerService _finalizerService;
+    private readonly ICoursesModuleApi _coursesModuleApi;
 
     public ExamExecutionCommandHandlerTests()
     {
@@ -31,6 +33,7 @@ public class ExamExecutionCommandHandlerTests
         _cacheService = Substitute.For<ICacheService>();
         _eventPublisher = Substitute.For<IEventStreamPublisher>();
         _finalizerService = new ExamFinalizerService(_dbContext, _cacheService, _eventPublisher);
+        _coursesModuleApi = Substitute.For<ICoursesModuleApi>();
     }
 
     [Fact]
@@ -72,7 +75,7 @@ public class ExamExecutionCommandHandlerTests
         await _dbContext.SaveChangesAsync();
 
         // 2. Start Exam
-        var startHandler = new StartExamCommandHandler(_dbContext, _currentUser, _cacheService);
+        var startHandler = new StartExamCommandHandler(_dbContext, _currentUser, _cacheService, _coursesModuleApi);
         var startResult = await startHandler.Handle(new StartExamCommand { ExamId = exam.Id }, CancellationToken.None);
 
         Assert.True(startResult.Success);

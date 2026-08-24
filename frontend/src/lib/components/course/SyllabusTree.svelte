@@ -211,25 +211,17 @@
 					<div
 						class="flex items-center justify-between px-4 py-3 text-xs transition-colors {isCurrent
 							? 'bg-primary/15 text-primary font-bold'
-							: 'hover:bg-base-100/40 text-base-content/80'} {isEnrolled ? 'cursor-pointer' : ''}"
+							: 'hover:bg-base-100/40 text-base-content/80'} {onSelectExam ? 'cursor-pointer' : ''}"
 						onclick={() => {
-							if (isEnrolled) {
-								if (onSelectExam) {
-									onSelectExam(exam);
-								} else {
-									window.location.href = `/exams/${exam.examId}/start`;
-								}
+							if (onSelectExam) {
+								onSelectExam(exam);
 							}
 						}}
-						role="button"
-						tabindex="0"
+						role={onSelectExam ? 'button' : undefined}
+						tabindex={onSelectExam ? 0 : undefined}
 						onkeydown={(e) => {
-							if (isEnrolled && e.key === 'Enter') {
-								if (onSelectExam) {
-									onSelectExam(exam);
-								} else {
-									window.location.href = `/exams/${exam.examId}/start`;
-								}
+							if (onSelectExam && e.key === 'Enter') {
+								onSelectExam(exam);
 							}
 						}}
 					>
@@ -240,7 +232,7 @@
 								<GraduationCap class="w-4 h-4 shrink-0 {isCurrent ? 'text-primary' : 'text-primary/70'}" />
 							{/if}
 							<div class="truncate">
-								<span class="{isCompleted ? 'text-base-content/90 font-medium' : ''}">{exam.examTitle || 'Course Final Examination'}</span>
+								<span class="{isCompleted ? 'text-base-content/90 font-medium' : ''} font-medium">{exam.examTitle || 'Course Final Examination'}</span>
 							</div>
 						</div>
 
@@ -252,13 +244,13 @@
 							{:else}
 								<span class="badge badge-ghost badge-xs font-semibold">Optional</span>
 							{/if}
-							{#if isEnrolled}
+							{#if onSelectExam}
 								{#if isCompleted}
 									<!-- Already completed -->
 								{:else}
 									<ChevronRight class="w-3.5 h-3.5 {isCurrent ? 'text-primary' : 'text-base-content/40'}" />
 								{/if}
-							{:else}
+							{:else if !isEnrolled}
 								<Lock class="w-3.5 h-3.5 text-base-content/30" />
 							{/if}
 						</div>

@@ -30,6 +30,7 @@ using MonoSlice.Modules.Exams.Features.ListQuestionBanks;
 using MonoSlice.Modules.Exams.Features.ListQuestions;
 using MonoSlice.Modules.Exams.Features.UpdateQuestionBank;
 using MonoSlice.Modules.Exams.Features.UpdateQuestion;
+using MonoSlice.Modules.Exams.Features.GetStudentExamOverview;
 using MonoSlice.Modules.Exams.Domain.Services;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Contracts;
@@ -102,6 +103,7 @@ public static class ExamsModule
         examsV1Group.MapUpdateQuestionEndpoint();
         examsV1Group.MapDeleteQuestionEndpoint();
         examsV1Group.MapGetExamEndpoint();
+        examsV1Group.MapGetStudentExamOverviewEndpoint();
         examsV1Group.MapStartExamEndpoint();
         examsV1Group.MapGetExamQuestionsEndpoint();
         examsV1Group.MapSaveAnswerEndpoint();

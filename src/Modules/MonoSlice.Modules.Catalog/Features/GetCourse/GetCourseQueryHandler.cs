@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Catalog.Domain;
 using MonoSlice.Modules.Catalog.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
+using MonoSlice.Shared.Abstractions.Contracts;
 using MonoSlice.Shared.Abstractions.CQRS;
 using MonoSlice.Shared.Abstractions.Exceptions;
 using MonoSlice.Shared.Abstractions.Interfaces;
@@ -14,15 +15,18 @@ public sealed class GetCourseQueryHandler : IQueryHandler<GetCourseQuery, ApiRes
     private readonly CoursesDbContext _dbContext;
     private readonly ICacheService _cacheService;
     private readonly ICurrentUser _currentUser;
+    private readonly IExamsModuleApi _examsModuleApi;
 
     public GetCourseQueryHandler(
         CoursesDbContext dbContext,
         ICacheService cacheService,
-        ICurrentUser currentUser)
+        ICurrentUser currentUser,
+        IExamsModuleApi examsModuleApi)
     {
         _dbContext = dbContext;
         _cacheService = cacheService;
         _currentUser = currentUser;
+        _examsModuleApi = examsModuleApi;
     }
 
     public async ValueTask<ApiResponse<CourseCurriculumDto>> Handle(
@@ -74,12 +78,18 @@ public sealed class GetCourseQueryHandler : IQueryHandler<GetCourseQuery, ApiRes
                 a.MaxScore
             )).ToList();
 
-            var exams = course.Exams.Select(e => new CourseExamDto(
-                e.Id,
-                e.ExamId,
-                e.OrderIndex,
-                e.IsMandatory
-            )).ToList();
+            var exams = new List<CourseExamDto>();
+            foreach (var e in course.Exams)
+            {
+                var examContract = await _examsModuleApi.GetExamByIdAsync(e.ExamId, cancellationToken);
+                exams.Add(new CourseExamDto(
+                    e.Id,
+                    e.ExamId,
+                    e.OrderIndex,
+                    e.IsMandatory,
+                    examContract?.Title ?? "Course Final Examination"
+                ));
+            }
 
             dto = new CourseCurriculumDto(
                 course.Id,

@@ -25,7 +25,8 @@ public sealed record CourseExamDto(
     Guid Id,
     Guid ExamId,
     int OrderIndex,
-    bool IsMandatory);
+    bool IsMandatory,
+    string? ExamTitle = null);
 
 public sealed record SectionDto(
     Guid Id,
