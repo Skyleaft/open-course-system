@@ -129,6 +129,7 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
             exam.Mode.ToString(),
             submission.StartedAtUtc,
             submission.MaxAllowedEndTimeUtc,
+            submission.ActiveSessionToken,
             questionDtos);
 
         return ApiResponse.Ok(paperDto);

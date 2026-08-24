@@ -117,13 +117,19 @@
 				<div>
 					<h2 class="text-xl font-bold text-base-content flex items-center gap-2">
 						<BookOpen class="w-5 h-5 text-primary" />
-						Course Syllabus
+						Course Curriculum & Milestones
 					</h2>
-					<p class="text-xs text-base-content/60">Explore sections and lessons included in this course curriculum</p>
+					<p class="text-xs text-base-content/60">Explore sections, lessons, assignments, and integrated examinations</p>
 				</div>
 			</div>
 
-			<SyllabusTree sections={course.sections || []} isEnrolled={course.isEnrolled} />
+			<SyllabusTree
+				sections={course.sections || []}
+				assignments={course.assignments || []}
+				exams={course.exams || []}
+				isEnrolled={course.isEnrolled}
+				courseId={course.id}
+			/>
 		</div>
 	{:else}
 		<div class="glass-card p-12 text-center rounded-3xl border border-base-content/10 space-y-2">

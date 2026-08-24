@@ -229,6 +229,64 @@ export interface StudentAnswer {
 	essayText?: string;
 }
 
+export interface StudentOptionDto {
+	id: string;
+	text: string;
+}
+
+export interface StudentQuestionDto {
+	id: string;
+	questionText: string;
+	type: QuestionType | string;
+	points: number;
+	displayOrder: number;
+	selectedOptionIds?: string[];
+	essayText?: string | null;
+	options: StudentOptionDto[];
+}
+
+export interface StudentExamPaperDto {
+	submissionId: string;
+	examId: string;
+	title: string;
+	mode: QuizMode | string;
+	startedAtUtc: string;
+	maxAllowedEndTimeUtc: string;
+	activeSessionToken: string;
+	questions: StudentQuestionDto[];
+}
+
+export interface OptionReviewDto {
+	id: string;
+	text: string;
+	isCorrect: boolean;
+}
+
+export interface QuestionReviewDto {
+	questionId: string;
+	questionText: string;
+	type: string;
+	points: number;
+	awardedScore?: number | null;
+	selectedOptionIds: string[];
+	essayText?: string | null;
+	explanation?: string | null;
+	options: OptionReviewDto[];
+}
+
+export interface ExamResultDetailsDto {
+	submissionId: string;
+	examId: string;
+	examTitle: string;
+	mode: string;
+	status: string;
+	score?: number | null;
+	isPassed?: boolean | null;
+	startedAtUtc: string;
+	submittedAtUtc?: string | null;
+	questions: QuestionReviewDto[];
+}
+
 export interface ListExamsParams {
 	mode?: QuizMode | string;
 	isPublished?: boolean;

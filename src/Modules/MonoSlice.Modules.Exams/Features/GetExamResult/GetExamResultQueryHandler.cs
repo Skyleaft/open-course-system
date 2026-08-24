@@ -57,7 +57,9 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
             throw new NotFoundException(nameof(QuizExam), submission.ExamId);
         }
 
-        var canViewExplanations = exam.Mode == QuizMode.Simulation || submission.Status == SubmissionStatus.Completed;
+        var canViewExplanations = exam.Mode == QuizMode.Simulation ||
+                                  submission.Status == SubmissionStatus.Completed ||
+                                  submission.Status == SubmissionStatus.TimedOut;
 
         var resolvedQuestions = new List<(BankQuestion Question, decimal Points)>();
 
@@ -76,6 +78,12 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
             }
         }
 
+        var rng = new Random(submission.RandomSeed);
+        if (exam.ShuffleQuestions)
+        {
+            resolvedQuestions = resolvedQuestions.OrderBy(_ => rng.Next()).ToList();
+        }
+
         var questionReviews = resolvedQuestions.Select(item =>
         {
             var q = item.Question;
@@ -89,6 +97,11 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
                 o.Text,
                 canViewExplanations && o.IsCorrect
             )).ToList();
+
+            if (exam.ShuffleOptions)
+            {
+                options = options.OrderBy(_ => rng.Next()).ToList();
+            }
 
             return new QuestionReviewDto(
                 q.Id,

@@ -9,7 +9,9 @@ import type {
 	StudentAnswer,
 	QuestionType,
 	QuestionBank,
-	BankQuestion
+	BankQuestion,
+	StudentExamPaperDto,
+	ExamResultDetailsDto
 } from './types.ts';
 
 export const examsApi = {
@@ -251,14 +253,8 @@ export const examsApi = {
 	async getQuestions(
 		submissionId: string,
 		customFetch?: typeof fetch
-	): Promise<{
-		questions: QuizQuestion[];
-		savedAnswers: Record<string, { selectedOptionIds: string[]; essayText?: string }>;
-		remainingSeconds: number;
-		maxAllowedEndTimeUtc: string;
-		mode: string;
-	}> {
-		return apiClient.get(`/api/v1/exams/submissions/${submissionId}/questions`, undefined, customFetch);
+	): Promise<StudentExamPaperDto> {
+		return apiClient.get<StudentExamPaperDto>(`/api/v1/exams/submissions/${submissionId}/questions`, undefined, customFetch);
 	},
 
 	async saveAnswer(
@@ -299,15 +295,7 @@ export const examsApi = {
 	async getResult(
 		submissionId: string,
 		customFetch?: typeof fetch
-	): Promise<{
-		submission: QuizSubmission;
-		questionsWithReview?: Array<QuizQuestion & {
-			selectedOptionIds: string[];
-			essayText?: string;
-			awardedScore?: number;
-			isCorrect?: boolean;
-		}>;
-	}> {
-		return apiClient.get(`/api/v1/exams/submissions/${submissionId}/result`, undefined, customFetch);
+	): Promise<ExamResultDetailsDto> {
+		return apiClient.get<ExamResultDetailsDto>(`/api/v1/exams/submissions/${submissionId}/result`, undefined, customFetch);
 	}
 };

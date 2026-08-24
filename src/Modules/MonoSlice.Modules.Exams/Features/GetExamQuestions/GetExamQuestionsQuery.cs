@@ -12,6 +12,7 @@ public sealed record StudentExamPaperDto(
     string Mode,
     DateTime StartedAtUtc,
     DateTime MaxAllowedEndTimeUtc,
+    string ActiveSessionToken,
     IReadOnlyList<StudentQuestionDto> Questions);
 
 public sealed record StudentQuestionDto(

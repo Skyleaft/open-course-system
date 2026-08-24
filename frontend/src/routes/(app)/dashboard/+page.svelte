@@ -1,5 +1,8 @@
 <script lang="ts">
 	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { coursesApi } from '#lib/api/courses.ts';
+	import { examsApi } from '#lib/api/exams.ts';
+	import type { Course, QuizExam } from '#lib/api/types.ts';
 	import GlassCard from '#lib/components/ui/GlassCard.svelte';
 	import StatCard from '#lib/components/ui/StatCard.svelte';
 	import {
@@ -10,8 +13,34 @@
 		ArrowRight,
 		PlayCircle,
 		Sparkles,
-		Layers
+		Layers,
+		ShieldAlert
 	} from '@lucide/svelte';
+	import { onMount } from 'svelte';
+
+	let enrolledCourses = $state<Course[]>([]);
+	let activeExams = $state<QuizExam[]>([]);
+	let isLoading = $state(true);
+
+	onMount(async () => {
+		try {
+			const [coursesRes, examsRes] = await Promise.allSettled([
+				coursesApi.getCourses({ pageSize: 4 }),
+				examsApi.listExams({ isPublished: true, pageSize: 4 })
+			]);
+
+			if (coursesRes.status === 'fulfilled' && coursesRes.value?.items) {
+				enrolledCourses = coursesRes.value.items;
+			}
+			if (examsRes.status === 'fulfilled' && examsRes.value?.items) {
+				activeExams = examsRes.value.items;
+			}
+		} catch (err) {
+			console.error(err);
+		} finally {
+			isLoading = false;
+		}
+	});
 </script>
 
 <div class="space-y-8">
@@ -21,7 +50,7 @@
 			<div class="space-y-2">
 				<div class="inline-flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-1 text-xs font-semibold text-primary">
 					<Sparkles class="h-3.5 w-3.5" />
-					Welcome to Open Course System
+					Student Learning Center
 				</div>
 				<h1 class="text-3xl font-extrabold tracking-tight text-base-content sm:text-4xl">
 					Hello, {authStore.user?.fullName || 'Student'}! 👋
@@ -38,7 +67,7 @@
 				</a>
 				<a href="/exams" class="btn btn-ghost glass-card rounded-xl text-xs font-medium border border-white/10 hover:bg-base-100/40">
 					<GraduationCap class="h-4 w-4 mr-1" />
-					My Exams
+					Examinations
 				</a>
 			</div>
 		</div>
@@ -47,28 +76,28 @@
 	<!-- Metric Stat Cards -->
 	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		<StatCard
-			title="Enrolled Courses"
-			value="4"
-			description="Active learning paths"
+			title="Active Courses"
+			value={enrolledCourses.length > 0 ? String(enrolledCourses.length) : '4'}
+			description="Modular learning tracks"
 			icon={BookOpen}
 			color="primary"
 		/>
 		<StatCard
-			title="Exams Completed"
-			value="6"
-			description="Passing rate: 100%"
+			title="Available Exams"
+			value={activeExams.length > 0 ? String(activeExams.length) : '6'}
+			description="Simulations & Proctored"
 			icon={GraduationCap}
 			color="secondary"
 		/>
 		<StatCard
-			title="Certificates Earned"
+			title="Certificates"
 			value="3"
 			description="Cryptographically signed"
 			icon={Award}
 			color="accent"
 		/>
 		<StatCard
-			title="Study Time"
+			title="Study Hours"
 			value="28h"
 			description="+4h this week"
 			icon={Clock}
@@ -90,37 +119,38 @@
 					</a>
 				</div>
 
-				<div class="space-y-3">
-					<div class="flex items-center justify-between rounded-xl bg-base-100/40 p-3.5 border border-white/5">
-						<div class="flex items-center gap-3">
-							<div class="gradient-accent flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white font-bold text-sm">
-								CS
-							</div>
-							<div class="text-left">
-								<div class="text-xs font-bold text-base-content">Advanced Distributed Systems</div>
-								<div class="text-[10px] text-base-content/60">Lesson 4: Redis Streams & Event Sourcing</div>
-							</div>
-						</div>
-						<a href="/courses" class="btn btn-ghost btn-sm btn-circle text-primary hover:bg-primary/10">
-							<PlayCircle class="h-5 w-5" />
-						</a>
+				{#if isLoading}
+					<div class="space-y-3">
+						<div class="h-14 rounded-xl bg-base-200/50 animate-pulse"></div>
+						<div class="h-14 rounded-xl bg-base-200/50 animate-pulse"></div>
 					</div>
-
-					<div class="flex items-center justify-between rounded-xl bg-base-100/40 p-3.5 border border-white/5">
-						<div class="flex items-center gap-3">
-							<div class="bg-secondary/20 border border-secondary/30 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-secondary font-bold text-sm">
-								AI
+				{:else if enrolledCourses.length > 0}
+					<div class="space-y-3">
+						{#each enrolledCourses.slice(0, 3) as course (course.id)}
+							<div class="flex items-center justify-between rounded-xl bg-base-100/40 p-3.5 border border-white/5 hover:border-primary/20 transition-all">
+								<div class="flex items-center gap-3 overflow-hidden">
+									<div class="gradient-accent flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white font-bold text-xs uppercase">
+										{course.title.slice(0, 2)}
+									</div>
+									<div class="text-left overflow-hidden">
+										<div class="text-xs font-bold text-base-content truncate">{course.title}</div>
+										<div class="text-[10px] text-base-content/60 flex items-center gap-1">
+											<Layers class="w-3 h-3 text-primary" />
+											{course.sections?.length || 0} Sections
+										</div>
+									</div>
+								</div>
+								<a href="/courses/{course.id}/learn" class="btn btn-ghost btn-sm btn-circle text-primary hover:bg-primary/10 shrink-0">
+									<PlayCircle class="h-5 w-5" />
+								</a>
 							</div>
-							<div class="text-left">
-								<div class="text-xs font-bold text-base-content">Fullstack Machine Learning</div>
-								<div class="text-[10px] text-base-content/60">Lesson 2: Realtime Vision Interceptors</div>
-							</div>
-						</div>
-						<a href="/courses" class="btn btn-ghost btn-sm btn-circle text-primary hover:bg-primary/10">
-							<PlayCircle class="h-5 w-5" />
-						</a>
+						{/each}
 					</div>
-				</div>
+				{:else}
+					<div class="p-6 text-center text-xs text-base-content/50">
+						No active course enrollments yet. <a href="/courses" class="text-primary font-bold hover:underline">Explore Catalog</a>
+					</div>
+				{/if}
 			</div>
 		</GlassCard>
 
@@ -134,33 +164,41 @@
 					</a>
 				</div>
 
-				<div class="space-y-3">
-					<div class="flex items-center justify-between rounded-xl bg-primary/10 border border-primary/20 p-3.5">
-						<div class="space-y-0.5 text-left">
-							<div class="flex items-center gap-2">
-								<span class="badge badge-primary badge-xs uppercase font-bold">RealExam</span>
-								<span class="text-xs font-bold text-base-content">Distributed Architectures Final</span>
-							</div>
-							<div class="text-[10px] text-base-content/60">60 mins • Passing Score: 75% • Proctored</div>
-						</div>
-						<a href="/exams" class="btn btn-primary gradient-accent btn-xs rounded-lg text-white border-0">
-							Take Exam
-						</a>
+				{#if isLoading}
+					<div class="space-y-3">
+						<div class="h-14 rounded-xl bg-base-200/50 animate-pulse"></div>
+						<div class="h-14 rounded-xl bg-base-200/50 animate-pulse"></div>
 					</div>
-
-					<div class="flex items-center justify-between rounded-xl bg-base-100/40 p-3.5 border border-white/5">
-						<div class="space-y-0.5 text-left">
-							<div class="flex items-center gap-2">
-								<span class="badge badge-ghost badge-xs uppercase font-bold">Simulation</span>
-								<span class="text-xs font-bold text-base-content">Mock Practice Test: ASP.NET Core</span>
+				{:else if activeExams.length > 0}
+					<div class="space-y-3">
+						{#each activeExams.slice(0, 3) as exam (exam.id)}
+							{@const isReal = exam.mode === 'RealExam'}
+							<div class="flex items-center justify-between rounded-xl {isReal ? 'bg-primary/10 border-primary/20' : 'bg-base-100/40 border-white/5'} border p-3.5">
+								<div class="space-y-0.5 text-left overflow-hidden mr-2">
+									<div class="flex items-center gap-2">
+										<span class="badge {isReal ? 'badge-primary' : 'badge-ghost'} badge-xs uppercase font-bold text-[9px]">
+											{isReal ? 'Proctored' : 'Simulation'}
+										</span>
+										<span class="text-xs font-bold text-base-content truncate">{exam.title}</span>
+									</div>
+									<div class="text-[10px] text-base-content/60">
+										{exam.durationMinutes} mins • Passing: {exam.passingScore}%
+									</div>
+								</div>
+								<a
+									href="/exams/{exam.id}/start"
+									class="btn {isReal ? 'btn-primary gradient-accent' : 'btn-ghost glass-card border border-white/10'} btn-xs rounded-lg text-white border-0 shrink-0 font-semibold"
+								>
+									{isReal ? 'Start Exam' : 'Practice'}
+								</a>
 							</div>
-							<div class="text-[10px] text-base-content/60">30 mins • Free Practice • Instant Explanations</div>
-						</div>
-						<a href="/exams" class="btn btn-ghost btn-xs glass-card rounded-lg border border-white/10">
-							Practice
-						</a>
+						{/each}
 					</div>
-				</div>
+				{:else}
+					<div class="p-6 text-center text-xs text-base-content/50">
+						No examinations currently available.
+					</div>
+				{/if}
 			</div>
 		</GlassCard>
 	</div>
