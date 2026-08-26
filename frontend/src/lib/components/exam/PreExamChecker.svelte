@@ -1,16 +1,18 @@
 <script lang="ts">
 	import GlassCard from '#lib/components/ui/GlassCard.svelte';
-	import { Camera, Mic, Maximize, CheckCircle2, AlertCircle, Sparkles, ArrowRight } from '@lucide/svelte';
+	import { Camera, Mic, Maximize, CheckCircle2, AlertCircle, Sparkles, ArrowRight, ShieldCheck, ShieldAlert, Monitor } from '@lucide/svelte';
+	import type { ExamRuleConfig } from '$lib/api/types.ts';
 	import { onMount, onDestroy } from 'svelte';
 
 	interface Props {
 		examTitle: string;
 		durationMinutes: number;
-		mode: string;
+		mode?: string;
+		rules?: ExamRuleConfig | null;
 		onReadyToStart: (stream: MediaStream | null) => void;
 	}
 
-	let { examTitle, durationMinutes, mode, onReadyToStart }: Props = $props();
+	let { examTitle, durationMinutes, mode, rules, onReadyToStart }: Props = $props();
 
 	let videoElement: HTMLVideoElement | null = null;
 	let mediaStream = $state<MediaStream | null>(null);
@@ -22,29 +24,40 @@
 	let errorMessage = $state<string | null>(null);
 	let isInitializing = $state(true);
 
-	const isRealExam = $derived(mode === 'RealExam');
+	const requiresCamera = $derived(rules?.requireCamera !== false);
+	const requiresMic = $derived(rules?.requireMicrophone === true);
+	const requiresFullscreen = $derived(rules?.forceFullscreen !== false);
+	const ruleName = $derived(rules?.name || mode || 'Proctored Exam');
+
 	const canStart = $derived(
-		(!isRealExam || (hasCamera && hasMic)) && isTermsAccepted
+		(!requiresCamera || hasCamera) &&
+		(!requiresMic || hasMic) &&
+		isTermsAccepted
 	);
 
 	onMount(async () => {
 		try {
-			if (navigator.mediaDevices?.getUserMedia) {
-				const stream = await navigator.mediaDevices.getUserMedia({
-					video: { width: { ideal: 640 }, height: { ideal: 480 } },
-					audio: true
-				});
-				mediaStream = stream;
-				hasCamera = stream.getVideoTracks().length > 0;
-				hasMic = stream.getAudioTracks().length > 0;
+			if (requiresCamera || requiresMic) {
+				if (navigator.mediaDevices?.getUserMedia) {
+					const stream = await navigator.mediaDevices.getUserMedia({
+						video: requiresCamera ? { width: { ideal: 640 }, height: { ideal: 480 } } : false,
+						audio: requiresMic
+					});
+					mediaStream = stream;
+					hasCamera = stream.getVideoTracks().length > 0;
+					hasMic = stream.getAudioTracks().length > 0;
 
-				if (videoElement) {
-					videoElement.srcObject = stream;
+					if (videoElement && requiresCamera) {
+						videoElement.srcObject = stream;
+					}
 				}
+			} else {
+				hasCamera = true;
+				hasMic = true;
 			}
 		} catch (err: any) {
-			if (isRealExam) {
-				errorMessage = 'Camera & microphone permissions are required for proctored RealExam mode.';
+			if (requiresCamera || requiresMic) {
+				errorMessage = 'Camera and/or microphone device permissions are required to enter this examination.';
 			}
 		} finally {
 			isInitializing = false;
@@ -52,18 +65,20 @@
 	});
 
 	onDestroy(() => {
-		// Stop media stream tracks if cancelled before start
+		// Stop tracks if leaving before exam start
 	});
 
 	async function handleStart() {
-		// Request fullscreen
-		try {
-			if (document.documentElement.requestFullscreen) {
-				await document.documentElement.requestFullscreen();
-				hasFullscreen = true;
+		// Request fullscreen if required
+		if (requiresFullscreen) {
+			try {
+				if (document.documentElement.requestFullscreen) {
+					await document.documentElement.requestFullscreen();
+					hasFullscreen = true;
+				}
+			} catch {
+				console.warn('Fullscreen prompt skipped/blocked');
 			}
-		} catch {
-			console.warn('Fullscreen prompt skipped/blocked');
 		}
 
 		onReadyToStart(mediaStream);
@@ -79,7 +94,7 @@
 		</div>
 		<h1 class="text-3xl font-extrabold text-base-content tracking-tight">{examTitle}</h1>
 		<div class="flex items-center justify-center gap-3 text-xs text-base-content/70">
-			<span class="badge {isRealExam ? 'badge-primary' : 'badge-ghost'} font-bold">{mode}</span>
+			<span class="badge badge-primary font-bold">{ruleName}</span>
 			<span>&bull;</span>
 			<span>{durationMinutes} Minutes</span>
 		</div>
@@ -89,30 +104,38 @@
 	<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
 		<!-- Left: Camera Preview -->
 		<GlassCard class="flex flex-col items-center justify-center p-4 space-y-3 text-center">
-			<div class="relative aspect-video w-full overflow-hidden rounded-2xl bg-black/60 border border-white/10 shadow-inner">
-				<video
-					bind:this={videoElement}
-					autoplay
-					muted
-					playsinline
-					class="h-full w-full object-cover transform scale-x-[-1]"
-				></video>
+			{#if requiresCamera}
+				<div class="relative aspect-video w-full overflow-hidden rounded-2xl bg-black/60 border border-white/10 shadow-inner">
+					<video
+						bind:this={videoElement}
+						autoplay
+						muted
+						playsinline
+						class="h-full w-full object-cover transform scale-x-[-1]"
+					></video>
 
-				{#if isInitializing}
-					<div class="absolute inset-0 flex items-center justify-center bg-base-300/80">
-						<span class="loading loading-spinner loading-md text-primary"></span>
-					</div>
-				{:else if !hasCamera}
-					<div class="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-xs text-base-content/50">
-						<Camera class="h-8 w-8 opacity-40" />
-						<span>Camera feed unavailable</span>
-					</div>
-				{/if}
-			</div>
+					{#if isInitializing}
+						<div class="absolute inset-0 flex items-center justify-center bg-base-300/80">
+							<span class="loading loading-spinner loading-md text-primary"></span>
+						</div>
+					{:else if !hasCamera}
+						<div class="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-xs text-base-content/50">
+							<Camera class="h-8 w-8 opacity-40" />
+							<span>Camera feed unavailable</span>
+						</div>
+					{/if}
+				</div>
 
-			<div class="text-[11px] text-base-content/60">
-				📹 Live Picture-in-Picture preview. (Video is processed locally).
-			</div>
+				<div class="text-[11px] text-base-content/60">
+					📹 Live Picture-in-Picture preview. (Periodic snapshots will be verified).
+				</div>
+			{:else}
+				<div class="aspect-video w-full flex flex-col items-center justify-center rounded-2xl bg-base-200/50 border border-white/10 p-6 space-y-2">
+					<ShieldCheck class="w-12 h-12 text-success opacity-80" />
+					<div class="text-xs font-bold text-base-content">No Camera Required</div>
+					<div class="text-[11px] text-base-content/60">This ruleset does not require video proctoring.</div>
+				</div>
+			{/if}
 		</GlassCard>
 
 		<!-- Right: Verification Items -->
@@ -121,36 +144,60 @@
 				<h3 class="text-sm font-bold uppercase tracking-wider text-base-content/60">Readiness Criteria</h3>
 
 				<div class="space-y-2 text-xs">
+					<!-- Camera -->
 					<div class="flex items-center justify-between rounded-xl bg-base-100/40 p-3 border border-white/5">
 						<span class="flex items-center gap-2 font-semibold">
 							<Camera class="h-4 w-4 text-primary" />
 							Webcam Device
 						</span>
-						{#if hasCamera}
+						{#if !requiresCamera}
+							<span class="badge badge-ghost badge-xs">Not Required</span>
+						{:else if hasCamera}
 							<CheckCircle2 class="h-4 w-4 text-success" />
 						{:else}
 							<span class="badge badge-warning badge-xs font-semibold">Required</span>
 						{/if}
 					</div>
 
+					<!-- Microphone -->
 					<div class="flex items-center justify-between rounded-xl bg-base-100/40 p-3 border border-white/5">
 						<span class="flex items-center gap-2 font-semibold">
 							<Mic class="h-4 w-4 text-secondary" />
-							Microphone
+							Microphone Device
 						</span>
-						{#if hasMic}
+						{#if !requiresMic}
+							<span class="badge badge-ghost badge-xs">Not Required</span>
+						{:else if hasMic}
 							<CheckCircle2 class="h-4 w-4 text-success" />
 						{:else}
 							<span class="badge badge-warning badge-xs font-semibold">Required</span>
 						{/if}
 					</div>
 
+					<!-- Fullscreen -->
 					<div class="flex items-center justify-between rounded-xl bg-base-100/40 p-3 border border-white/5">
 						<span class="flex items-center gap-2 font-semibold">
 							<Maximize class="h-4 w-4 text-accent" />
-							Fullscreen Support
+							Fullscreen Mode
 						</span>
-						<CheckCircle2 class="h-4 w-4 text-success" />
+						{#if requiresFullscreen}
+							<span class="badge badge-primary badge-xs">Enforced</span>
+						{:else}
+							<span class="badge badge-ghost badge-xs">Optional</span>
+						{/if}
+					</div>
+
+					<!-- Tab Switching -->
+					<div class="flex items-center justify-between rounded-xl bg-base-100/40 p-3 border border-white/5">
+						<span class="flex items-center gap-2 font-semibold">
+							<Monitor class="h-4 w-4 text-info" />
+							Tab Visibility Guard
+						</span>
+						{#if rules?.canTabSwitch}
+							<span class="badge badge-success badge-xs">Permitted</span>
+						{:else}
+							<span class="badge badge-error badge-xs">Strict Single Tab</span>
+						{/if}
 					</div>
 				</div>
 

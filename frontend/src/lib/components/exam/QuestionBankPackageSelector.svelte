@@ -9,7 +9,9 @@
 		FolderPlus,
 		Tag,
 		Sparkles,
-		Plus
+		Plus,
+		ChevronDown,
+		ListFilter
 	} from 'lucide-svelte';
 
 	interface Props {
@@ -82,14 +84,49 @@
 				/>
 			</div>
 
-			<select
-				bind:value={selectedCategory}
-				class="select select-bordered select-sm bg-base-100/50 text-xs"
-			>
-				{#each categories as cat}
-					<option value={cat}>{cat === 'All' ? 'All Categories' : cat}</option>
-				{/each}
-			</select>
+			<!-- Category Filter Combobox / Dropdown with Blur -->
+			<div class="dropdown dropdown-end sm:w-auto">
+				<div
+					tabindex="0"
+					role="button"
+					class="btn btn-sm btn-outline border-base-content/20 bg-base-100/70 backdrop-blur-md rounded-xl text-xs font-semibold flex items-center justify-between gap-2 w-full sm:w-44 shadow-xs hover:bg-base-100/90"
+				>
+					<span class="flex items-center gap-1.5 truncate">
+						<Tag class="w-3.5 h-3.5 text-primary shrink-0" />
+						<span class="truncate">{selectedCategory === 'All' ? 'All Categories' : selectedCategory}</span>
+					</span>
+					<ChevronDown class="w-3.5 h-3.5 text-base-content/50 shrink-0" />
+				</div>
+				<ul
+					tabindex="0"
+					class="dropdown-content menu p-1.5 shadow-2xl bg-base-100/95 backdrop-blur-2xl border border-base-content/10 rounded-2xl w-52 z-50 mt-1.5 space-y-0.5 text-xs font-medium max-h-56 overflow-y-auto"
+				>
+					{#each categories as cat}
+						<li>
+							<button
+								type="button"
+								class="rounded-xl flex items-center justify-between {selectedCategory === cat ? 'active bg-primary text-white font-bold' : ''}"
+								onclick={() => {
+									selectedCategory = cat;
+									(document.activeElement as HTMLElement)?.blur?.();
+								}}
+							>
+								<span class="flex items-center gap-2 truncate">
+									{#if cat === 'All'}
+										<ListFilter class="w-3.5 h-3.5 shrink-0" />
+									{:else}
+										<Tag class="w-3.5 h-3.5 shrink-0 {selectedCategory === cat ? 'text-white' : 'text-primary'}" />
+									{/if}
+									<span class="truncate">{cat === 'All' ? 'All Categories' : cat}</span>
+								</span>
+								{#if selectedCategory === cat}
+									<Check class="w-3.5 h-3.5 shrink-0" />
+								{/if}
+							</button>
+						</li>
+					{/each}
+				</ul>
+			</div>
 		</div>
 
 		<!-- Question Banks Grid / List -->

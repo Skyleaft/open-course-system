@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
@@ -19,7 +20,12 @@ public sealed class ListExamsQueryHandler : IQueryHandler<ListExamsQuery, ApiRes
 
     public async ValueTask<ApiResponse<PaginatedList<ExamSummaryDto>>> Handle(ListExamsQuery query, CancellationToken cancellationToken)
     {
-        var dbQuery = _dbContext.Exams.AsNoTracking();
+        var dbQuery = _dbContext.Exams
+            .AsNoTracking()
+            .Include(e => e.Sections)
+                .ThenInclude(s => s.QuestionBank)
+                .ThenInclude(qb => qb!.Questions)
+            .AsQueryable();
 
         // If user is not Admin/Instructor, they only see published exams
         var isElevated = _currentUser.IsAuthenticated && (_currentUser.IsInRole("Admin") || _currentUser.IsInRole("Instructor"));
@@ -33,9 +39,9 @@ public sealed class ListExamsQueryHandler : IQueryHandler<ListExamsQuery, ApiRes
             dbQuery = dbQuery.Where(e => e.IsPublished == query.IsPublished.Value);
         }
 
-        if (query.Mode.HasValue)
+        if (query.ExamRuleId.HasValue)
         {
-            dbQuery = dbQuery.Where(e => e.Mode == query.Mode.Value);
+            dbQuery = dbQuery.Where(e => e.ExamRuleId == query.ExamRuleId.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(query.SearchTerm))
@@ -49,30 +55,47 @@ public sealed class ListExamsQueryHandler : IQueryHandler<ListExamsQuery, ApiRes
         var pageIndex = Math.Max(1, query.PageIndex);
         var pageSize = Math.Clamp(query.PageSize, 1, 100);
 
-        var items = await dbQuery
+        var rawList = await dbQuery
             .OrderByDescending(e => e.CreatedAtUtc)
             .Skip((pageIndex - 1) * pageSize)
             .Take(pageSize)
-            .Select(e => new ExamSummaryDto(
+            .ToListAsync(cancellationToken);
+
+        var items = rawList.Select(e =>
+        {
+            var ruleConfigDto = new ExamRuleConfigDto(
+                e.RuleConfig.Name,
+                e.RuleConfig.CanTabSwitch,
+                e.RuleConfig.MaxTabSwitchesAllowed,
+                e.RuleConfig.RestrictClipboardAndMouse,
+                e.RuleConfig.ForceFullscreen,
+                e.RuleConfig.KeyboardDetection,
+                e.RuleConfig.RequireCamera,
+                e.RuleConfig.SnapshotIntervalSeconds,
+                e.RuleConfig.RequireMicrophone,
+                e.RuleConfig.MaxAllowedViolations,
+                e.RuleConfig.AutoDisqualifyOnExceed);
+
+            return new ExamSummaryDto(
                 e.Id,
                 e.InstructorId,
                 e.Title,
                 e.Description,
-                e.Mode.ToString(),
+                e.ExamRuleId,
+                ruleConfigDto,
                 e.DurationMinutes,
                 e.PassingScore,
-                e.MaxAllowedViolations,
                 e.MaxAttempts,
                 e.AvailableFromUtc,
                 e.AvailableToUtc,
                 e.IsPublished,
                 e.Sections.Count,
-                e.Sections.SelectMany(s => s.QuestionBank!.Questions).Count(),
+                e.Sections.SelectMany(s => s.QuestionBank?.Questions ?? Enumerable.Empty<Domain.BankQuestion>()).Count(),
                 e.CreatedBy,
                 e.UpdatedBy,
                 e.CreatedAtUtc
-            ))
-            .ToListAsync(cancellationToken);
+            );
+        }).ToList();
 
         var paginated = new PaginatedList<ExamSummaryDto>(items, totalCount, pageIndex, pageSize);
         return ApiResponse.Ok(paginated);

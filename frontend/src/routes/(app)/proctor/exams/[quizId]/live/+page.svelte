@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { proctorApi, type LiveCandidate, type CandidateViolation } from '#lib/api/proctor.ts';
-	import { ExamHubClient } from '#lib/signalr/exam-hub.ts';
+	import { ExamHubClient } from '#lib/signalr/exam-hub.svelte.ts';
 	import GlassCard from '#lib/components/ui/GlassCard.svelte';
 	import GlassModal from '#lib/components/ui/GlassModal.svelte';
 	import { toast } from '#lib/stores/toast.svelte.ts';

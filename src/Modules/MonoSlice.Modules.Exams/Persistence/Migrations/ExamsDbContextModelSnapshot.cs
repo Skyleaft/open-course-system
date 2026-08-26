@@ -71,6 +71,98 @@ namespace MonoSlice.Modules.Exams.Persistence.Migrations
                     b.ToTable("bank_questions", "exams");
                 });
 
+            modelBuilder.Entity("MonoSlice.Modules.Exams.Domain.ExamRule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("AutoDisqualifyOnExceed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("CanTabSwitch")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("CreatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("ForceFullscreen")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("IsSystemPreset")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("KeyboardDetection")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("MaxAllowedViolations")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(3);
+
+                    b.Property<int>("MaxTabSwitchesAllowed")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("RequireCamera")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<bool>("RequireMicrophone")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<bool>("RestrictClipboardAndMouse")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<int>("SnapshotIntervalSeconds")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(45);
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("UpdatedAtUtc")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedBy");
+
+                    b.HasIndex("IsSystemPreset");
+
+                    b.ToTable("exam_rules", "exams");
+                });
+
             modelBuilder.Entity("MonoSlice.Modules.Exams.Domain.ProctoringSnapshot", b =>
                 {
                     b.Property<Guid>("Id")
@@ -176,6 +268,9 @@ namespace MonoSlice.Modules.Exams.Persistence.Migrations
                         .HasColumnType("integer")
                         .HasDefaultValue(60);
 
+                    b.Property<Guid?>("ExamRuleId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("InstructorId")
                         .HasColumnType("uuid");
 
@@ -184,26 +279,20 @@ namespace MonoSlice.Modules.Exams.Persistence.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
-                    b.Property<int>("MaxAllowedViolations")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(3);
-
                     b.Property<int>("MaxAttempts")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
                         .HasDefaultValue(1);
-
-                    b.Property<string>("Mode")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
 
                     b.Property<decimal>("PassingScore")
                         .ValueGeneratedOnAdd()
                         .HasPrecision(5, 2)
                         .HasColumnType("numeric(5,2)")
                         .HasDefaultValue(70m);
+
+                    b.Property<string>("RuleConfig")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<bool>("ShuffleOptions")
                         .ValueGeneratedOnAdd()
@@ -232,6 +321,8 @@ namespace MonoSlice.Modules.Exams.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedBy");
+
+                    b.HasIndex("ExamRuleId");
 
                     b.HasIndex("InstructorId");
 
@@ -295,6 +386,10 @@ namespace MonoSlice.Modules.Exams.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
+
+                    b.Property<string>("AppliedRules")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int>("AttemptNumber")
                         .HasColumnType("integer");
@@ -408,6 +503,14 @@ namespace MonoSlice.Modules.Exams.Persistence.Migrations
                         .HasForeignKey("SubmissionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("MonoSlice.Modules.Exams.Domain.QuizExam", b =>
+                {
+                    b.HasOne("MonoSlice.Modules.Exams.Domain.ExamRule", null)
+                        .WithMany()
+                        .HasForeignKey("ExamRuleId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("MonoSlice.Modules.Exams.Domain.QuizSection", b =>

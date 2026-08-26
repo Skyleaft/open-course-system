@@ -9,7 +9,11 @@ import type {
 	StudentAnswer,
 	QuestionType,
 	QuestionBank,
-	BankQuestion
+	BankQuestion,
+	StudentExamPaperDto,
+	ExamResultDetailsDto,
+	StudentExamOverviewDto,
+	ImportQuestionBankResult
 } from './types.ts';
 
 export const examsApi = {
@@ -41,13 +45,18 @@ export const examsApi = {
 		return apiClient.get<QuizExam>(`/api/v1/exams/${id}`, undefined, customFetch);
 	},
 
+	async getStudentExamOverview(id: string, customFetch?: typeof fetch): Promise<StudentExamOverviewDto> {
+		return apiClient.get<StudentExamOverviewDto>(`/api/v1/exams/${id}/overview`, undefined, customFetch);
+	},
+
 	async createExam(data: {
 		title: string;
 		description?: string;
-		mode: string;
+		examRuleId?: string;
+		ruleConfig?: import('./types.ts').ExamRuleConfig;
+		mode?: string;
 		durationMinutes: number;
 		passingScore: number;
-		maxAllowedViolations?: number;
 		maxAttempts?: number;
 		availableFromUtc?: string;
 		availableToUtc?: string;
@@ -60,10 +69,11 @@ export const examsApi = {
 	async updateExam(id: string, data: {
 		title: string;
 		description?: string;
-		mode: string;
+		examRuleId?: string;
+		ruleConfig?: import('./types.ts').ExamRuleConfig;
+		mode?: string;
 		durationMinutes: number;
 		passingScore: number;
-		maxAllowedViolations?: number;
 		maxAttempts?: number;
 		availableFromUtc?: string;
 		availableToUtc?: string;
@@ -136,6 +146,20 @@ export const examsApi = {
 
 	async deleteQuestionBank(id: string): Promise<boolean> {
 		return apiClient.delete<boolean>(`/api/v1/exams/question-banks/${id}`);
+	},
+
+	async importQuestionBank(
+		formData: FormData,
+		targetBankId?: string
+	): Promise<ImportQuestionBankResult> {
+		const endpoint = targetBankId
+			? `/api/v1/exams/question-banks/${targetBankId}/import`
+			: '/api/v1/exams/question-banks/import';
+		return apiClient.post<ImportQuestionBankResult>(endpoint, formData);
+	},
+
+	async downloadQuestionBankTemplate(customFetch?: typeof fetch): Promise<Blob> {
+		return apiClient.getBlob('/api/v1/exams/question-banks/template', undefined, customFetch);
 	},
 
 	// Bank Questions Query & CRUD
@@ -251,14 +275,8 @@ export const examsApi = {
 	async getQuestions(
 		submissionId: string,
 		customFetch?: typeof fetch
-	): Promise<{
-		questions: QuizQuestion[];
-		savedAnswers: Record<string, { selectedOptionIds: string[]; essayText?: string }>;
-		remainingSeconds: number;
-		maxAllowedEndTimeUtc: string;
-		mode: string;
-	}> {
-		return apiClient.get(`/api/v1/exams/submissions/${submissionId}/questions`, undefined, customFetch);
+	): Promise<StudentExamPaperDto> {
+		return apiClient.get<StudentExamPaperDto>(`/api/v1/exams/submissions/${submissionId}/questions`, undefined, customFetch);
 	},
 
 	async saveAnswer(
@@ -299,15 +317,41 @@ export const examsApi = {
 	async getResult(
 		submissionId: string,
 		customFetch?: typeof fetch
-	): Promise<{
-		submission: QuizSubmission;
-		questionsWithReview?: Array<QuizQuestion & {
-			selectedOptionIds: string[];
-			essayText?: string;
-			awardedScore?: number;
-			isCorrect?: boolean;
-		}>;
-	}> {
-		return apiClient.get(`/api/v1/exams/submissions/${submissionId}/result`, undefined, customFetch);
+	): Promise<ExamResultDetailsDto> {
+		return apiClient.get<ExamResultDetailsDto>(`/api/v1/exams/submissions/${submissionId}/result`, undefined, customFetch);
+	},
+
+	async getExamSubmissions(
+		examId: string,
+		params?: {
+			studentId?: string;
+			status?: string;
+			pageIndex?: number;
+			pageSize?: number;
+		},
+		customFetch?: typeof fetch
+	): Promise<PaginatedList<import('./types.ts').ExamSubmissionDto>> {
+		const searchParams = new URLSearchParams();
+		if (params?.studentId) searchParams.set('studentId', params.studentId);
+		if (params?.status) searchParams.set('status', params.status);
+		if (params?.pageIndex) searchParams.set('page', String(params.pageIndex));
+		if (params?.pageSize) searchParams.set('pageSize', String(params.pageSize));
+
+		const qs = searchParams.toString();
+		return apiClient.get<PaginatedList<import('./types.ts').ExamSubmissionDto>>(
+			`/api/v1/exams/${examId}/submissions${qs ? `?${qs}` : ''}`,
+			undefined,
+			customFetch
+		);
+	},
+
+	async grantRetake(
+		examId: string,
+		studentId: string,
+		reason?: string
+	): Promise<boolean> {
+		return apiClient.post<boolean>(`/api/v1/exams/${examId}/students/${studentId}/retake`, {
+			reason
+		});
 	}
 };

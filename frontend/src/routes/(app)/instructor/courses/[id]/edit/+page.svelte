@@ -1,11 +1,23 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { fade, scale } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { coursesApi } from '$lib/api/courses.ts';
 	import { examsApi } from '$lib/api/exams.ts';
-	import type { Course, CourseSection, Lesson, LessonType, CourseExam, QuizExam } from '$lib/api/types.ts';
+	import type {
+		Course,
+		CourseSection,
+		Lesson,
+		LessonType,
+		CourseExam,
+		QuizExam,
+		CourseStudentEnrollmentDto,
+		CourseStudentExamProgressDto
+	} from '$lib/api/types.ts';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
+	import SegmentedTabs from '$lib/components/ui/SegmentedTabs.svelte';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import RichEditor from '$lib/components/editor/RichEditor.svelte';
 	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
@@ -32,7 +44,18 @@
 		AlignLeft,
 		BookOpen,
 		EyeOff,
-		X
+		X,
+		Users,
+		UserPlus,
+		UserMinus,
+		Search,
+		GraduationCap,
+		RefreshCw,
+		Eye,
+		ShieldAlert,
+		RotateCcw,
+		Award,
+		Zap
 	} from 'lucide-svelte';
 
 	const courseId = (page.params.id || '') as string;
@@ -41,8 +64,72 @@
 	let isLoading = $state(true);
 	let isActionLoading = $state(false);
 
-	// Tabs: 'curriculum' | 'exams' | 'settings'
-	let activeTab = $state<'curriculum' | 'exams' | 'settings'>('curriculum');
+	// Tabs: 'curriculum' | 'students' | 'exams' | 'settings'
+	let activeTab = $state<'curriculum' | 'students' | 'exams' | 'settings'>('curriculum');
+
+	// Students Enrollment Management State
+	let enrolledStudents = $state<CourseStudentEnrollmentDto[]>([]);
+	let totalEnrollments = $state(0);
+	let isEnrollmentsLoading = $state(false);
+	let studentSearchTerm = $state('');
+	let studentPageIndex = $state(1);
+	let isEnrollModalOpen = $state(false);
+	let newStudentEmail = $state('');
+	let isEnrollingStudent = $state(false);
+	let isUnenrollModalOpen = $state(false);
+	let removingEnrollment = $state<CourseStudentEnrollmentDto | null>(null);
+	let isRemovingEnrollment = $state(false);
+
+	// Student Detail & Retake Modals
+	let selectedStudentForDetail = $state<CourseStudentEnrollmentDto | null>(null);
+	let isStudentDetailModalOpen = $state(false);
+	let isRetakeModalOpen = $state(false);
+	let retakeTarget = $state<{
+		examId: string;
+		examTitle: string;
+		studentId: string;
+		studentName: string;
+	} | null>(null);
+	let retakeReason = $state('');
+	let isGrantingRetake = $state(false);
+
+	function openStudentDetail(student: CourseStudentEnrollmentDto) {
+		selectedStudentForDetail = student;
+		isStudentDetailModalOpen = true;
+	}
+
+	function openRetakeModal(student: CourseStudentEnrollmentDto, exam: CourseStudentExamProgressDto) {
+		retakeTarget = {
+			examId: exam.examId,
+			examTitle: exam.examTitle,
+			studentId: student.userId,
+			studentName: student.fullName
+		};
+		retakeReason = '';
+		isRetakeModalOpen = true;
+	}
+
+	async function handleGrantRetake() {
+		if (!retakeTarget) return;
+		isGrantingRetake = true;
+		try {
+			await examsApi.grantRetake(retakeTarget.examId, retakeTarget.studentId, retakeReason.trim() || undefined);
+			toast.success(`Retake permission granted for ${retakeTarget.studentName} on ${retakeTarget.examTitle}!`);
+			isRetakeModalOpen = false;
+			retakeTarget = null;
+			await loadEnrollments();
+			if (selectedStudentForDetail) {
+				const updatedStudent = enrolledStudents.find(s => s.userId === selectedStudentForDetail?.userId);
+				if (updatedStudent) {
+					selectedStudentForDetail = updatedStudent;
+				}
+			}
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to grant retake.');
+		} finally {
+			isGrantingRetake = false;
+		}
+	}
 
 	// Course Settings State
 	let editCourseTitle = $state('');
@@ -130,9 +217,70 @@
 	async function loadAllData() {
 		isLoading = true;
 		try {
-			await Promise.all([loadCourse(), loadExams()]);
+			await Promise.all([loadCourse(), loadExams(), loadEnrollments()]);
 		} finally {
 			isLoading = false;
+		}
+	}
+
+	async function loadEnrollments() {
+		isEnrollmentsLoading = true;
+		try {
+			const res = await coursesApi.getCourseEnrollments(courseId, {
+				pageIndex: studentPageIndex,
+				search: studentSearchTerm.trim() || undefined
+			});
+			enrolledStudents = res.items || [];
+			totalEnrollments = res.totalCount || 0;
+		} catch (err: any) {
+			console.error('Failed to load course enrollments:', err);
+			enrolledStudents = [];
+			totalEnrollments = 0;
+		} finally {
+			isEnrollmentsLoading = false;
+		}
+	}
+
+	async function handleAdminEnrollStudent() {
+		if (!newStudentEmail.trim()) {
+			toast.warning('Please provide a valid email address or student identifier.');
+			return;
+		}
+
+		isEnrollingStudent = true;
+		try {
+			const res = await coursesApi.adminEnrollStudent(courseId, {
+				email: newStudentEmail.trim()
+			});
+			toast.success(`Successfully enrolled ${res.studentName} (${res.studentEmail})!`);
+			isEnrollModalOpen = false;
+			newStudentEmail = '';
+			await loadEnrollments();
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to enroll student.');
+		} finally {
+			isEnrollingStudent = false;
+		}
+	}
+
+	function openUnenrollModal(student: CourseStudentEnrollmentDto) {
+		removingEnrollment = student;
+		isUnenrollModalOpen = true;
+	}
+
+	async function handleAdminRemoveEnrollment() {
+		if (!removingEnrollment) return;
+		isRemovingEnrollment = true;
+		try {
+			await coursesApi.adminRemoveEnrollment(courseId, removingEnrollment.enrollmentId);
+			toast.success(`Removed ${removingEnrollment.fullName} from course.`);
+			isUnenrollModalOpen = false;
+			removingEnrollment = null;
+			await loadEnrollments();
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to un-enroll student.');
+		} finally {
+			isRemovingEnrollment = false;
 		}
 	}
 
@@ -512,50 +660,18 @@
 				</div>
 
 				<div class="flex items-center gap-2 flex-shrink-0">
-					<!-- Tabs switch -->
-					<div class="flex items-center gap-1 rounded-2xl p-1 bg-base-200/70 border border-base-content/10">
-						<button
-							type="button"
-							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'curriculum'
-								? 'btn-primary text-primary-content shadow-xs'
-								: 'btn-ghost text-base-content/70'}"
-							onclick={() => (activeTab = 'curriculum')}
-						>
-							<Layers class="w-3.5 h-3.5" />
-							Curriculum ({course.sections?.length || 0})
-						</button>
-						<button
-							type="button"
-							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'exams'
-								? 'btn-primary text-primary-content shadow-xs'
-								: 'btn-ghost text-base-content/70'}"
-							onclick={() => (activeTab = 'exams')}
-						>
-							<FileText class="w-3.5 h-3.5" />
-							Exams ({course.exams?.length || 0})
-						</button>
-						<button
-							type="button"
-							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'settings'
-								? 'btn-primary text-primary-content shadow-xs'
-								: 'btn-ghost text-base-content/70'}"
-							onclick={() => (activeTab = 'settings')}
-						>
-							<Settings class="w-3.5 h-3.5" />
-							Settings
-						</button>
-					</div>
-
-					{#if activeTab === 'curriculum'}
-						<button
-							type="button"
-							class="btn btn-primary btn-xs rounded-xl text-primary-content font-bold shadow-sm gap-1"
-							onclick={() => (isAddSectionModalOpen = true)}
-						>
-							<Plus class="w-3.5 h-3.5" />
-							Add Section
-						</button>
-					{/if}
+					<SegmentedTabs
+						tabs={[
+							{ id: 'curriculum', label: 'Curriculum', icon: Layers, count: course.sections?.length || 0 },
+							{ id: 'students', label: 'Students', icon: Users, count: totalEnrollments },
+							{ id: 'exams', label: 'Exams', icon: FileText, count: course.exams?.length || 0 },
+							{ id: 'settings', label: 'Settings', icon: Settings }
+						]}
+						bind:active={activeTab}
+						onChange={(tabId) => {
+							if (tabId === 'students') loadEnrollments();
+						}}
+					/>
 				</div>
 			</div>
 		</GlassCard>
@@ -707,9 +823,243 @@
 					</div>
 				{/if}
 			</GlassCard>
+		{:else if activeTab === 'students'}
+			<!-- Tab: Enrolled Students Management -->
+			<GlassCard class="p-6 space-y-6">
+				<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+					<div>
+						<h3 class="text-base font-bold text-base-content flex items-center gap-2">
+							<Users class="w-5 h-5 text-primary" />
+							Enrolled Students & Progression ({totalEnrollments})
+						</h3>
+						<p class="text-xs text-base-content/70">
+							Track student completion rates, inspect lesson milestones, and manage enrollment roster.
+						</p>
+					</div>
+
+					<div class="flex items-center gap-3">
+						<div class="relative w-full sm:w-64">
+							<Search class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-base-content/50" />
+							<input
+								type="text"
+								placeholder="Search student by name or email..."
+								bind:value={studentSearchTerm}
+								oninput={() => {
+									studentPageIndex = 1;
+									loadEnrollments();
+								}}
+								class="input input-sm w-full rounded-xl bg-base-200/50 pl-8 text-xs border-white/10"
+							/>
+						</div>
+
+						<button
+							type="button"
+							class="btn btn-sm btn-primary gap-1.5 shadow-sm rounded-xl font-bold shrink-0"
+							onclick={() => (isEnrollModalOpen = true)}
+						>
+							<UserPlus class="w-4 h-4" />
+							Enroll Student
+						</button>
+					</div>
+				</div>
+
+				{#if isEnrollmentsLoading}
+					<div class="space-y-3">
+						{#each Array(3) as _}
+							<div class="h-16 rounded-2xl bg-base-200/50 animate-pulse"></div>
+						{/each}
+					</div>
+				{:else if enrolledStudents.length === 0}
+					<div class="py-12 text-center bg-base-200/40 rounded-2xl border border-dashed border-base-300 space-y-3">
+						<Users class="w-10 h-10 text-base-content/30 mx-auto" />
+						<div class="space-y-1">
+							<p class="text-sm font-semibold text-base-content/80">
+								{studentSearchTerm ? 'No students match your search' : 'No students enrolled yet'}
+							</p>
+							<p class="text-xs text-base-content/50 max-w-sm mx-auto">
+								{studentSearchTerm
+									? 'Try adjusting your search criteria.'
+									: 'Enrolled students will appear here with real-time course progression details.'}
+							</p>
+						</div>
+						<button
+							type="button"
+							class="btn btn-sm btn-primary gap-1.5 mt-2"
+							onclick={() => (isEnrollModalOpen = true)}
+						>
+							<UserPlus class="w-4 h-4" />
+							Enroll First Student
+						</button>
+					</div>
+				{:else}
+					<div class="overflow-x-auto rounded-2xl border border-base-content/10">
+						<table class="table table-sm w-full text-xs">
+							<thead class="bg-base-200/70 text-base-content/70">
+								<tr>
+									<th>Student</th>
+									<th>Enrolled Date</th>
+									<th>Course Progression</th>
+									<th>Lessons</th>
+									<th>Assignments</th>
+									<th>Examinations & Status</th>
+									<th>Last Active</th>
+									<th class="text-right">Actions</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-base-content/5">
+								{#each enrolledStudents as student (student.enrollmentId)}
+									{@const isFinished = student.progressPercent >= 100}
+									<tr class="hover:bg-base-100/40 transition-colors">
+										<td>
+											<button
+												type="button"
+												class="flex items-center gap-3 text-left group"
+												onclick={() => openStudentDetail(student)}
+											>
+												<div class="avatar placeholder">
+													<div class="w-8 h-8 rounded-xl bg-primary/10 text-primary font-bold text-xs flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
+														{student.fullName ? student.fullName.substring(0, 2).toUpperCase() : 'ST'}
+													</div>
+												</div>
+												<div>
+													<div class="font-bold text-base-content group-hover:text-primary transition-colors flex items-center gap-1">
+														<span>{student.fullName}</span>
+														<Eye class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+													</div>
+													<div class="text-[10px] text-base-content/50">{student.email}</div>
+												</div>
+											</button>
+										</td>
+										<td class="text-base-content/70">
+											{new Date(student.enrolledAtUtc).toLocaleDateString()}
+										</td>
+										<td>
+											<div class="space-y-1 w-28">
+												<div class="flex items-center justify-between text-[10px] font-bold">
+													<span class="{isFinished ? 'text-success' : 'text-primary'}">
+														{student.progressPercent}%
+													</span>
+												</div>
+												<div class="h-1.5 w-full overflow-hidden rounded-full bg-base-200">
+													<div
+														class="h-full transition-all duration-300 {isFinished ? 'bg-success' : 'gradient-accent'}"
+														style="width: {student.progressPercent}%"
+													></div>
+												</div>
+											</div>
+										</td>
+										<td>
+											<span class="badge badge-ghost badge-xs font-semibold">
+												{student.completedLessonsCount} / {student.totalLessonsCount}
+											</span>
+										</td>
+										<td>
+											<span class="badge badge-ghost badge-xs font-semibold">
+												{student.completedAssignmentsCount} / {student.totalAssignmentsCount}
+											</span>
+										</td>
+										<td>
+											{#if !student.exams || student.exams.length === 0}
+												<span class="text-base-content/40 text-[11px] italic">No exams</span>
+											{:else}
+												<div class="space-y-1.5 max-w-xs">
+													{#each student.exams as exam}
+														<div class="flex items-center justify-between gap-1.5 bg-base-200/50 p-1 rounded-lg border border-white/5">
+															<span class="font-medium text-[11px] truncate max-w-[110px]" title={exam.examTitle}>
+																{exam.examTitle}
+															</span>
+
+															<div class="flex items-center gap-1 shrink-0">
+																{#if exam.status === 'Completed'}
+																	<span class="badge badge-success text-white badge-xs font-bold">
+																		{exam.score !== null && exam.score !== undefined ? `${exam.score}%` : 'Done'}
+																	</span>
+																	<button
+																		type="button"
+																		class="btn btn-ghost btn-xs h-5 px-1 text-primary hover:bg-primary/10 rounded"
+																		onclick={() => openRetakeModal(student, exam)}
+																		title="Grant exam retake"
+																	>
+																		<RotateCcw class="w-3 h-3" />
+																	</button>
+																{:else if exam.status === 'Disqualified'}
+																	<span class="badge badge-error text-white badge-xs font-bold">
+																		Disqualified
+																	</span>
+																	<button
+																		type="button"
+																		class="btn btn-primary btn-xs h-5 px-1.5 text-white font-bold rounded shadow-xs"
+																		onclick={() => openRetakeModal(student, exam)}
+																		title="Allow student to retake"
+																	>
+																		<RotateCcw class="w-3 h-3 mr-0.5" />
+																		Retake
+																	</button>
+																{:else if exam.status === 'TimedOut'}
+																	<span class="badge badge-warning badge-xs font-bold">
+																		Timed Out
+																	</span>
+																	<button
+																		type="button"
+																		class="btn btn-primary btn-xs h-5 px-1.5 text-white font-bold rounded shadow-xs"
+																		onclick={() => openRetakeModal(student, exam)}
+																		title="Allow student to retake"
+																	>
+																		<RotateCcw class="w-3 h-3 mr-0.5" />
+																		Retake
+																	</button>
+																{:else if exam.status === 'InProgress'}
+																	<span class="badge badge-info text-white badge-xs font-semibold animate-pulse">
+																		In Progress
+																	</span>
+																{:else}
+																	<span class="badge badge-ghost badge-xs text-base-content/50">
+																		Not Started
+																	</span>
+																{/if}
+															</div>
+														</div>
+													{/each}
+												</div>
+											{/if}
+										</td>
+										<td class="text-base-content/60 text-[11px]">
+											{student.lastAccessedAtUtc
+												? new Date(student.lastAccessedAtUtc).toLocaleString()
+												: 'Never'}
+										</td>
+										<td class="text-right">
+											<div class="flex items-center justify-end gap-1">
+												<button
+													type="button"
+													class="btn btn-ghost btn-xs text-primary hover:bg-primary/10 rounded-lg gap-1"
+													onclick={() => openStudentDetail(student)}
+													title="Inspect Student Progress"
+												>
+													<Eye class="w-3.5 h-3.5" />
+													Inspect
+												</button>
+
+												<button
+													type="button"
+													class="btn btn-ghost btn-xs text-error hover:bg-error/10 rounded-lg gap-1"
+													onclick={() => openUnenrollModal(student)}
+													title="Unenroll student"
+												>
+													<UserMinus class="w-3.5 h-3.5" />
+												</button>
+											</div>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</GlassCard>
 		{:else if activeTab === 'exams'}
 			<!-- Tab 2: Reusable Exams Attachment -->
-			<GlassCard class="p-6">
+			<div class="rounded-3xl bg-base-100/60 border border-base-content/10 p-6 shadow-xl space-y-4">
 				<CourseExamAttachment
 					courseExams={course.exams || []}
 					{allExams}
@@ -717,7 +1067,7 @@
 					onDetachExam={handleDetachExam}
 					isLoading={isActionLoading}
 				/>
-			</GlassCard>
+			</div>
 		{:else}
 			<!-- Tab 3: Course Settings Studio -->
 			<GlassCard class="p-6 sm:p-8">
@@ -836,9 +1186,17 @@
 
 <!-- Add Section Modal -->
 {#if isAddSectionModalOpen}
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in" role="dialog" aria-modal="true">
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		transition:fade={{ duration: 180 }}
+	>
 		<div class="fixed inset-0" onclick={() => (isAddSectionModalOpen = false)} role="presentation"></div>
-		<div class="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4">
+		<div
+			class="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4"
+			transition:scale={{ duration: 220, start: 0.94, easing: cubicOut }}
+		>
 			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
 				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
 					<Layers class="w-5 h-5 text-primary" />
@@ -876,9 +1234,17 @@
 
 <!-- Edit Section Modal -->
 {#if isEditSectionModalOpen}
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in" role="dialog" aria-modal="true">
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		transition:fade={{ duration: 180 }}
+	>
 		<div class="fixed inset-0" onclick={() => (isEditSectionModalOpen = false)} role="presentation"></div>
-		<div class="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4">
+		<div
+			class="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4"
+			transition:scale={{ duration: 220, start: 0.94, easing: cubicOut }}
+		>
 			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
 				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
 					<Edit3 class="w-5 h-5 text-primary" />
@@ -915,9 +1281,17 @@
 
 <!-- Add Lesson Modal -->
 {#if isAddLessonModalOpen}
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in" role="dialog" aria-modal="true">
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		transition:fade={{ duration: 180 }}
+	>
 		<div class="fixed inset-0" onclick={() => (isAddLessonModalOpen = false)} role="presentation"></div>
-		<div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+		<div
+			class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+			transition:scale={{ duration: 220, start: 0.94, easing: cubicOut }}
+		>
 			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
 				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
 					<Plus class="w-5 h-5 text-primary" />
@@ -1016,9 +1390,17 @@
 
 <!-- Edit Lesson Modal -->
 {#if isEditLessonModalOpen}
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in" role="dialog" aria-modal="true">
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		transition:fade={{ duration: 180 }}
+	>
 		<div class="fixed inset-0" onclick={() => (isEditLessonModalOpen = false)} role="presentation"></div>
-		<div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+		<div
+			class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+			transition:scale={{ duration: 220, start: 0.94, easing: cubicOut }}
+		>
 			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
 				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
 					<Edit3 class="w-5 h-5 text-primary" />
@@ -1160,3 +1542,240 @@
 	onConfirm={handleDeleteCourse}
 	onCancel={() => (isDeleteCourseModalOpen = false)}
 />
+
+<!-- Manual Enroll Student Modal -->
+{#if isEnrollModalOpen}
+	<div class="modal modal-open">
+		<div class="modal-box max-w-md rounded-3xl border border-white/10 bg-base-100/90 backdrop-blur-2xl p-6 space-y-4 shadow-2xl">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
+				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
+					<UserPlus class="w-5 h-5 text-primary" />
+					Enroll Student Manually
+				</h3>
+				<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => (isEnrollModalOpen = false)}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			<form onsubmit={(e) => { e.preventDefault(); handleAdminEnrollStudent(); }} class="space-y-4">
+				<div class="space-y-1.5">
+					<label for="enroll-student-email" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80 block">
+						Student Email or User ID <span class="text-error">*</span>
+					</label>
+					<input
+						id="enroll-student-email"
+						type="text"
+						bind:value={newStudentEmail}
+						placeholder="e.g. student@example.com or GUID"
+						class="input input-bordered w-full rounded-xl bg-base-200/50 text-sm font-semibold"
+						required
+					/>
+					<p class="text-[11px] text-base-content/60 leading-relaxed">
+						Enrolling will immediately grant the student access to all lessons, assignments, and examinations in this course.
+					</p>
+				</div>
+
+				<div class="flex justify-end gap-2 pt-2 border-t border-base-content/10">
+					<button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick={() => (isEnrollModalOpen = false)}>Cancel</button>
+					<button
+						type="submit"
+						class="btn btn-sm btn-primary gradient-accent text-white font-bold rounded-xl gap-1.5 border-0 shadow-md"
+						disabled={isEnrollingStudent || !newStudentEmail.trim()}
+					>
+						{#if isEnrollingStudent}
+							<span class="loading loading-spinner loading-xs"></span>
+						{:else}
+							<UserPlus class="w-4 h-4" />
+							Enroll Student
+						{/if}
+					</button>
+				</div>
+			</form>
+		</div>
+		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isEnrollModalOpen = false)}></div>
+	</div>
+{/if}
+
+<!-- Unenroll Confirmation Modal -->
+<ConfirmModal
+	isOpen={isUnenrollModalOpen}
+	title="Un-enroll Student"
+	message={`Are you sure you want to remove student "${removingEnrollment?.fullName || 'Selected Student'}" (${removingEnrollment?.email || ''}) from this course? Their progress data for this course will be cleared.`}
+	confirmText="Un-enroll Student"
+	isDanger={true}
+	isLoading={isRemovingEnrollment}
+	onConfirm={handleAdminRemoveEnrollment}
+	onCancel={() => { isUnenrollModalOpen = false; removingEnrollment = null; }}
+/>
+
+<!-- Student Detailed Progress Inspection Modal -->
+{#if isStudentDetailModalOpen && selectedStudentForDetail}
+	<div class="modal modal-open">
+		<div class="modal-box max-w-2xl rounded-3xl border border-white/10 bg-base-100/95 backdrop-blur-2xl p-6 sm:p-8 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-4">
+				<div class="flex items-center gap-3">
+					<div class="avatar placeholder">
+						<div class="w-12 h-12 rounded-2xl bg-primary/15 text-primary font-extrabold text-base flex items-center justify-center border border-primary/20">
+							{selectedStudentForDetail.fullName ? selectedStudentForDetail.fullName.substring(0, 2).toUpperCase() : 'ST'}
+						</div>
+					</div>
+					<div>
+						<h3 class="font-extrabold text-lg text-base-content">{selectedStudentForDetail.fullName}</h3>
+						<p class="text-xs text-base-content/60">{selectedStudentForDetail.email}</p>
+					</div>
+				</div>
+				<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => (isStudentDetailModalOpen = false)}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			<!-- Progress Snapshot Summary Cards -->
+			<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+				<div class="bg-base-200/50 p-3 rounded-2xl border border-white/5 space-y-1">
+					<span class="text-[10px] uppercase font-bold text-base-content/50">Overall Progress</span>
+					<div class="text-lg font-black text-primary">{selectedStudentForDetail.progressPercent}%</div>
+				</div>
+				<div class="bg-base-200/50 p-3 rounded-2xl border border-white/5 space-y-1">
+					<span class="text-[10px] uppercase font-bold text-base-content/50">Lessons Done</span>
+					<div class="text-lg font-black text-base-content">{selectedStudentForDetail.completedLessonsCount} / {selectedStudentForDetail.totalLessonsCount}</div>
+				</div>
+				<div class="bg-base-200/50 p-3 rounded-2xl border border-white/5 space-y-1">
+					<span class="text-[10px] uppercase font-bold text-base-content/50">Assignments</span>
+					<div class="text-lg font-black text-base-content">{selectedStudentForDetail.completedAssignmentsCount} / {selectedStudentForDetail.totalAssignmentsCount}</div>
+				</div>
+				<div class="bg-base-200/50 p-3 rounded-2xl border border-white/5 space-y-1">
+					<span class="text-[10px] uppercase font-bold text-base-content/50">Enrolled Date</span>
+					<div class="text-xs font-semibold text-base-content/80 pt-1">{new Date(selectedStudentForDetail.enrolledAtUtc).toLocaleDateString()}</div>
+				</div>
+			</div>
+
+			<!-- Course Examinations Progression & Retake Controls -->
+			<div class="space-y-3">
+				<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+					<Award class="w-4 h-4 text-primary" />
+					Course Examinations & Attempt Supervision
+				</h4>
+
+				{#if !selectedStudentForDetail.exams || selectedStudentForDetail.exams.length === 0}
+					<div class="p-4 rounded-2xl bg-base-200/40 text-center text-xs text-base-content/60 border border-dashed border-base-300">
+						No examinations are attached to this course curriculum.
+					</div>
+				{:else}
+					<div class="space-y-2.5">
+						{#each selectedStudentForDetail.exams as exam}
+							<div class="glass-card p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+								<div class="space-y-1">
+									<div class="font-bold text-sm text-base-content">{exam.examTitle}</div>
+									<div class="flex items-center gap-2 text-xs text-base-content/60">
+										<span>Status:</span>
+										{#if exam.status === 'Completed'}
+											<span class="badge badge-success text-white badge-xs font-bold">Completed ({exam.score}%)</span>
+										{:else if exam.status === 'Disqualified'}
+											<span class="badge badge-error text-white badge-xs font-bold">Disqualified (Anti-cheat)</span>
+										{:else if exam.status === 'TimedOut'}
+											<span class="badge badge-warning badge-xs font-bold">Timed Out</span>
+										{:else if exam.status === 'InProgress'}
+											<span class="badge badge-info text-white badge-xs font-semibold">Active Session</span>
+										{:else}
+											<span class="badge badge-ghost badge-xs">Not Attempted</span>
+										{/if}
+										{#if exam.finishedAtUtc}
+											<span>• Submitted: {new Date(exam.finishedAtUtc).toLocaleDateString()}</span>
+										{/if}
+									</div>
+								</div>
+
+								<div class="flex items-center gap-2 shrink-0">
+									{#if exam.status !== 'NotStarted'}
+										<button
+											type="button"
+											class="btn btn-primary btn-sm rounded-xl text-white font-bold gap-1.5 shadow-md"
+											onclick={() => openRetakeModal(selectedStudentForDetail!, exam)}
+										>
+											<RotateCcw class="w-3.5 h-3.5" />
+											Grant Exam Retake
+										</button>
+									{:else}
+										<span class="text-xs text-base-content/40 italic">Candidate has not started</span>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<div class="flex justify-end pt-4 border-t border-base-content/10">
+				<button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick={() => (isStudentDetailModalOpen = false)}>
+					Close
+				</button>
+			</div>
+		</div>
+		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isStudentDetailModalOpen = false)}></div>
+	</div>
+{/if}
+
+<!-- Grant Exam Retake Confirmation Modal -->
+{#if isRetakeModalOpen && retakeTarget}
+	<div class="modal modal-open">
+		<div class="modal-box max-w-md rounded-3xl border border-white/10 bg-base-100/95 backdrop-blur-2xl p-6 space-y-4 shadow-2xl">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
+				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
+					<RotateCcw class="w-5 h-5 text-primary" />
+					Grant Examination Retake
+				</h3>
+				<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => (isRetakeModalOpen = false)}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			<div class="space-y-3">
+				<p class="text-xs text-base-content/80 leading-relaxed">
+					Are you sure you want to allow <strong>{retakeTarget.studentName}</strong> to retake <strong>{retakeTarget.examTitle}</strong>?
+				</p>
+
+				<div class="p-3 bg-primary/10 rounded-2xl border border-primary/20 text-[11px] text-primary space-y-1">
+					<p class="font-bold">What happens when you grant a retake:</p>
+					<ul class="list-disc pl-4 space-y-0.5 opacity-90">
+						<li>Previous blocked, timed-out, or disqualified attempt will be reset.</li>
+						<li>Active Redis session locks will be flushed immediately.</li>
+						<li>The student can immediately launch a fresh attempt.</li>
+					</ul>
+				</div>
+
+				<div class="space-y-1">
+					<label for="retake-reason" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+						Reason / Note (Optional)
+					</label>
+					<input
+						id="retake-reason"
+						type="text"
+						bind:value={retakeReason}
+						placeholder="e.g. Technical network glitch / False positive resolved"
+						class="input input-bordered input-sm w-full rounded-xl bg-base-200/50 text-xs"
+					/>
+				</div>
+			</div>
+
+			<div class="flex justify-end gap-2 pt-3 border-t border-base-content/10">
+				<button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick={() => (isRetakeModalOpen = false)}>
+					Cancel
+				</button>
+				<button
+					type="button"
+					class="btn btn-sm btn-primary gradient-accent text-white font-bold rounded-xl gap-1.5 shadow-md border-0"
+					onclick={handleGrantRetake}
+					disabled={isGrantingRetake}
+				>
+					{#if isGrantingRetake}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else}
+						<RotateCcw class="w-3.5 h-3.5" />
+					{/if}
+					Confirm & Unlock Retake
+				</button>
+			</div>
+		</div>
+		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isRetakeModalOpen = false)}></div>
+	</div>
+{/if}

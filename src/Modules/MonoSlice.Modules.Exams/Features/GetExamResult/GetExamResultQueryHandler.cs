@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Exams.Domain;
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
@@ -57,7 +58,9 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
             throw new NotFoundException(nameof(QuizExam), submission.ExamId);
         }
 
-        var canViewExplanations = exam.Mode == QuizMode.Simulation || submission.Status == SubmissionStatus.Completed;
+        var canViewExplanations = submission.AppliedRules.CanTabSwitch ||
+                                  submission.Status == SubmissionStatus.Completed ||
+                                  submission.Status == SubmissionStatus.TimedOut;
 
         var resolvedQuestions = new List<(BankQuestion Question, decimal Points)>();
 
@@ -76,6 +79,12 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
             }
         }
 
+        var rng = new Random(submission.RandomSeed);
+        if (exam.ShuffleQuestions)
+        {
+            resolvedQuestions = resolvedQuestions.OrderBy(_ => rng.Next()).ToList();
+        }
+
         var questionReviews = resolvedQuestions.Select(item =>
         {
             var q = item.Question;
@@ -90,6 +99,11 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
                 canViewExplanations && o.IsCorrect
             )).ToList();
 
+            if (exam.ShuffleOptions)
+            {
+                options = options.OrderBy(_ => rng.Next()).ToList();
+            }
+
             return new QuestionReviewDto(
                 q.Id,
                 q.QuestionText,
@@ -102,11 +116,25 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
                 options);
         }).ToList();
 
+        var appliedRulesDto = new ExamRuleConfigDto(
+            submission.AppliedRules.Name,
+            submission.AppliedRules.CanTabSwitch,
+            submission.AppliedRules.MaxTabSwitchesAllowed,
+            submission.AppliedRules.RestrictClipboardAndMouse,
+            submission.AppliedRules.ForceFullscreen,
+            submission.AppliedRules.KeyboardDetection,
+            submission.AppliedRules.RequireCamera,
+            submission.AppliedRules.SnapshotIntervalSeconds,
+            submission.AppliedRules.RequireMicrophone,
+            submission.AppliedRules.MaxAllowedViolations,
+            submission.AppliedRules.AutoDisqualifyOnExceed);
+
         var dto = new ExamResultDetailsDto(
             submission.Id,
             exam.Id,
             exam.Title,
-            exam.Mode.ToString(),
+            exam.ExamRuleId,
+            appliedRulesDto,
             submission.Status.ToString(),
             submission.Score,
             submission.IsPassed,

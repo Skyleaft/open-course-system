@@ -156,13 +156,14 @@
 	{:else if exams.length > 0}
 		<div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
 			{#each exams as exam (exam.id)}
-				{@const isReal = exam.mode === 'RealExam'}
-				<GlassCard class="flex flex-col justify-between p-6 border {isReal ? 'border-primary/20' : 'border-white/10'} hover:border-primary/40 transition-all space-y-4 shadow-xl">
+				{@const ruleName = exam.ruleConfig?.name || exam.mode || 'Exam'}
+				{@const isStrict = exam.ruleConfig ? !exam.ruleConfig.canTabSwitch : exam.mode === 'RealExam'}
+				<GlassCard class="flex flex-col justify-between p-6 border {isStrict ? 'border-primary/20' : 'border-white/10'} hover:border-primary/40 transition-all space-y-4 shadow-xl">
 					<div class="space-y-3">
 						<div class="flex items-center justify-between">
 							<div class="flex items-center gap-2">
-								<span class="badge {isReal ? 'badge-primary font-bold' : 'badge-ghost'} badge-xs uppercase">
-									{exam.mode === 'RealExam' ? 'Proctored' : 'Simulation'}
+								<span class="badge {isStrict ? 'badge-primary font-bold' : 'badge-ghost'} badge-xs">
+									{ruleName}
 								</span>
 								<span class="badge {exam.isPublished ? 'badge-success text-white' : 'badge-warning'} badge-xs font-semibold">
 									{exam.isPublished ? 'Published' : 'Draft'}
@@ -200,11 +201,11 @@
 							</span>
 							<span>&bull;</span>
 							<span>Pass: {exam.passingScore}%</span>
-							{#if isReal}
+							{#if isStrict}
 								<span>&bull;</span>
 								<span class="inline-flex items-center gap-1 text-warning">
 									<ShieldAlert class="h-3.5 w-3.5" />
-									Max {exam.maxAllowedViolations} Violations
+									Max {exam.ruleConfig?.maxAllowedViolations ?? exam.maxAllowedViolations ?? 3} Strikes
 								</span>
 							{/if}
 						</div>

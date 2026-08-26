@@ -1,5 +1,6 @@
-using Mapster;
+using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Exams.Domain;
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
@@ -29,14 +30,44 @@ public sealed class CreateExamCommandHandler : ICommandHandler<CreateExamCommand
             throw new UnauthorizedAccessException("Authentication required to create exams.");
         }
 
+        ExamRuleConfig ruleConfig;
+        if (command.RuleConfig != null)
+        {
+            ruleConfig = new ExamRuleConfig
+            {
+                Name = command.RuleConfig.Name,
+                CanTabSwitch = command.RuleConfig.CanTabSwitch,
+                MaxTabSwitchesAllowed = command.RuleConfig.MaxTabSwitchesAllowed,
+                RestrictClipboardAndMouse = command.RuleConfig.RestrictClipboardAndMouse,
+                ForceFullscreen = command.RuleConfig.ForceFullscreen,
+                KeyboardDetection = command.RuleConfig.KeyboardDetection,
+                RequireCamera = command.RuleConfig.RequireCamera,
+                SnapshotIntervalSeconds = command.RuleConfig.SnapshotIntervalSeconds,
+                RequireMicrophone = command.RuleConfig.RequireMicrophone,
+                MaxAllowedViolations = command.RuleConfig.MaxAllowedViolations,
+                AutoDisqualifyOnExceed = command.RuleConfig.AutoDisqualifyOnExceed
+            };
+        }
+        else if (command.ExamRuleId.HasValue)
+        {
+            var rule = await _dbContext.ExamRules
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Id == command.ExamRuleId.Value, cancellationToken);
+            ruleConfig = rule != null ? rule.ToConfig() : ExamRuleConfig.StrictProctored();
+        }
+        else
+        {
+            ruleConfig = ExamRuleConfig.StrictProctored();
+        }
+
         var exam = QuizExam.Create(
             _currentUser.UserId.Value,
             command.Title,
             command.Description,
-            command.Mode,
             command.DurationMinutes,
             command.PassingScore,
-            command.MaxAllowedViolations,
+            command.ExamRuleId,
+            ruleConfig,
             command.MaxAttempts,
             command.AvailableFromUtc,
             command.AvailableToUtc,
@@ -47,10 +78,37 @@ public sealed class CreateExamCommandHandler : ICommandHandler<CreateExamCommand
         await _dbContext.Exams.AddAsync(exam, cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        var dto = exam.Adapt<ExamDetailDto>() with
-        {
-            Mode = exam.Mode.ToString()
-        };
+        var ruleConfigDto = new ExamRuleConfigDto(
+            exam.RuleConfig.Name,
+            exam.RuleConfig.CanTabSwitch,
+            exam.RuleConfig.MaxTabSwitchesAllowed,
+            exam.RuleConfig.RestrictClipboardAndMouse,
+            exam.RuleConfig.ForceFullscreen,
+            exam.RuleConfig.KeyboardDetection,
+            exam.RuleConfig.RequireCamera,
+            exam.RuleConfig.SnapshotIntervalSeconds,
+            exam.RuleConfig.RequireMicrophone,
+            exam.RuleConfig.MaxAllowedViolations,
+            exam.RuleConfig.AutoDisqualifyOnExceed);
+
+        var dto = new ExamDetailDto(
+            exam.Id,
+            exam.InstructorId,
+            exam.Title,
+            exam.Description,
+            exam.ExamRuleId,
+            ruleConfigDto,
+            exam.DurationMinutes,
+            exam.PassingScore,
+            exam.MaxAttempts,
+            exam.AvailableFromUtc,
+            exam.AvailableToUtc,
+            exam.IsPublished,
+            exam.ShuffleQuestions,
+            exam.ShuffleOptions,
+            exam.CreatedBy,
+            exam.UpdatedBy,
+            exam.CreatedAtUtc);
 
         return ApiResponse.Ok(dto, "Exam created successfully.");
     }

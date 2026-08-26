@@ -2,6 +2,7 @@
 	import PageShell from '#lib/components/layout/PageShell.svelte';
 	import GlassCard from '#lib/components/ui/GlassCard.svelte';
 	import { authStore } from '#lib/stores/auth.svelte.ts';
+	import { customizationStore } from '#lib/stores/customization.svelte.ts';
 	import {
 		Sparkles,
 		ShieldCheck,
@@ -25,16 +26,16 @@
 			<div class="relative z-10 mx-auto max-w-4xl space-y-6">
 				<div class="inline-flex items-center gap-2 rounded-full border border-white/10 bg-base-100/50 px-4 py-1.5 backdrop-blur-xl shadow-sm">
 					<span class="gradient-accent flex h-2 w-2 rounded-full animate-pulse"></span>
-					<span class="text-xs font-semibold text-base-content/80">Next-Gen Realtime Examination & LMS</span>
+					<span class="text-xs font-semibold text-base-content/80">{customizationStore.data.branding.tagline}</span>
 				</div>
 
 				<h1 class="text-4xl font-extrabold tracking-tight text-base-content sm:text-6xl md:text-7xl">
-					Learn Without Limits. <br />
-					<span class="text-gradient">Examine With Integrity.</span>
+					{customizationStore.data.branding.siteName} <br />
+					<span class="text-gradient">Learn Without Limits.</span>
 				</h1>
 
 				<p class="mx-auto max-w-2xl text-base text-base-content/70 sm:text-lg">
-					A high-concurrency learning management system paired with an anti-cheat examination engine. Deterministic question shuffling, realtime proctoring streams, and instant verifiable certificates.
+					{customizationStore.data.branding.description}
 				</p>
 
 				<div class="flex flex-wrap items-center justify-center gap-4 pt-4">

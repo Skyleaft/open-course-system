@@ -12,7 +12,8 @@
 		PlusCircle,
 		ShieldCheck,
 		FileCheck2,
-		HelpCircle
+		HelpCircle,
+		Sliders
 	} from '@lucide/svelte';
 
 	interface Props {
@@ -60,6 +61,17 @@
 					</li>
 					<li>
 						<a
+							href="/my-courses"
+							class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors {isActive('/my-courses')
+								? 'bg-primary/15 text-primary font-semibold border border-primary/20'
+								: 'text-base-content/80 hover:bg-base-100/40 hover:text-base-content'}"
+						>
+							<GraduationCap class="h-4 w-4 text-primary" />
+							My Courses
+						</a>
+					</li>
+					<li>
+						<a
 							href="/courses"
 							class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors {isActive('/courses')
 								? 'bg-primary/15 text-primary font-semibold border border-primary/20'
@@ -67,17 +79,6 @@
 						>
 							<BookOpen class="h-4 w-4" />
 							Course Catalog
-						</a>
-					</li>
-					<li>
-						<a
-							href="/exams"
-							class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors {isActive('/exams')
-								? 'bg-primary/15 text-primary font-semibold border border-primary/20'
-								: 'text-base-content/80 hover:bg-base-100/40 hover:text-base-content'}"
-						>
-							<GraduationCap class="h-4 w-4" />
-							Examinations
 						</a>
 					</li>
 					<li>
@@ -152,6 +153,17 @@
 							>
 								<HelpCircle class="h-4 w-4" />
 								Question Banks
+							</a>
+						</li>
+						<li>
+							<a
+								href="/instructor/settings"
+								class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors {isActive('/instructor/settings')
+									? 'bg-primary/15 text-primary font-semibold border border-primary/20'
+									: 'text-base-content/80 hover:bg-base-100/40 hover:text-base-content'}"
+							>
+								<Sliders class="h-4 w-4 text-primary" />
+								Site Customization
 							</a>
 						</li>
 					</ul>

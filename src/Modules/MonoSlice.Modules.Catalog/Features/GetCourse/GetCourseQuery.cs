@@ -18,13 +18,15 @@ public sealed record CourseCurriculumDto(
     IReadOnlyList<SectionDto> Sections,
     IReadOnlyList<AssignmentDto> Assignments,
     IReadOnlyList<CourseExamDto> Exams,
-    bool IsEnrolled = false);
+    bool IsEnrolled = false,
+    int EnrolledStudentsCount = 0);
 
 public sealed record CourseExamDto(
     Guid Id,
     Guid ExamId,
     int OrderIndex,
-    bool IsMandatory);
+    bool IsMandatory,
+    string? ExamTitle = null);
 
 public sealed record SectionDto(
     Guid Id,

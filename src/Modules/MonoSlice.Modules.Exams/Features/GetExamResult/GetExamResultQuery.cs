@@ -1,3 +1,4 @@
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
 
@@ -9,7 +10,8 @@ public sealed record ExamResultDetailsDto(
     Guid SubmissionId,
     Guid ExamId,
     string ExamTitle,
-    string Mode,
+    Guid? ExamRuleId,
+    ExamRuleConfigDto AppliedRules,
     string Status,
     decimal? Score,
     bool? IsPassed,

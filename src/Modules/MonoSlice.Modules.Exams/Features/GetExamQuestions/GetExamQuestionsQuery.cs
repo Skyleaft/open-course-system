@@ -1,3 +1,4 @@
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
 
@@ -9,10 +10,20 @@ public sealed record StudentExamPaperDto(
     Guid SubmissionId,
     Guid ExamId,
     string Title,
-    string Mode,
+    ExamRuleConfigDto AppliedRules,
     DateTime StartedAtUtc,
     DateTime MaxAllowedEndTimeUtc,
-    IReadOnlyList<StudentQuestionDto> Questions);
+    string ActiveSessionToken,
+    IReadOnlyList<StudentQuestionDto> Questions,
+    IReadOnlyList<StudentExamSectionDto>? Sections = null,
+    Guid? ExamRuleId = null);
+
+public sealed record StudentExamSectionDto(
+    Guid Id,
+    string Title,
+    string? Description,
+    int OrderIndex,
+    int QuestionCount);
 
 public sealed record StudentQuestionDto(
     Guid Id,
@@ -22,7 +33,9 @@ public sealed record StudentQuestionDto(
     int DisplayOrder,
     IReadOnlyList<Guid>? SelectedOptionIds,
     string? EssayText,
-    IReadOnlyList<StudentOptionDto> Options);
+    IReadOnlyList<StudentOptionDto> Options,
+    Guid? SectionId = null,
+    string? SectionTitle = null);
 
 public sealed record StudentOptionDto(
     Guid Id,

@@ -108,3 +108,9 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Ensure native select popup options have solid background so they don't appear see-through without blur */
+select option {
+  background-color: var(--color-base-100, #1f2937);
+  color: var(--color-base-content, #f3f4f6);
+}

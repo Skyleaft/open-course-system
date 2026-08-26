@@ -7,7 +7,7 @@
 	import SyllabusTree from '$lib/components/course/SyllabusTree.svelte';
 	import EnrollmentFlow from '$lib/components/course/EnrollmentFlow.svelte';
 	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
-	import { BookOpen, Layers, Clock, ArrowLeft, Sparkles, CheckCircle2, FileText, Award } from 'lucide-svelte';
+	import { BookOpen, Layers, Clock, ArrowLeft, Sparkles, CheckCircle2, FileText, Award, Users } from 'lucide-svelte';
 
 	const courseId = (page.params.id || '') as string;
 	let course = $state<Course | null>(null);
@@ -45,6 +45,10 @@
 						<span class="text-xs text-base-content/60 flex items-center gap-1">
 							<Layers class="w-3.5 h-3.5 text-primary" />
 							{course.sections?.length || 0} Sections
+						</span>
+						<span class="text-xs text-base-content/60 flex items-center gap-1">
+							<Users class="w-3.5 h-3.5 text-secondary" />
+							{course.enrolledStudentsCount || 0} Students Enrolled
 						</span>
 						{#if course.exams && course.exams.length > 0}
 							<span class="text-xs text-base-content/60 flex items-center gap-1">
@@ -117,13 +121,19 @@
 				<div>
 					<h2 class="text-xl font-bold text-base-content flex items-center gap-2">
 						<BookOpen class="w-5 h-5 text-primary" />
-						Course Syllabus
+						Course Curriculum & Milestones
 					</h2>
-					<p class="text-xs text-base-content/60">Explore sections and lessons included in this course curriculum</p>
+					<p class="text-xs text-base-content/60">Explore sections, lessons, assignments, and integrated examinations</p>
 				</div>
 			</div>
 
-			<SyllabusTree sections={course.sections || []} isEnrolled={course.isEnrolled} />
+			<SyllabusTree
+				sections={course.sections || []}
+				assignments={course.assignments || []}
+				exams={course.exams || []}
+				isEnrolled={course.isEnrolled}
+				courseId={course.id}
+			/>
 		</div>
 	{:else}
 		<div class="glass-card p-12 text-center rounded-3xl border border-base-content/10 space-y-2">

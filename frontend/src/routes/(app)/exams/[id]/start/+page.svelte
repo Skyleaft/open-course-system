@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { examsApi } from '#lib/api/exams.ts';
+	import type { ExamRuleConfig } from '$lib/api/types.ts';
 	import PreExamChecker from '#lib/components/exam/PreExamChecker.svelte';
 	import { toast } from '#lib/stores/toast.svelte.ts';
 	import { goto } from '$app/navigation';
@@ -10,6 +11,7 @@
 	let examTitle = $state('Distributed Consensus Final Examination');
 	let durationMinutes = $state(60);
 	let mode = $state('RealExam');
+	let ruleConfig = $state<ExamRuleConfig | null>(null);
 	let isLoading = $state(true);
 
 	onMount(async () => {
@@ -18,7 +20,8 @@
 			if (res) {
 				examTitle = res.title;
 				durationMinutes = res.durationMinutes;
-				mode = res.mode;
+				ruleConfig = res.ruleConfig || null;
+				mode = res.ruleConfig?.name || res.mode || 'RealExam';
 			}
 		} catch {
 			// Demo fallback
@@ -32,20 +35,15 @@
 			const startRes = await examsApi.startExam(examId);
 			if (startRes?.submissionId) {
 				// Store session token in sessionStorage for submission runner
-				sessionStorage.setItem(`exam_token_${startRes.submissionId}`, startRes.activeSessionToken);
+				if (startRes.activeSessionToken) {
+					sessionStorage.setItem(`exam_token_${startRes.submissionId}`, startRes.activeSessionToken);
+				}
 				goto(`/exams/submissions/${startRes.submissionId}`);
 			} else {
-				// Fallback demo submission ID
-				const demoSubId = 'sub-demo-123';
-				sessionStorage.setItem(`exam_token_${demoSubId}`, 'token-123');
-				goto(`/exams/submissions/${demoSubId}`);
+				toast.error('Failed to receive examination attempt session from server.');
 			}
 		} catch (err: any) {
-			toast.error(err?.message || 'Failed to initialize exam session.');
-			// Fallback demo redirect
-			const demoSubId = 'sub-demo-123';
-			sessionStorage.setItem(`exam_token_${demoSubId}`, 'token-123');
-			goto(`/exams/submissions/${demoSubId}`);
+			toast.error(err?.message || 'Failed to initialize examination attempt.');
 		}
 	}
 </script>
@@ -58,6 +56,7 @@
 			{examTitle}
 			{durationMinutes}
 			{mode}
+			rules={ruleConfig}
 			onReadyToStart={handleReadyToStart}
 		/>
 	{/if}

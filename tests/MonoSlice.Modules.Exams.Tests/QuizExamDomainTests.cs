@@ -10,23 +10,23 @@ public class QuizExamDomainTests
     public void Create_ShouldInitializeWithGuidV7AndCorrectValues()
     {
         var instructorId = Guid.CreateVersion7();
+        var ruleConfig = ExamRuleConfig.StrictProctored();
         var exam = QuizExam.Create(
             instructorId,
             "C# Certification Exam",
             "Professional C# assessment",
-            QuizMode.RealExam,
             durationMinutes: 90,
             passingScore: 75m,
-            maxAllowedViolations: 3);
+            ruleConfig: ruleConfig);
 
         Assert.NotEqual(Guid.Empty, exam.Id);
         Assert.Equal(instructorId, exam.InstructorId);
         Assert.Equal(instructorId, exam.CreatedBy);
         Assert.Equal("C# Certification Exam", exam.Title);
-        Assert.Equal(QuizMode.RealExam, exam.Mode);
+        Assert.Equal("Strict Proctored", exam.RuleConfig.Name);
         Assert.Equal(90, exam.DurationMinutes);
         Assert.Equal(75m, exam.PassingScore);
-        Assert.Equal(3, exam.MaxAllowedViolations);
+        Assert.Equal(3, exam.RuleConfig.MaxAllowedViolations);
         Assert.False(exam.IsPublished);
         Assert.Empty(exam.Sections);
     }
@@ -34,7 +34,7 @@ public class QuizExamDomainTests
     [Fact]
     public void Publish_ShouldThrowException_WhenNoSectionsExist()
     {
-        var exam = QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", QuizMode.Simulation, 30, 60m);
+        var exam = QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", 30, 60m, ruleConfig: ExamRuleConfig.Practice());
 
         Assert.Throws<BusinessRuleException>(() => exam.Publish());
     }
@@ -43,7 +43,7 @@ public class QuizExamDomainTests
     public void AddSection_WithQuestionBank_AndPublish_ShouldSucceed()
     {
         var instructorId = Guid.CreateVersion7();
-        var exam = QuizExam.Create(instructorId, "Exam 1", "Desc", QuizMode.Simulation, 30, 60m);
+        var exam = QuizExam.Create(instructorId, "Exam 1", "Desc", 30, 60m, ruleConfig: ExamRuleConfig.Practice());
 
         var qb = QuestionBank.Create(instructorId, "C# Basics Bank", "Fundamentals");
         var q = qb.AddQuestion("What is CLR?", QuestionType.SingleChoice, 5m);
@@ -100,12 +100,13 @@ public class QuizExamDomainTests
             studentId,
             durationMinutes: 60,
             randomSeed: 12345,
-            activeSessionToken: "token123");
+            activeSessionToken: "token123",
+            appliedRules: new ExamRuleConfig { MaxAllowedViolations = 2, AutoDisqualifyOnExceed = true });
 
-        submission.RecordViolation("TAB_SWITCH", "User switched browser tab", maxAllowedViolations: 2);
+        submission.RecordViolation("TAB_SWITCH", "User switched browser tab");
         Assert.Equal(SubmissionStatus.InProgress, submission.Status);
 
-        submission.RecordViolation("FULLSCREEN_EXIT", "User exited full screen", maxAllowedViolations: 2);
+        submission.RecordViolation("FULLSCREEN_EXIT", "User exited full screen");
         Assert.Equal(SubmissionStatus.Disqualified, submission.Status);
     }
 
@@ -135,6 +136,6 @@ public class QuizExamDomainTests
         var to = DateTime.UtcNow.AddDays(1);
 
         Assert.Throws<BusinessRuleException>(() =>
-            QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", QuizMode.RealExam, 60, 70m, availableFromUtc: from, availableToUtc: to));
+            QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", 60, 70m, availableFromUtc: from, availableToUtc: to));
     }
 }

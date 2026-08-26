@@ -27,4 +27,6 @@ public interface IExamsModuleApi
     Task<QuizExamContractDto?> GetExamByIdAsync(Guid quizId, CancellationToken ct = default);
     Task<QuizSubmissionContractDto?> GetSubmissionByIdAsync(Guid submissionId, CancellationToken ct = default);
     Task<bool> ValidateActiveSessionAsync(Guid submissionId, Guid sessionToken, CancellationToken ct = default);
+    Task<IReadOnlyList<QuizSubmissionContractDto>> GetStudentSubmissionsForExamsAsync(Guid studentId, IEnumerable<Guid> examIds, CancellationToken ct = default);
+    Task<IReadOnlyList<QuizSubmissionContractDto>> GetStudentsSubmissionsForExamsAsync(IEnumerable<Guid> studentIds, IEnumerable<Guid> examIds, CancellationToken ct = default);
 }

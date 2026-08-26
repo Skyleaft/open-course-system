@@ -9,6 +9,7 @@ public sealed class ExamsDbContext : DbContext
 {
     public const string DefaultSchema = "exams";
 
+    public DbSet<ExamRule> ExamRules => Set<ExamRule>();
     public DbSet<QuizExam> Exams => Set<QuizExam>();
     public DbSet<QuestionBank> QuestionBanks => Set<QuestionBank>();
     public DbSet<BankQuestion> BankQuestions => Set<BankQuestion>();
@@ -29,6 +30,34 @@ public sealed class ExamsDbContext : DbContext
 
         var jsonSerializerOptions = new JsonSerializerOptions();
 
+        // ExamRule
+        modelBuilder.Entity<ExamRule>(builder =>
+        {
+            builder.ToTable("exam_rules", DefaultSchema);
+            builder.HasKey(r => r.Id);
+            builder.Property(r => r.Id).ValueGeneratedNever();
+
+            builder.Property(r => r.Name).HasMaxLength(100).IsRequired();
+            builder.Property(r => r.Description);
+            builder.Property(r => r.IsSystemPreset).HasDefaultValue(false);
+            builder.Property(r => r.CanTabSwitch).HasDefaultValue(false);
+            builder.Property(r => r.MaxTabSwitchesAllowed).HasDefaultValue(0);
+            builder.Property(r => r.RestrictClipboardAndMouse).HasDefaultValue(true);
+            builder.Property(r => r.ForceFullscreen).HasDefaultValue(true);
+            builder.Property(r => r.KeyboardDetection).HasDefaultValue(true);
+            builder.Property(r => r.RequireCamera).HasDefaultValue(true);
+            builder.Property(r => r.SnapshotIntervalSeconds).HasDefaultValue(45);
+            builder.Property(r => r.RequireMicrophone).HasDefaultValue(false);
+            builder.Property(r => r.MaxAllowedViolations).HasDefaultValue(3);
+            builder.Property(r => r.AutoDisqualifyOnExceed).HasDefaultValue(true);
+            builder.Property(r => r.CreatedBy);
+            builder.Property(r => r.CreatedAtUtc).IsRequired();
+            builder.Property(r => r.UpdatedAtUtc);
+
+            builder.HasIndex(r => r.IsSystemPreset);
+            builder.HasIndex(r => r.CreatedBy);
+        });
+
         // QuizExam
         modelBuilder.Entity<QuizExam>(builder =>
         {
@@ -39,14 +68,21 @@ public sealed class ExamsDbContext : DbContext
             builder.Property(e => e.InstructorId).IsRequired();
             builder.Property(e => e.Title).HasMaxLength(255).IsRequired();
             builder.Property(e => e.Description);
-            builder.Property(e => e.Mode)
-                .HasConversion<string>()
-                .HasMaxLength(50)
-                .IsRequired();
+
+            builder.Property(e => e.ExamRuleId);
+            builder.Property(e => e.RuleConfig)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, jsonSerializerOptions),
+                    v => JsonSerializer.Deserialize<ExamRuleConfig>(v, jsonSerializerOptions) ?? ExamRuleConfig.StrictProctored(),
+                    new ValueComparer<ExamRuleConfig>(
+                        (c1, c2) => JsonSerializer.Serialize(c1, jsonSerializerOptions) == JsonSerializer.Serialize(c2, jsonSerializerOptions),
+                        c => c == null ? 0 : JsonSerializer.Serialize(c, jsonSerializerOptions).GetHashCode(),
+                        c => JsonSerializer.Deserialize<ExamRuleConfig>(JsonSerializer.Serialize(c, jsonSerializerOptions), jsonSerializerOptions)!
+                    )
+                );
 
             builder.Property(e => e.DurationMinutes).HasDefaultValue(60).IsRequired();
             builder.Property(e => e.PassingScore).HasPrecision(5, 2).HasDefaultValue(70m);
-            builder.Property(e => e.MaxAllowedViolations).HasDefaultValue(3);
             builder.Property(e => e.MaxAttempts).HasDefaultValue(1);
             builder.Property(e => e.AvailableFromUtc);
             builder.Property(e => e.AvailableToUtc);
@@ -58,6 +94,11 @@ public sealed class ExamsDbContext : DbContext
             builder.Property(e => e.CreatedAtUtc).IsRequired();
             builder.Property(e => e.UpdatedAtUtc);
 
+            builder.HasOne<ExamRule>()
+                .WithMany()
+                .HasForeignKey(e => e.ExamRuleId)
+                .OnDelete(DeleteBehavior.SetNull);
+
             builder.HasMany(e => e.Sections)
                 .WithOne()
                 .HasForeignKey(s => s.ExamId)
@@ -66,6 +107,7 @@ public sealed class ExamsDbContext : DbContext
             builder.HasIndex(e => e.InstructorId);
             builder.HasIndex(e => e.IsPublished);
             builder.HasIndex(e => e.CreatedBy);
+            builder.HasIndex(e => e.ExamRuleId);
         });
 
         // QuestionBank (Package Aggregate)
@@ -171,6 +213,18 @@ public sealed class ExamsDbContext : DbContext
 
             builder.Property(s => s.ExamId).IsRequired();
             builder.Property(s => s.StudentId).IsRequired();
+
+            builder.Property(s => s.AppliedRules)
+                .HasConversion(
+                    v => JsonSerializer.Serialize(v, jsonSerializerOptions),
+                    v => JsonSerializer.Deserialize<ExamRuleConfig>(v, jsonSerializerOptions) ?? ExamRuleConfig.StrictProctored(),
+                    new ValueComparer<ExamRuleConfig>(
+                        (c1, c2) => JsonSerializer.Serialize(c1, jsonSerializerOptions) == JsonSerializer.Serialize(c2, jsonSerializerOptions),
+                        c => c == null ? 0 : JsonSerializer.Serialize(c, jsonSerializerOptions).GetHashCode(),
+                        c => JsonSerializer.Deserialize<ExamRuleConfig>(JsonSerializer.Serialize(c, jsonSerializerOptions), jsonSerializerOptions)!
+                    )
+                );
+
             builder.Property(s => s.StartedAtUtc).IsRequired();
             builder.Property(s => s.MaxAllowedEndTimeUtc).IsRequired();
             builder.Property(s => s.SubmittedAtUtc);

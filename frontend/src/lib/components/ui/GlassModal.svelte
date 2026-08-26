@@ -1,6 +1,8 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import { X } from 'lucide-svelte';
+	import { fade, scale } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
 
 	interface Props {
 		isOpen: boolean;
@@ -31,14 +33,18 @@
 
 {#if isOpen}
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md transition-opacity duration-300 animate-in fade-in"
+		class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
 		role="dialog"
 		aria-modal="true"
+		transition:fade={{ duration: 180 }}
 	>
 		<!-- Backdrop click -->
 		<div class="fixed inset-0" onclick={onClose} role="presentation"></div>
 
-		<div class="glass-modal relative z-10 w-full {maxWidth} overflow-hidden rounded-2xl border p-6 shadow-2xl backdrop-blur-2xl">
+		<div
+			class="glass-modal relative z-10 w-full {maxWidth} overflow-hidden rounded-2xl border p-6 shadow-2xl backdrop-blur-2xl"
+			transition:scale={{ duration: 220, start: 0.94, easing: cubicOut }}
+		>
 			{#if title}
 				<div class="mb-4 flex items-center justify-between border-b border-white/10 pb-3">
 					<h3 class="text-lg font-bold text-base-content">{title}</h3>

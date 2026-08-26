@@ -208,6 +208,30 @@ class ApiClient {
 		);
 	}
 
+	getBlob(path: string, options?: RequestInit, customFetch?: typeof fetch): Promise<Blob> {
+		const url = path.startsWith('http') ? path : `${this.baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+		const headers = new Headers(options?.headers || {});
+
+		if (this.accessToken && !headers.has('Authorization')) {
+			headers.set('Authorization', `Bearer ${this.accessToken}`);
+		}
+
+		return (async () => {
+			const response = await (customFetch || fetch)(url, {
+				...options,
+				method: 'GET',
+				headers,
+				credentials: 'include'
+			});
+
+			if (!response.ok) {
+				throw new ApiError('DOWNLOAD_FAILED', response.statusText, undefined, response.status);
+			}
+
+			return response.blob();
+		})();
+	}
+
 	delete<T>(path: string, options?: RequestInit, customFetch?: typeof fetch): Promise<T> {
 		return this.request<T>(path, { ...options, method: 'DELETE' }, customFetch);
 	}

@@ -56,24 +56,148 @@ Every feature slice lives in `Features/<FeatureName>/` within its module:
 Features/AddQuestion/
 ├── AddQuestionCommand.cs           # Command: public sealed partial class AddQuestionCommand : ICommand<ApiResponse<Guid>>
 ├── AddQuestionCommandHandler.cs   # ICommandHandler<AddQuestionCommand, ApiResponse<Guid>>
-├── AddQuestionValidator.cs        # FluentValidation AbstractValidator<AddQuestionCommand>
 └── AddQuestionEndpoint.cs         # FastEndpoint / MapGroup HTTP route
 ```
 
 > [!IMPORTANT]
-> **CQRS Class Convention**: Always define commands and queries as **`public sealed partial class`** (with init-only or get/set properties), **never** as `sealed record`. This ensures proper compatibility with source generators (Sannr/Mediator/Serialization).
+> **CQRS Class & Validation Convention**:
+> 1. Always define CQRS commands and queries as **`public sealed partial class`** (with init-only or get/set properties), **NEVER** as `record` or `sealed record`. This ensures proper compatibility with compile-time source generators (Sannr validation generators, Mediator pipelines, and JSON source generators).
+> 2. Always use **Sannr** for input validation directly on command/query properties (`using Sannr;`). Use validation attributes such as `[Required]`, `[Range(min, max)]`, `[StringLength(max, MinimumLength = min)]`, and `[EmailAddress]`.
 
-### Command Definition Example
+### Command Definition Example (with Sannr Validation)
 ```csharp
+using Sannr;
+using MonoSlice.Shared.Abstractions.Common;
+using MonoSlice.Shared.Abstractions.CQRS;
+
+namespace MonoSlice.Modules.Exams.Features.AddQuestion;
+
 public sealed partial class AddQuestionCommand : ICommand<ApiResponse<Guid>>
 {
-    public Guid? BankId { get; init; }
+    [Required]
+    public Guid BankId { get; init; }
+
+    [Required]
+    [StringLength(2000, MinimumLength = 3)]
     public string QuestionText { get; init; } = string.Empty;
+
     public QuestionType Type { get; init; } = QuestionType.SingleChoice;
+
+    [Range(0.25, 1000)]
     public decimal Points { get; init; } = 1m;
+
     public string? Explanation { get; init; }
     public List<QuestionOptionDto> Options { get; init; } = [];
 }
+```
+
+### Query Definition Example (with Sannr Validation)
+```csharp
+using Sannr;
+using MonoSlice.Shared.Abstractions.Common;
+using MonoSlice.Shared.Abstractions.CQRS;
+
+namespace MonoSlice.Modules.Exams.Features.ListExams;
+
+public sealed partial class ListExamsQuery : IQuery<ApiResponse<PaginatedList<ExamSummaryDto>>>
+{
+    public QuizMode? Mode { get; init; }
+    public bool? IsPublished { get; init; }
+    public string? SearchTerm { get; init; }
+
+    [Range(1, int.MaxValue)]
+    public int PageIndex { get; init; } = 1;
+
+    [Range(1, 1000)]
+    public int PageSize { get; init; } = 20;
+}
+```
+
+### Supported Sannr Validation Attributes
+
+| Attribute | Description | Example |
+| :--- | :--- | :--- |
+| `[Required]` | Ensures field is not null/empty | `[Required(ErrorMessage = "Name is required")]` |
+| `[StringLength]` | Validates string length | `[StringLength(50, MinimumLength = 2)]` |
+| `[Range]` | Numeric range validation | `[Range(18, 65)]` |
+| `[EmailAddress]` | Email format validation | `[EmailAddress]` |
+| `[Url]` | URL format validation | `[Url]` |
+| `[Phone]` | Phone number validation | `[Phone]` |
+| `[CreditCard]` | Credit card format | `[CreditCard]` |
+| `[FileExtensions]` | File extension validation | `[FileExtensions(Extensions = "pdf,docx")]` |
+| `[FutureDate]` | Date must be in future | `[FutureDate]` |
+| `[AllowedValues]` | Whitelist validation | `[AllowedValues("Active", "Inactive")]` |
+| `[RequiredIf]` | Conditional required | `[RequiredIf("IsEmployed", true)]` |
+| `[ConditionalRange]` | Conditional range | `[ConditionalRange("MinValue", "MaxValue")]` |
+
+### Sanitization Attributes
+Automatically clean and transform input data:
+
+```csharp
+public class UserProfile
+{
+    [Sanitize(Trim = true, ToUpper = true)]
+    public string? Username { get; set; }
+    
+    [Sanitize(ToLower = true)]
+    public string? Email { get; set; }
+}
+```
+
+### Custom Validators
+Implement complex business logic with async support:
+
+```csharp
+[CustomValidator(typeof(UserValidator))]
+public class User
+{
+    public string? Username { get; set; }
+    public string? Email { get; set; }
+}
+
+public class UserValidator : SannrValidator<User>
+{
+    public override async Task<ValidationResult> ValidateAsync(User instance, ValidationContext context)
+    {
+        var result = ValidationResult.Success();
+        
+        // Custom async validation logic
+        if (await IsUsernameTaken(instance.Username))
+        {
+            result.Errors.Add(new ValidationError("Username", "Username already exists"));
+        }
+        
+        return result;
+    }
+}
+```
+
+### Validation Groups
+Control which validations run in different scenarios:
+
+```csharp
+public class Order
+{
+    [Required]
+    public string? CustomerName { get; set; }
+    
+    [Required(Group = "Shipping")]
+    public string? ShippingAddress { get; set; }
+    
+    [Required(Group = "Billing")]
+    public string? BillingAddress { get; set; }
+}
+
+// Validate only shipping fields
+var result = await validator.ValidateAsync(order, group: "Shipping");
+```
+
+### Error Message Resources
+Support for localized error messages:
+
+```csharp
+[Required(ErrorMessageResourceName = "RequiredField", ErrorMessageResourceType = typeof(Resources.Validation))]
+public string? Name { get; set; }
 ```
 
 ### Handler Pattern
@@ -106,6 +230,30 @@ public sealed class AddQuestionCommandHandler : ICommandHandler<AddQuestionComma
 }
 ```
 
+### Endpoint Pattern & Role-Based Authorization Policy
+
+> [!IMPORTANT]
+> **MANDATORY ROLE-BASED AUTHORIZATION POLICY ON ENDPOINTS**:
+> Whenever securing an endpoint with `.RequireAuthorization()`, **NEVER** use parameterless `.RequireAuthorization()`. Always specify explicit role-based requirements via policy lambda `.RequireAuthorization(policy => policy.RequireRole(...))`:
+> - **Management & Authoring Endpoints (Instructor/Admin)**:
+>   ```csharp
+>   .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
+>   ```
+> - **System Admin / Platform Governance Endpoints**:
+>   ```csharp
+>   .RequireAuthorization(policy => policy.RequireRole("Admin"));
+>   ```
+> - **Student & Candidate Action Endpoints**:
+>   ```csharp
+>   .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
+>   ```
+> - **Proctor / Monitor Endpoints**:
+>   ```csharp
+>   .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin", "Proctor"));
+>   ```
+>
+> Public endpoints must be explicitly marked with `.AllowAnonymous()`. Never leave an endpoint with ambiguous or unconstrained authentication.
+
 ---
 
 ## 4. Entity Framework Core & PostgreSQL Multi-Schema Conventions
@@ -118,22 +266,37 @@ Each module has its own PostgreSQL schema:
 - `exams`    -> `ExamsDbContext`
 - `assessments` -> `AssessmentsDbContext`
 - `communications` -> `CommunicationsDbContext`
+- `customization` -> `CustomizationDbContext`
 
 ```csharp
 protected override void OnModelCreating(ModelBuilder modelBuilder)
 {
     base.OnModelCreating(modelBuilder);
-    modelBuilder.HasDefaultSchema("exams");
+    modelBuilder.HasDefaultSchema("customization");
 }
 ```
 
-### Adding New Migrations via EF Tools
+### Adding New Migrations via EF Tools (Mandatory on Any Schema Change)
+
+> [!IMPORTANT]
+> **MANDATORY EF CORE MIGRATION RULE**:
+> Whenever creating a new `DbContext`, adding new entities, or modifying entity configurations/table structures in any module, you **MUST IMMEDIATELY** generate the corresponding EF Core migration files before finalizing your changes. Never leave a DbContext without its migration snapshot.
+
 Always run with the module project as `--project`, Host as `--startup-project`, and explicit `--context`:
 ```bash
 dotnet ef migrations add <MigrationName> \
-  --project src/Modules/MonoSlice.Modules.Exams/MonoSlice.Modules.Exams.csproj \
+  --project src/Modules/MonoSlice.Modules.<ModuleName>/MonoSlice.Modules.<ModuleName>.csproj \
   --startup-project src/MonoSlice.Host/MonoSlice.Host.csproj \
-  --context ExamsDbContext \
+  --context <Module>DbContext \
+  --output-dir Persistence/Migrations
+```
+
+**Example for Customization**:
+```bash
+dotnet ef migrations add InitialCustomizationMigration \
+  --project src/Modules/MonoSlice.Modules.Customization/MonoSlice.Modules.Customization.csproj \
+  --startup-project src/MonoSlice.Host/MonoSlice.Host.csproj \
+  --context CustomizationDbContext \
   --output-dir Persistence/Migrations
 ```
 

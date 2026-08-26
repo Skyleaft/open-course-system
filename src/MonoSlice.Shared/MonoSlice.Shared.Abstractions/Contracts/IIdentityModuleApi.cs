@@ -12,6 +12,7 @@ public sealed record UserContractDto(
 public interface IIdentityModuleApi
 {
     Task<UserContractDto?> GetUserByIdAsync(Guid userId, CancellationToken ct = default);
+    Task<UserContractDto?> GetUserByEmailAsync(string email, CancellationToken ct = default);
     Task<bool> ValidateUserRoleAsync(Guid userId, string role, CancellationToken ct = default);
     Task<IReadOnlyList<UserContractDto>> GetUsersByIdsAsync(IEnumerable<Guid> userIds, CancellationToken ct = default);
 }

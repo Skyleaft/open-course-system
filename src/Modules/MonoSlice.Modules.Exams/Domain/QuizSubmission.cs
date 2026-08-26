@@ -7,6 +7,7 @@ public sealed class QuizSubmission : AggregateRoot<Guid>
 {
     public Guid ExamId { get; private set; }
     public Guid StudentId { get; private set; }
+    public ExamRuleConfig AppliedRules { get; private set; } = ExamRuleConfig.StrictProctored();
     public int AttemptNumber { get; private set; } = 1;
     public int DurationMinutes { get; private set; } = 60;
     public DateTime StartedAtUtc { get; private set; } = DateTime.UtcNow;
@@ -33,6 +34,7 @@ public sealed class QuizSubmission : AggregateRoot<Guid>
         int durationMinutes,
         int randomSeed,
         string activeSessionToken,
+        ExamRuleConfig? appliedRules = null,
         int attemptNumber = 1,
         DateTime? availableToUtc = null)
     {
@@ -57,6 +59,7 @@ public sealed class QuizSubmission : AggregateRoot<Guid>
             Id = Guid.CreateVersion7(),
             ExamId = examId,
             StudentId = studentId,
+            AppliedRules = appliedRules ?? ExamRuleConfig.StrictProctored(),
             AttemptNumber = Math.Max(1, attemptNumber),
             DurationMinutes = durationMinutes,
             StartedAtUtc = startedAt,
@@ -92,12 +95,15 @@ public sealed class QuizSubmission : AggregateRoot<Guid>
         return answer;
     }
 
-    public void RecordViolation(string type, string reason, int maxAllowedViolations = 3)
+    public void RecordViolation(string type, string reason, int? maxAllowedViolations = null, bool? autoDisqualify = null)
     {
         var record = new ViolationRecord(type, reason, DateTime.UtcNow);
         Violations.Add(record);
 
-        if (Violations.Count >= maxAllowedViolations)
+        var limit = maxAllowedViolations ?? AppliedRules.MaxAllowedViolations;
+        var shouldDisqualify = autoDisqualify ?? AppliedRules.AutoDisqualifyOnExceed;
+
+        if (shouldDisqualify && Violations.Count >= limit)
         {
             Status = SubmissionStatus.Disqualified;
         }

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { examsApi } from '#lib/api/exams.ts';
-	import type { ExamHubClient } from '#lib/signalr/exam-hub.ts';
+	import type { ExamHubClient } from '#lib/signalr/exam-hub.svelte.ts';
 	import { onMount, onDestroy } from 'svelte';
 
 	const browser = typeof window !== 'undefined';
@@ -17,8 +17,8 @@
 	let worker: Worker | null = null;
 	let isCapturing = $state(false);
 
-	onMount(() => {
-		if (browser && stream) {
+	$effect(() => {
+		if (browser && stream && !worker) {
 			// Initialize hidden video element
 			videoElement = document.createElement('video');
 			videoElement.srcObject = stream;
@@ -39,10 +39,12 @@
 			};
 
 			worker.postMessage({ action: 'START' });
+		} else if (!stream && worker) {
+			cleanup();
 		}
 	});
 
-	onDestroy(() => {
+	function cleanup() {
 		if (worker) {
 			worker.postMessage({ action: 'STOP' });
 			worker.terminate();
@@ -52,6 +54,10 @@
 			videoElement.srcObject = null;
 			videoElement = null;
 		}
+	}
+
+	onDestroy(() => {
+		cleanup();
 	});
 
 	async function captureAndUploadSnapshot() {

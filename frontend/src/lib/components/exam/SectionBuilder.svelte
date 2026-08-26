@@ -2,6 +2,8 @@
 	import type { QuizSection, QuestionBank, BankQuestion } from '$lib/api/types.ts';
 	import QuestionBankPackageSelector from './QuestionBankPackageSelector.svelte';
 	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
+	import { fade, scale } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
 	import {
 		Layers,
 		Plus,
@@ -304,14 +306,18 @@
 <!-- Add/Edit Section Modal (Clean Centered Modal) -->
 {#if isModalOpen}
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in"
+		class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
 		role="dialog"
 		aria-modal="true"
+		transition:fade={{ duration: 180 }}
 	>
 		<!-- Backdrop click -->
 		<div class="fixed inset-0" onclick={() => (isModalOpen = false)} role="presentation"></div>
 
-		<div class="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4">
+		<div
+			class="relative z-10 w-full max-w-lg overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4"
+			transition:scale={{ duration: 220, start: 0.94, easing: cubicOut }}
+		>
 			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
 				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
 					<Layers class="w-5 h-5 text-primary" />

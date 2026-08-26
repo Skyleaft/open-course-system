@@ -18,12 +18,20 @@
 		CheckCircle2,
 		FileText,
 		FolderPlus,
-		AlertCircle
+		AlertCircle,
+		Download,
+		FileUp,
+		ListFilter,
+		ChevronDown,
+		AlignLeft
 	} from 'lucide-svelte';
 	import { examsApi } from '$lib/api/exams.ts';
 	import type { QuestionBank, BankQuestion, QuestionType, QuestionOption } from '$lib/api/types.ts';
 	import { toast } from '$lib/stores/toast.svelte.ts';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
+	import QuestionBankModal from '$lib/components/exam/QuestionBankModal.svelte';
+	import ImportWordModal from '$lib/components/exam/ImportWordModal.svelte';
+	import QuestionModal from '$lib/components/exam/QuestionModal.svelte';
 	import RichEditor from '$lib/components/editor/RichEditor.svelte';
 	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
 
@@ -41,27 +49,14 @@
 	// Delete Bank Modal
 	let isDeleteBankModalOpen = $state(false);
 
-	// Create Question Modal
-	let isCreateQuestionModalOpen = $state(false);
-	let newQuestionText = $state('');
-	let newQuestionType = $state<QuestionType>('SingleChoice');
-	let newQuestionPoints = $state(5);
-	let newQuestionExplanation = $state('');
-	let newQuestionOptions = $state<Array<{ text: string; isCorrect: boolean }>>([
-		{ text: 'Option A', isCorrect: true },
-		{ text: 'Option B', isCorrect: false },
-		{ text: 'Option C', isCorrect: false },
-		{ text: 'Option D', isCorrect: false }
-	]);
+	// Import Word Modal
+	let isImportModalOpen = $state(false);
+	let isDownloadingTemplate = $state(false);
 
-	// Edit Question Modal
-	let isEditQuestionModalOpen = $state(false);
-	let editingQuestionId = $state<string | null>(null);
-	let editQuestionText = $state('');
-	let editQuestionType = $state<QuestionType>('SingleChoice');
-	let editQuestionPoints = $state(5);
-	let editQuestionExplanation = $state('');
-	let editQuestionOptions = $state<Array<{ id?: string; text: string; isCorrect: boolean }>>([]);
+	// Question Modal (Create / Edit)
+	let isQuestionModalOpen = $state(false);
+	let questionModalMode = $state<'create' | 'edit'>('create');
+	let editingQuestion = $state<BankQuestion | null>(null);
 
 	// Delete Question Modal
 	let isDeleteQuestionModalOpen = $state(false);
@@ -73,6 +68,48 @@
 	let editBankCategory = $state('');
 	let editBankDescription = $state('');
 	let editBankTags = $state('');
+
+	async function handleDownloadTemplate() {
+		isDownloadingTemplate = true;
+		try {
+			const blob = await examsApi.downloadQuestionBankTemplate();
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = 'QuestionBank-Template.docx';
+			document.body.appendChild(a);
+			a.click();
+			window.URL.revokeObjectURL(url);
+			document.body.removeChild(a);
+			toast.success('Question Bank Word Template downloaded.');
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to download Word template.');
+		} finally {
+			isDownloadingTemplate = false;
+		}
+	}
+
+	async function handleImportQuestions(payload: { file: File }) {
+		if (!bankId || !payload.file) return;
+
+		const formData = new FormData();
+		formData.append('file', payload.file);
+
+		isActionLoading = true;
+		try {
+			const result = await examsApi.importQuestionBank(formData, bankId);
+			toast.success(`Imported and appended ${result.totalImportedQuestions} questions into "${bank?.title || 'this bank'}"!`);
+			if (result.warnings && result.warnings.length > 0) {
+				toast.info(result.warnings.join(' | '));
+			}
+			isImportModalOpen = false;
+			await loadBankDetails();
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to import questions from Word document.');
+		} finally {
+			isActionLoading = false;
+		}
+	}
 
 	const questionTypes: Array<{ id: QuestionType; label: string; icon: typeof CheckCircle2 }> = [
 		{ id: 'SingleChoice', label: 'Single Choice', icon: CheckCircle2 },
@@ -119,101 +156,56 @@
 	const multipleChoiceCount = $derived(questions.filter((q) => q.type === 'MultipleChoice').length);
 
 	function openCreateQuestion() {
-		newQuestionText = '';
-		newQuestionType = 'SingleChoice';
-		newQuestionPoints = 5;
-		newQuestionExplanation = '';
-		newQuestionOptions = [
-			{ text: 'Option A', isCorrect: true },
-			{ text: 'Option B', isCorrect: false },
-			{ text: 'Option C', isCorrect: false },
-			{ text: 'Option D', isCorrect: false }
-		];
-		isCreateQuestionModalOpen = true;
-	}
-
-	async function handleSaveNewQuestion(e: Event) {
-		e.preventDefault();
-		if (!newQuestionText.trim()) {
-			toast.warning('Question prompt cannot be empty.');
-			return;
-		}
-
-		if (newQuestionType === 'SingleChoice' || newQuestionType === 'MultipleChoice' || newQuestionType === 'TrueFalse') {
-			const hasCorrect = newQuestionOptions.some((o) => o.isCorrect);
-			if (!hasCorrect) {
-				toast.warning('Please mark at least one option as the correct answer.');
-				return;
-			}
-			const hasEmpty = newQuestionOptions.some((o) => !o.text.trim());
-			if (hasEmpty) {
-				toast.warning('All option choices must have text.');
-				return;
-			}
-		}
-
-		isActionLoading = true;
-		try {
-			await examsApi.addQuestion(bankId, {
-				bankId,
-				questionText: newQuestionText.trim(),
-				type: newQuestionType,
-				points: Number(newQuestionPoints),
-				explanation: newQuestionExplanation.trim() || undefined,
-				options: newQuestionOptions.map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect }))
-			});
-
-			toast.success('Question added to Question Bank pool successfully!');
-			isCreateQuestionModalOpen = false;
-			await loadBankDetails();
-		} catch (err: any) {
-			toast.error(err?.message || 'Failed to add question.');
-		} finally {
-			isActionLoading = false;
-		}
+		questionModalMode = 'create';
+		editingQuestion = null;
+		isQuestionModalOpen = true;
 	}
 
 	function openEditQuestion(question: BankQuestion) {
-		editingQuestionId = question.id;
-		editQuestionText = question.questionText || question.text || '';
-		editQuestionType = question.type;
-		editQuestionPoints = question.points || 5;
-		editQuestionExplanation = question.explanation || '';
-		editQuestionOptions = (question.options || []).map((o) => ({
-			id: o.id,
-			text: o.text,
-			isCorrect: Boolean(o.isCorrect)
-		}));
-		isEditQuestionModalOpen = true;
+		questionModalMode = 'edit';
+		editingQuestion = question;
+		isQuestionModalOpen = true;
 	}
 
-	async function handleUpdateQuestion(e: Event) {
-		e.preventDefault();
-		if (!editingQuestionId) return;
-		if (!editQuestionText.trim()) {
-			toast.warning('Question prompt cannot be empty.');
-			return;
-		}
+	async function handleSaveQuestion(data: {
+		questionText: string;
+		type: QuestionType;
+		points: number;
+		explanation?: string;
+		options: Array<{ id?: string; text: string; isCorrect: boolean }>;
+	}) {
+		if (!bankId) return;
 
 		isActionLoading = true;
 		try {
-			await examsApi.updateQuestion(editingQuestionId, {
-				questionText: editQuestionText.trim(),
-				type: editQuestionType,
-				points: Number(editQuestionPoints),
-				explanation: editQuestionExplanation.trim() || undefined,
-				options: editQuestionOptions.map((o) => ({
-					id: o.id,
-					text: o.text.trim(),
-					isCorrect: o.isCorrect
-				}))
-			});
-
-			toast.success('Question updated successfully!');
-			isEditQuestionModalOpen = false;
+			if (questionModalMode === 'create') {
+				await examsApi.addQuestion(bankId, {
+					bankId,
+					questionText: data.questionText,
+					type: data.type,
+					points: data.points,
+					explanation: data.explanation,
+					options: data.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect }))
+				});
+				toast.success('Question added to Question Bank pool successfully!');
+			} else if (editingQuestion?.id) {
+				await examsApi.updateQuestion(editingQuestion.id, {
+					questionText: data.questionText,
+					type: data.type,
+					points: data.points,
+					explanation: data.explanation,
+					options: data.options.map((o) => ({
+						id: o.id,
+						text: o.text,
+						isCorrect: o.isCorrect
+					}))
+				});
+				toast.success('Question updated successfully!');
+			}
+			isQuestionModalOpen = false;
 			await loadBankDetails();
 		} catch (err: any) {
-			toast.error(err?.message || 'Failed to update question.');
+			toast.error(err?.message || 'Failed to save question.');
 		} finally {
 			isActionLoading = false;
 		}
@@ -248,24 +240,19 @@
 		isEditBankModalOpen = true;
 	}
 
-	async function handleSaveBankInfo() {
-		if (!bankId || !editBankTitle.trim()) {
+	async function handleSaveBankInfo(data: { title: string; category: string; description: string; tags: string[] }) {
+		if (!bankId || !data.title.trim()) {
 			toast.warning('Pool title cannot be empty.');
 			return;
 		}
 
-		const tagsList = editBankTags
-			.split(',')
-			.map((t) => t.trim())
-			.filter(Boolean);
-
 		isActionLoading = true;
 		try {
 			await examsApi.updateQuestionBank(bankId, {
-				title: editBankTitle.trim(),
-				category: editBankCategory.trim() || undefined,
-				description: editBankDescription.trim() || undefined,
-				tags: tagsList
+				title: data.title.trim(),
+				category: data.category.trim() || undefined,
+				description: data.description.trim() || undefined,
+				tags: data.tags
 			});
 			toast.success('Question Bank pool updated successfully.');
 			isEditBankModalOpen = false;
@@ -289,47 +276,6 @@
 			toast.error(err?.message || 'Failed to delete Question Bank pool.');
 		} finally {
 			isActionLoading = false;
-		}
-	}
-
-	// Helper for Option management
-	function addOption(target: 'new' | 'edit') {
-		if (target === 'new') {
-			newQuestionOptions = [...newQuestionOptions, { text: `Option ${String.fromCharCode(65 + newQuestionOptions.length)}`, isCorrect: false }];
-		} else {
-			editQuestionOptions = [...editQuestionOptions, { text: `Option ${String.fromCharCode(65 + editQuestionOptions.length)}`, isCorrect: false }];
-		}
-	}
-
-	function removeOption(target: 'new' | 'edit', index: number) {
-		if (target === 'new') {
-			if (newQuestionOptions.length <= 2) return;
-			newQuestionOptions = newQuestionOptions.filter((_, i) => i !== index);
-		} else {
-			if (editQuestionOptions.length <= 2) return;
-			editQuestionOptions = editQuestionOptions.filter((_, i) => i !== index);
-		}
-	}
-
-	function setCorrectOption(target: 'new' | 'edit', index: number, isMulti: boolean) {
-		if (target === 'new') {
-			if (isMulti) {
-				newQuestionOptions[index].isCorrect = !newQuestionOptions[index].isCorrect;
-			} else {
-				newQuestionOptions = newQuestionOptions.map((opt, i) => ({
-					...opt,
-					isCorrect: i === index
-				}));
-			}
-		} else {
-			if (isMulti) {
-				editQuestionOptions[index].isCorrect = !editQuestionOptions[index].isCorrect;
-			} else {
-				editQuestionOptions = editQuestionOptions.map((opt, i) => ({
-					...opt,
-					isCorrect: i === index
-				}));
-			}
 		}
 	}
 </script>
@@ -387,14 +333,37 @@
 					{/if}
 				</div>
 
-				<div class="flex items-center gap-2 flex-shrink-0">
+				<div class="flex items-center gap-2 flex-wrap flex-shrink-0">
+					<button
+						type="button"
+						class="btn btn-sm btn-ghost border border-base-content/10 gap-1.5 hover:bg-base-200"
+						onclick={handleDownloadTemplate}
+						disabled={isDownloadingTemplate}
+					>
+						{#if isDownloadingTemplate}
+							<span class="loading loading-spinner loading-xs"></span>
+						{:else}
+							<Download class="w-4 h-4 text-primary" />
+						{/if}
+						<span>Word Template</span>
+					</button>
+
 					<button
 						type="button"
 						class="btn btn-sm btn-outline btn-primary gap-1.5"
+						onclick={() => (isImportModalOpen = true)}
+					>
+						<FileUp class="w-4 h-4" />
+						<span>Import Word (.docx)</span>
+					</button>
+
+					<button
+						type="button"
+						class="btn btn-sm btn-outline btn-neutral gap-1.5"
 						onclick={openEditBankModal}
 					>
 						<Edit3 class="w-4 h-4" />
-						Edit Pool Info
+						Edit Pool
 					</button>
 
 					<button
@@ -403,7 +372,7 @@
 						onclick={() => (isDeleteBankModalOpen = true)}
 					>
 						<Trash2 class="w-4 h-4" />
-						Delete Pool
+						Delete
 					</button>
 
 					<button
@@ -462,7 +431,7 @@
 		</div>
 
 		<!-- Search & Filter Controls -->
-		<GlassCard class="p-4">
+		<GlassCard class="p-4 relative z-30 overflow-visible">
 			<div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
 				<div class="relative w-full sm:w-96">
 					<Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" />
@@ -474,17 +443,128 @@
 					/>
 				</div>
 
-				<div class="flex items-center gap-2 w-full sm:w-auto">
-					<select
-						bind:value={selectedType}
-						class="select select-bordered select-sm bg-base-100/50 text-xs font-semibold w-full sm:w-auto"
+				<!-- Type Filter Combobox / Dropdown with Blur -->
+				<div class="dropdown dropdown-end w-full sm:w-auto z-50">
+					<div
+						tabindex="0"
+						role="button"
+						class="btn btn-sm btn-outline border-base-content/20 bg-base-100/70 backdrop-blur-md rounded-xl text-xs font-semibold flex items-center justify-between gap-2 w-full sm:w-44 shadow-xs hover:bg-base-100/90"
 					>
-						<option value="All">All Types</option>
-						<option value="SingleChoice">Single Choice</option>
-						<option value="MultipleChoice">Multiple Choice</option>
-						<option value="TrueFalse">True / False</option>
-						<option value="Essay">Essay</option>
-					</select>
+						<span class="flex items-center gap-1.5 truncate">
+							{#if selectedType === 'All'}
+								<ListFilter class="w-3.5 h-3.5 text-base-content/60" />
+								<span>All Types</span>
+							{:else if selectedType === 'SingleChoice'}
+								<CheckCircle2 class="w-3.5 h-3.5 text-primary" />
+								<span>Single Choice</span>
+							{:else if selectedType === 'MultipleChoice'}
+								<CheckSquare class="w-3.5 h-3.5 text-info" />
+								<span>Multiple Choice</span>
+							{:else if selectedType === 'TrueFalse'}
+								<Tag class="w-3.5 h-3.5 text-warning" />
+								<span>True / False</span>
+							{:else if selectedType === 'Essay'}
+								<AlignLeft class="w-3.5 h-3.5 text-secondary" />
+								<span>Essay</span>
+							{/if}
+						</span>
+						<ChevronDown class="w-3.5 h-3.5 text-base-content/50 shrink-0" />
+					</div>
+					<ul
+						tabindex="0"
+						class="dropdown-content menu p-1.5 shadow-2xl bg-base-100/95 backdrop-blur-2xl border border-base-content/10 rounded-2xl w-52 z-50 mt-1.5 space-y-0.5 text-xs font-medium"
+					>
+						<li>
+							<button
+								type="button"
+								class="rounded-xl flex items-center justify-between {selectedType === 'All' ? 'active bg-primary text-white font-bold' : ''}"
+								onclick={() => {
+									selectedType = 'All';
+									(document.activeElement as HTMLElement)?.blur?.();
+								}}
+							>
+								<span class="flex items-center gap-2">
+									<ListFilter class="w-3.5 h-3.5" />
+									All Types
+								</span>
+								{#if selectedType === 'All'}
+									<Check class="w-3.5 h-3.5" />
+								{/if}
+							</button>
+						</li>
+						<li>
+							<button
+								type="button"
+								class="rounded-xl flex items-center justify-between {selectedType === 'SingleChoice' ? 'active bg-primary text-white font-bold' : ''}"
+								onclick={() => {
+									selectedType = 'SingleChoice';
+									(document.activeElement as HTMLElement)?.blur?.();
+								}}
+							>
+								<span class="flex items-center gap-2">
+									<CheckCircle2 class="w-3.5 h-3.5 text-primary {selectedType === 'SingleChoice' ? 'text-white' : ''}" />
+									Single Choice
+								</span>
+								{#if selectedType === 'SingleChoice'}
+									<Check class="w-3.5 h-3.5" />
+								{/if}
+							</button>
+						</li>
+						<li>
+							<button
+								type="button"
+								class="rounded-xl flex items-center justify-between {selectedType === 'MultipleChoice' ? 'active bg-primary text-white font-bold' : ''}"
+								onclick={() => {
+									selectedType = 'MultipleChoice';
+									(document.activeElement as HTMLElement)?.blur?.();
+								}}
+							>
+								<span class="flex items-center gap-2">
+									<CheckSquare class="w-3.5 h-3.5 text-info {selectedType === 'MultipleChoice' ? 'text-white' : ''}" />
+									Multiple Choice
+								</span>
+								{#if selectedType === 'MultipleChoice'}
+									<Check class="w-3.5 h-3.5" />
+								{/if}
+							</button>
+						</li>
+						<li>
+							<button
+								type="button"
+								class="rounded-xl flex items-center justify-between {selectedType === 'TrueFalse' ? 'active bg-primary text-white font-bold' : ''}"
+								onclick={() => {
+									selectedType = 'TrueFalse';
+									(document.activeElement as HTMLElement)?.blur?.();
+								}}
+							>
+								<span class="flex items-center gap-2">
+									<Tag class="w-3.5 h-3.5 text-warning {selectedType === 'TrueFalse' ? 'text-white' : ''}" />
+									True / False
+								</span>
+								{#if selectedType === 'TrueFalse'}
+									<Check class="w-3.5 h-3.5" />
+								{/if}
+							</button>
+						</li>
+						<li>
+							<button
+								type="button"
+								class="rounded-xl flex items-center justify-between {selectedType === 'Essay' ? 'active bg-primary text-white font-bold' : ''}"
+								onclick={() => {
+									selectedType = 'Essay';
+									(document.activeElement as HTMLElement)?.blur?.();
+								}}
+							>
+								<span class="flex items-center gap-2">
+									<AlignLeft class="w-3.5 h-3.5 text-secondary {selectedType === 'Essay' ? 'text-white' : ''}" />
+									Essay
+								</span>
+								{#if selectedType === 'Essay'}
+									<Check class="w-3.5 h-3.5" />
+								{/if}
+							</button>
+						</li>
+					</ul>
 				</div>
 			</div>
 		</GlassCard>
@@ -590,393 +670,29 @@
 	{/if}
 </div>
 
-<!-- Add Question Modal -->
-{#if isCreateQuestionModalOpen}
-	<div class="modal modal-open z-50">
-		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-2xl">
-			<h3 class="font-bold text-base text-base-content flex items-center gap-2">
-				<Plus class="w-5 h-5 text-primary" />
-				Add Question to Pool: {bank?.title}
-			</h3>
-
-			<form onsubmit={handleSaveNewQuestion} class="space-y-4 mt-4">
-				<!-- Question Type Selector -->
-				<div>
-					<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Question Type
-					</label>
-					<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-						{#each questionTypes as qt}
-							<button
-								type="button"
-								class="p-2.5 rounded-xl border text-left flex items-center gap-2 text-xs font-bold transition-all {newQuestionType === qt.id ? 'border-primary bg-primary/10 text-primary shadow-sm' : 'border-base-content/10 bg-base-200/50 text-base-content/70'}"
-								onclick={() => (newQuestionType = qt.id)}
-							>
-								<qt.icon class="w-4 h-4" />
-								<span>{qt.label}</span>
-							</button>
-						{/each}
-					</div>
-				</div>
-
-				<!-- Prompt Editor -->
-				<div>
-					<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Question Prompt <span class="text-error">*</span>
-					</label>
-					<RichEditor
-						bind:content={newQuestionText}
-						placeholder="Write question statement, scenario, or mathematical equation..."
-					/>
-				</div>
-
-				<!-- Points -->
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-					<div>
-						<label for="q-points-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Default Points <span class="text-error">*</span>
-						</label>
-						<input
-							id="q-points-input"
-							type="number"
-							step="0.5"
-							min="0.5"
-							bind:value={newQuestionPoints}
-							class="input input-bordered input-sm w-full bg-base-200/50"
-							required
-						/>
-					</div>
-
-					<div>
-						<label for="q-exp-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Explanation / Key Note
-						</label>
-						<input
-							id="q-exp-input"
-							type="text"
-							bind:value={newQuestionExplanation}
-							placeholder="Feedback shown to candidate..."
-							class="input input-bordered input-sm w-full bg-base-200/50"
-						/>
-					</div>
-				</div>
-
-				<!-- Options for Choices -->
-				{#if newQuestionType !== 'Essay'}
-					<div class="space-y-2 pt-2 border-t border-base-content/10">
-						<div class="flex items-center justify-between">
-							<span class="text-xs font-bold uppercase tracking-wider text-base-content/70">
-								Options & Answers
-							</span>
-							{#if newQuestionType !== 'TrueFalse'}
-								<button
-									type="button"
-									class="btn btn-xs btn-ghost gap-1 text-primary"
-									onclick={() => addOption('new')}
-								>
-									<Plus class="w-3.5 h-3.5" />
-									Add Option
-								</button>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							{#each newQuestionOptions as opt, oIdx}
-								<div class="flex items-center gap-2 p-2 rounded-xl bg-base-200/50 border border-base-content/5">
-									<button
-										type="button"
-										class="btn btn-xs btn-square {opt.isCorrect ? 'btn-success text-success-content' : 'btn-ghost'}"
-										onclick={() => setCorrectOption('new', oIdx, newQuestionType === 'MultipleChoice')}
-										title={opt.isCorrect ? 'Correct Answer' : 'Mark as Correct'}
-									>
-										{#if opt.isCorrect}
-											<Check class="w-3.5 h-3.5" />
-										{:else}
-											<span class="text-[10px] font-bold">{String.fromCharCode(65 + oIdx)}</span>
-										{/if}
-									</button>
-
-									<input
-										type="text"
-										bind:value={opt.text}
-										placeholder="Choice statement..."
-										class="input input-bordered input-xs flex-1 bg-base-100"
-										required
-									/>
-
-									{#if newQuestionType !== 'TrueFalse' && newQuestionOptions.length > 2}
-										<button
-											type="button"
-											class="btn btn-xs btn-ghost btn-square text-error"
-											onclick={() => removeOption('new', oIdx)}
-										>
-											<Trash2 class="w-3.5 h-3.5" />
-										</button>
-									{/if}
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<div class="modal-action pt-3 border-t border-base-content/10">
-					<button
-						type="button"
-						class="btn btn-sm btn-ghost"
-						onclick={() => (isCreateQuestionModalOpen = false)}
-						disabled={isActionLoading}
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						class="btn btn-sm btn-primary gap-1.5"
-						disabled={isActionLoading || !newQuestionText.trim()}
-					>
-						{#if isActionLoading}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							<Check class="w-4 h-4" />
-						{/if}
-						Add Question
-					</button>
-				</div>
-			</form>
-		</div>
-		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isCreateQuestionModalOpen = false)}></div>
-	</div>
-{/if}
-
-<!-- Edit Question Modal -->
-{#if isEditQuestionModalOpen}
-	<div class="modal modal-open z-50">
-		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-2xl">
-			<h3 class="font-bold text-base text-base-content flex items-center gap-2">
-				<Edit3 class="w-5 h-5 text-primary" />
-				Edit Question
-			</h3>
-
-			<form onsubmit={handleUpdateQuestion} class="space-y-4 mt-4">
-				<!-- Prompt Editor -->
-				<div>
-					<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Question Prompt <span class="text-error">*</span>
-					</label>
-					<RichEditor
-						bind:content={editQuestionText}
-						placeholder="Write question statement, scenario, or mathematical equation..."
-					/>
-				</div>
-
-				<!-- Points -->
-				<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-					<div>
-						<label for="edit-q-points-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Points <span class="text-error">*</span>
-						</label>
-						<input
-							id="edit-q-points-input"
-							type="number"
-							step="0.5"
-							min="0.5"
-							bind:value={editQuestionPoints}
-							class="input input-bordered input-sm w-full bg-base-200/50"
-							required
-						/>
-					</div>
-
-					<div>
-						<label for="edit-q-exp-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-							Explanation / Key Note
-						</label>
-						<input
-							id="edit-q-exp-input"
-							type="text"
-							bind:value={editQuestionExplanation}
-							placeholder="Feedback shown to candidate..."
-							class="input input-bordered input-sm w-full bg-base-200/50"
-						/>
-					</div>
-				</div>
-
-				<!-- Options for Choices -->
-				{#if editQuestionType !== 'Essay'}
-					<div class="space-y-2 pt-2 border-t border-base-content/10">
-						<div class="flex items-center justify-between">
-							<span class="text-xs font-bold uppercase tracking-wider text-base-content/70">
-								Options & Answers
-							</span>
-							{#if editQuestionType !== 'TrueFalse'}
-								<button
-									type="button"
-									class="btn btn-xs btn-ghost gap-1 text-primary"
-									onclick={() => addOption('edit')}
-								>
-									<Plus class="w-3.5 h-3.5" />
-									Add Option
-								</button>
-							{/if}
-						</div>
-
-						<div class="space-y-2">
-							{#each editQuestionOptions as opt, oIdx}
-								<div class="flex items-center gap-2 p-2 rounded-xl bg-base-200/50 border border-base-content/5">
-									<button
-										type="button"
-										class="btn btn-xs btn-square {opt.isCorrect ? 'btn-success text-success-content' : 'btn-ghost'}"
-										onclick={() => setCorrectOption('edit', oIdx, editQuestionType === 'MultipleChoice')}
-										title={opt.isCorrect ? 'Correct Answer' : 'Mark as Correct'}
-									>
-										{#if opt.isCorrect}
-											<Check class="w-3.5 h-3.5" />
-										{:else}
-											<span class="text-[10px] font-bold">{String.fromCharCode(65 + oIdx)}</span>
-										{/if}
-									</button>
-
-									<input
-										type="text"
-										bind:value={opt.text}
-										placeholder="Choice statement..."
-										class="input input-bordered input-xs flex-1 bg-base-100"
-										required
-									/>
-
-									{#if editQuestionType !== 'TrueFalse' && editQuestionOptions.length > 2}
-										<button
-											type="button"
-											class="btn btn-xs btn-ghost btn-square text-error"
-											onclick={() => removeOption('edit', oIdx)}
-										>
-											<Trash2 class="w-3.5 h-3.5" />
-										</button>
-									{/if}
-								</div>
-							{/each}
-						</div>
-					</div>
-				{/if}
-
-				<div class="modal-action pt-3 border-t border-base-content/10">
-					<button
-						type="button"
-						class="btn btn-sm btn-ghost"
-						onclick={() => (isEditQuestionModalOpen = false)}
-						disabled={isActionLoading}
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						class="btn btn-sm btn-primary gap-1.5"
-						disabled={isActionLoading || !editQuestionText.trim()}
-					>
-						{#if isActionLoading}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							<Check class="w-4 h-4" />
-						{/if}
-						Save Changes
-					</button>
-				</div>
-			</form>
-		</div>
-		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isEditQuestionModalOpen = false)}></div>
-	</div>
-{/if}
+<!-- Question Create / Edit Modal -->
+<QuestionModal
+	isOpen={isQuestionModalOpen}
+	mode={questionModalMode}
+	bankTitle={bank?.title || ''}
+	initialQuestion={editingQuestion}
+	isLoading={isActionLoading}
+	onClose={() => (isQuestionModalOpen = false)}
+	onSave={handleSaveQuestion}
+/>
 
 <!-- Edit Bank Details Modal -->
-{#if isEditBankModalOpen}
-	<div class="modal modal-open z-50">
-		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-md">
-			<h3 class="font-bold text-base text-base-content flex items-center gap-2">
-				<Edit3 class="w-5 h-5 text-primary" />
-				Edit Question Bank Pool Info
-			</h3>
-
-			<form
-				onsubmit={(e) => {
-					e.preventDefault();
-					handleSaveBankInfo();
-				}}
-				class="space-y-4 mt-4"
-			>
-				<div>
-					<label for="edit-bank-title" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Pool Title <span class="text-error">*</span>
-					</label>
-					<input
-						id="edit-bank-title"
-						type="text"
-						bind:value={editBankTitle}
-						class="input input-bordered input-sm w-full bg-base-200/50"
-						required
-					/>
-				</div>
-
-				<div>
-					<label for="edit-bank-cat" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Category
-					</label>
-					<input
-						id="edit-bank-cat"
-						type="text"
-						bind:value={editBankCategory}
-						class="input input-bordered input-sm w-full bg-base-200/50"
-					/>
-				</div>
-
-				<div>
-					<label for="edit-bank-desc" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Description
-					</label>
-					<textarea
-						id="edit-bank-desc"
-						bind:value={editBankDescription}
-						rows="2"
-						class="textarea textarea-bordered textarea-sm w-full bg-base-200/50"
-					></textarea>
-				</div>
-
-				<div>
-					<label for="edit-bank-tags" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Tags (Comma separated)
-					</label>
-					<input
-						id="edit-bank-tags"
-						type="text"
-						bind:value={editBankTags}
-						class="input input-bordered input-sm w-full bg-base-200/50"
-					/>
-				</div>
-
-				<div class="modal-action pt-2">
-					<button
-						type="button"
-						class="btn btn-sm btn-ghost"
-						onclick={() => (isEditBankModalOpen = false)}
-						disabled={isActionLoading}
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						class="btn btn-sm btn-primary gap-1.5"
-						disabled={isActionLoading || !editBankTitle.trim()}
-					>
-						{#if isActionLoading}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							<Check class="w-4 h-4" />
-						{/if}
-						Save Info
-					</button>
-				</div>
-			</form>
-		</div>
-		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isEditBankModalOpen = false)}></div>
-	</div>
-{/if}
+<QuestionBankModal
+	isOpen={isEditBankModalOpen}
+	mode="edit"
+	title={editBankTitle}
+	category={editBankCategory}
+	description={editBankDescription}
+	tags={editBankTags}
+	isLoading={isActionLoading}
+	onClose={() => (isEditBankModalOpen = false)}
+	onSave={handleSaveBankInfo}
+/>
 
 <!-- Delete Question Confirmation Modal -->
 {#if isDeleteQuestionModalOpen}
@@ -1055,3 +771,14 @@
 		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isDeleteBankModalOpen = false)}></div>
 	</div>
 {/if}
+
+<!-- Import Questions from Word Modal -->
+<ImportWordModal
+	isOpen={isImportModalOpen}
+	targetBankTitle={bank?.title || 'this bank'}
+	isDownloadingTemplate={isDownloadingTemplate}
+	isLoading={isActionLoading}
+	onClose={() => (isImportModalOpen = false)}
+	onDownloadTemplate={handleDownloadTemplate}
+	onImport={handleImportQuestions}
+/>

@@ -46,7 +46,7 @@ public class ExamManagementCommandHandlerTests
         qb.AddQuestion("Q1", QuestionType.SingleChoice, 5m, "Exp", [new(Guid.CreateVersion7(), "A", true)]);
         _dbContext.QuestionBanks.Add(qb);
 
-        var exam = QuizExam.Create(instructorId, "Exam to Delete", "Desc", QuizMode.RealExam, 60, 75m);
+        var exam = QuizExam.Create(instructorId, "Exam to Delete", "Desc", 60, 75m);
         exam.AddSection(qb.Id, "Section 1");
 
         _dbContext.Exams.Add(exam);
@@ -80,7 +80,7 @@ public class ExamManagementCommandHandlerTests
         _currentUser.IsInRole("Admin").Returns(false);
         _currentUser.IsInRole("Instructor").Returns(true);
 
-        var exam = QuizExam.Create(instructorId, "Protected Exam", "Desc", QuizMode.RealExam, 60, 75m);
+        var exam = QuizExam.Create(instructorId, "Protected Exam", "Desc", 60, 75m);
         _dbContext.Exams.Add(exam);
         await _dbContext.SaveChangesAsync();
 
@@ -168,8 +168,8 @@ public class ExamManagementCommandHandlerTests
         _currentUser.IsInRole("Instructor").Returns(true);
 
         var instructorId = Guid.CreateVersion7();
-        var exam1 = QuizExam.Create(instructorId, "Microservices Architect Exam", "Desc", QuizMode.RealExam, 60, 75m);
-        var exam2 = QuizExam.Create(instructorId, "Basic SQL Practice", "Desc", QuizMode.Simulation, 30, 60m);
+        var exam1 = QuizExam.Create(instructorId, "Microservices Architect Exam", "Desc", 60, 75m);
+        var exam2 = QuizExam.Create(instructorId, "Basic SQL Practice", "Desc", 30, 60m, ruleConfig: ExamRuleConfig.Practice());
 
         _dbContext.Exams.AddRange(exam1, exam2);
         await _dbContext.SaveChangesAsync();

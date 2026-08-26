@@ -115,6 +115,7 @@ export interface Course {
 	assignments?: Assignment[];
 	exams?: CourseExam[];
 	isEnrolled?: boolean;
+	enrolledStudentsCount?: number;
 }
 
 export interface EnrollmentResultDto {
@@ -159,10 +160,165 @@ export interface SubmissionResultDto {
 	submittedAtUtc: string;
 }
 
+export interface EnrolledCourseDto {
+	id: string;
+	title: string;
+	description?: string | null;
+	thumbnailUrl?: string | null;
+	accessType: string;
+	instructorId: string;
+	enrolledAtUtc: string;
+	progressPercent: number;
+	totalLessonsCount: number;
+	completedLessonsCount: number;
+	totalAssignmentsCount: number;
+	completedAssignmentsCount: number;
+	totalExamsCount: number;
+	completedExamsCount: number;
+	lastAccessedLessonId?: string | null;
+	lastAccessedLessonTitle?: string | null;
+}
+
+export interface CourseProgressDto {
+	courseId: string;
+	completedLessonIds: string[];
+	completedAssignmentIds: string[];
+	completedExamIds: string[];
+	progressPercent: number;
+	lastAccessedLessonId?: string | null;
+}
+
+export interface LessonProgressResultDto {
+	courseId: string;
+	lessonId: string;
+	isCompleted: boolean;
+	completedAtUtc?: string | null;
+	updatedCourseProgressPercent: number;
+}
+
+export interface CourseStudentExamProgressDto {
+	examId: string;
+	examTitle: string;
+	status: string;
+	score?: number | null;
+	isPassed?: boolean | null;
+	startedAtUtc?: string | null;
+	finishedAtUtc?: string | null;
+}
+
+export interface CourseStudentEnrollmentDto {
+	enrollmentId: string;
+	userId: string;
+	fullName: string;
+	email: string;
+	avatarUrl?: string | null;
+	enrolledAtUtc: string;
+	progressPercent: number;
+	completedLessonsCount: number;
+	totalLessonsCount: number;
+	completedAssignmentsCount: number;
+	totalAssignmentsCount: number;
+	lastAccessedAtUtc?: string | null;
+	exams?: CourseStudentExamProgressDto[];
+}
+
+export interface ViolationSummaryDto {
+	type: string;
+	reason: string;
+	timestampUtc: string;
+}
+
+export interface ExamSubmissionDto {
+	id: string;
+	examId: string;
+	examTitle: string;
+	studentId: string;
+	studentName: string;
+	studentEmail: string;
+	studentPicture?: string | null;
+	attemptNumber: number;
+	maxAttempts: number;
+	startedAtUtc: string;
+	submittedAtUtc?: string | null;
+	status: string;
+	score?: number | null;
+	isPassed?: boolean | null;
+	violationsCount: number;
+	violations: ViolationSummaryDto[];
+	snapshotsCount: number;
+}
+
+export interface AdminEnrollStudentRequest {
+	userId?: string;
+	email?: string;
+}
+
+export interface AdminEnrollStudentResultDto {
+	enrollmentId: string;
+	courseId: string;
+	userId: string;
+	studentName: string;
+	studentEmail: string;
+	enrolledAtUtc: string;
+}
+
 // Exam Types
 export type QuizMode = 'Simulation' | 'RealExam';
 export type QuestionType = 'SingleChoice' | 'MultipleChoice' | 'Essay' | 'TrueFalse';
 export type SubmissionStatus = 'InProgress' | 'Completed' | 'Disqualified' | 'TimedOut';
+
+export interface ExamRuleConfig {
+	name: string;
+	canTabSwitch: boolean;
+	maxTabSwitchesAllowed: number;
+	restrictClipboardAndMouse: boolean;
+	forceFullscreen: boolean;
+	keyboardDetection: boolean;
+	requireCamera: boolean;
+	snapshotIntervalSeconds: number;
+	requireMicrophone: boolean;
+	maxAllowedViolations: number;
+	autoDisqualifyOnExceed: boolean;
+}
+
+export interface ExamRuleDto {
+	id: string;
+	name: string;
+	description?: string | null;
+	isSystemPreset: boolean;
+	canTabSwitch: boolean;
+	maxTabSwitchesAllowed: number;
+	restrictClipboardAndMouse: boolean;
+	forceFullscreen: boolean;
+	keyboardDetection: boolean;
+	requireCamera: boolean;
+	snapshotIntervalSeconds: number;
+	requireMicrophone: boolean;
+	maxAllowedViolations: number;
+	autoDisqualifyOnExceed: boolean;
+	createdBy?: string | null;
+	createdAtUtc: string;
+	updatedAtUtc?: string | null;
+}
+
+export interface CreateExamRuleRequest {
+	name: string;
+	description?: string;
+	canTabSwitch?: boolean;
+	maxTabSwitchesAllowed?: number;
+	restrictClipboardAndMouse?: boolean;
+	forceFullscreen?: boolean;
+	keyboardDetection?: boolean;
+	requireCamera?: boolean;
+	snapshotIntervalSeconds?: number;
+	requireMicrophone?: boolean;
+	maxAllowedViolations?: number;
+	autoDisqualifyOnExceed?: boolean;
+}
+
+export interface UpdateExamRuleRequest extends CreateExamRuleRequest {
+	id: string;
+}
 
 export interface QuestionOption {
 	id: string;
@@ -191,6 +347,8 @@ export interface BankQuestion {
 	bankCategory?: string;
 	quizId?: string;
 	examId?: string;
+	sectionId?: string | null;
+	sectionTitle?: string | null;
 	questionText?: string;
 	text?: string;
 	type: QuestionType;
@@ -229,8 +387,83 @@ export interface StudentAnswer {
 	essayText?: string;
 }
 
+export interface StudentOptionDto {
+	id: string;
+	text: string;
+}
+
+export interface StudentExamSectionDto {
+	id: string;
+	title: string;
+	description?: string | null;
+	orderIndex: number;
+	questionCount: number;
+}
+
+export interface StudentQuestionDto {
+	id: string;
+	sectionId?: string | null;
+	sectionTitle?: string | null;
+	questionText: string;
+	type: QuestionType | string;
+	points: number;
+	displayOrder: number;
+	selectedOptionIds?: string[];
+	essayText?: string | null;
+	options: StudentOptionDto[];
+}
+
+export interface StudentExamPaperDto {
+	submissionId: string;
+	examId: string;
+	title: string;
+	appliedRules: ExamRuleConfig;
+	mode?: string;
+	examRuleId?: string | null;
+	startedAtUtc: string;
+	maxAllowedEndTimeUtc: string;
+	activeSessionToken: string;
+	questions: StudentQuestionDto[];
+	sections?: StudentExamSectionDto[];
+}
+
+export interface OptionReviewDto {
+	id: string;
+	text: string;
+	isCorrect: boolean;
+}
+
+export interface QuestionReviewDto {
+	questionId: string;
+	questionText: string;
+	type: string;
+	points: number;
+	awardedScore?: number | null;
+	selectedOptionIds: string[];
+	essayText?: string | null;
+	explanation?: string | null;
+	options: OptionReviewDto[];
+}
+
+export interface ExamResultDetailsDto {
+	submissionId: string;
+	examId: string;
+	examTitle: string;
+	appliedRules?: ExamRuleConfig;
+	mode?: string;
+	examRuleId?: string | null;
+	status: string;
+	score?: number | null;
+	isPassed?: boolean | null;
+	startedAtUtc: string;
+	submittedAtUtc?: string | null;
+	questions: QuestionReviewDto[];
+}
+
 export interface ListExamsParams {
-	mode?: QuizMode | string;
+	examRuleId?: string;
+	ruleName?: string;
+	mode?: string;
 	isPublished?: boolean;
 	search?: string;
 	searchTerm?: string;
@@ -243,10 +476,12 @@ export interface ExamSummaryDto {
 	instructorId: string;
 	title: string;
 	description?: string | null;
-	mode: QuizMode | string;
+	examRuleId?: string | null;
+	ruleConfig?: ExamRuleConfig;
+	mode?: string;
 	durationMinutes: number;
 	passingScore: number;
-	maxAllowedViolations: number;
+	maxAllowedViolations?: number;
 	isPublished: boolean;
 	sectionsCount?: number;
 	questionsCount: number;
@@ -255,12 +490,38 @@ export interface ExamSummaryDto {
 	createdAtUtc: string;
 }
 
+export interface StudentExamOverviewDto {
+	id: string;
+	title: string;
+	description?: string | null;
+	examRuleId?: string | null;
+	ruleConfig?: ExamRuleConfig;
+	mode?: string;
+	durationMinutes: number;
+	passingScore: number;
+	maxAllowedViolations?: number;
+	maxAttempts: number;
+	availableFromUtc?: string | null;
+	availableToUtc?: string | null;
+	isPublished: boolean;
+	totalQuestionsCount: number;
+	sectionsCount: number;
+	completedAttemptsCount: number;
+	remainingAttempts: number;
+	bestScore?: number | null;
+	isPassed: boolean;
+	hasActiveSession: boolean;
+	activeSubmissionId?: string | null;
+}
+
 export interface QuizExam {
 	id: string;
 	instructorId?: string;
 	title: string;
 	description?: string | null;
-	mode: QuizMode | string;
+	examRuleId?: string | null;
+	ruleConfig?: ExamRuleConfig;
+	mode?: string;
 	durationMinutes: number;
 	passingScore: number;
 	maxAllowedViolations: number;
@@ -413,4 +674,11 @@ export interface PaginatedList<T> {
 	totalPages: number;
 	hasPreviousPage: boolean;
 	hasNextPage: boolean;
+}
+
+export interface ImportQuestionBankResult {
+	bankId: string;
+	bankTitle: string;
+	totalImportedQuestions: number;
+	warnings: string[];
 }

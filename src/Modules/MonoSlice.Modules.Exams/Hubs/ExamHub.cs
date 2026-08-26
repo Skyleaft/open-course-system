@@ -136,7 +136,7 @@ public sealed class ExamHub : Hub
         }
 
         var reason = details ?? violationType;
-        submission.RecordViolation(violationType, reason, exam.MaxAllowedViolations);
+        submission.RecordViolation(violationType, reason);
         await _dbContext.SaveChangesAsync();
 
         var examGroup = $"exam_{submissionId}";
@@ -146,7 +146,7 @@ public sealed class ExamHub : Hub
         await Clients.Group(examGroup).SendAsync(
             "ViolationWarning",
             submission.Violations.Count,
-            exam.MaxAllowedViolations,
+            submission.AppliedRules.MaxAllowedViolations,
             reason);
 
         // Alert proctors

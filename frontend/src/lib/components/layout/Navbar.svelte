@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { authStore } from '#lib/stores/auth.svelte.ts';
-	import { Sun, Moon, LogOut, User as UserIcon, BookOpen, GraduationCap, ShieldAlert, Sparkles, Menu } from '@lucide/svelte';
+	import { customizationStore } from '#lib/stores/customization.svelte.ts';
+	import { Sun, Moon, LogOut, User as UserIcon, BookOpen, GraduationCap, ShieldAlert, Sparkles, Menu, Sliders } from '@lucide/svelte';
 
 	const browser = typeof window !== 'undefined';
 
@@ -14,7 +15,7 @@
 
 	$effect(() => {
 		if (browser) {
-			const saved = localStorage.getItem('theme') as 'dark' | 'light' || 'dark';
+			const saved = localStorage.getItem('theme') as 'dark' | 'light' || customizationStore.data.theme.defaultTheme as 'dark' | 'light' || 'dark';
 			currentTheme = saved;
 			document.documentElement.setAttribute('data-theme', saved);
 		}
@@ -45,27 +46,35 @@
 			{/if}
 
 			<a href="/" class="group flex items-center gap-2.5 transition-transform duration-200 hover:scale-105">
-				<div class="gradient-accent flex h-9 w-9 items-center justify-center rounded-xl shadow-md">
-					<Sparkles class="h-5 w-5 text-white" />
-				</div>
+				{#if currentTheme === 'dark' && customizationStore.data.branding.logoDarkUrl}
+					<img src={customizationStore.data.branding.logoDarkUrl} alt={customizationStore.data.branding.siteName} class="h-9 w-auto object-contain rounded-lg" />
+				{:else if currentTheme === 'light' && customizationStore.data.branding.logoLightUrl}
+					<img src={customizationStore.data.branding.logoLightUrl} alt={customizationStore.data.branding.siteName} class="h-9 w-auto object-contain rounded-lg" />
+				{:else}
+					<div class="gradient-accent flex h-9 w-9 items-center justify-center rounded-xl shadow-md">
+						<Sparkles class="h-5 w-5 text-white" />
+					</div>
+				{/if}
 				<div class="flex flex-col">
-					<span class="text-gradient font-bold tracking-tight text-base sm:text-lg">Open Course System</span>
-					<span class="text-[10px] uppercase tracking-widest text-base-content/60 -mt-1 font-medium">LMS & Exams</span>
+					<span class="text-gradient font-bold tracking-tight text-base sm:text-lg">{customizationStore.data.branding.siteName}</span>
+					<span class="text-[10px] uppercase tracking-widest text-base-content/60 -mt-1 font-medium truncate max-w-[180px]">{customizationStore.data.branding.tagline}</span>
 				</div>
 			</a>
 		</div>
 
 		<!-- Center Navigation (Quick Links) -->
 		<nav class="hidden md:flex items-center gap-1">
+			{#if authStore.isAuthenticated}
+				<a href="/my-courses" class="btn btn-ghost btn-sm rounded-lg font-medium text-sm hover:bg-base-100/40">
+					<GraduationCap class="h-4 w-4 mr-1 text-primary opacity-90" />
+					My Courses
+				</a>
+			{/if}
 			<a href="/courses" class="btn btn-ghost btn-sm rounded-lg font-medium text-sm hover:bg-base-100/40">
 				<BookOpen class="h-4 w-4 mr-1 opacity-70" />
-				Courses
+				Catalog
 			</a>
 			{#if authStore.isAuthenticated}
-				<a href="/exams" class="btn btn-ghost btn-sm rounded-lg font-medium text-sm hover:bg-base-100/40">
-					<GraduationCap class="h-4 w-4 mr-1 opacity-70" />
-					Exams
-				</a>
 				{#if authStore.isInstructor || authStore.isAdmin}
 					<a href="/instructor/courses" class="btn btn-ghost btn-sm rounded-lg font-medium text-sm hover:bg-base-100/40">
 						Instructor Studio
@@ -127,6 +136,14 @@
 								My Certificates
 							</a>
 						</li>
+						{#if authStore.isInstructor || authStore.isAdmin}
+							<li>
+								<a href="/instructor/settings" class="rounded-lg py-2 text-xs font-medium text-primary">
+									<Sliders class="h-4 w-4 opacity-90" />
+									Site Customization
+								</a>
+							</li>
+						{/if}
 						<div class="divider my-1 opacity-20"></div>
 						<li>
 							<button

@@ -30,7 +30,18 @@ using MonoSlice.Modules.Exams.Features.ListQuestionBanks;
 using MonoSlice.Modules.Exams.Features.ListQuestions;
 using MonoSlice.Modules.Exams.Features.UpdateQuestionBank;
 using MonoSlice.Modules.Exams.Features.UpdateQuestion;
+using MonoSlice.Modules.Exams.Features.GetStudentExamOverview;
+using MonoSlice.Modules.Exams.Features.GetExamSubmissions;
+using MonoSlice.Modules.Exams.Features.GrantRetake;
+using MonoSlice.Modules.Exams.Features.ImportQuestionBank;
+using MonoSlice.Modules.Exams.Features.ExamRules.CreateExamRule;
+using MonoSlice.Modules.Exams.Features.ExamRules.DeleteExamRule;
+using MonoSlice.Modules.Exams.Features.ExamRules.GetExamRule;
+using MonoSlice.Modules.Exams.Features.ExamRules.ListExamRules;
+using MonoSlice.Modules.Exams.Features.ExamRules.UpdateExamRule;
+using MonoSlice.Modules.Exams.Features.ExportQuestionBankTemplate;
 using MonoSlice.Modules.Exams.Domain.Services;
+using MonoSlice.Modules.Exams.Services;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Contracts;
 using MonoSlice.Shared.Abstractions.Messaging;
@@ -70,10 +81,12 @@ public static class ExamsModule
 
         // Register module services and contract API
         services.AddScoped<IExamFinalizerService, MonoSlice.Modules.Exams.Domain.Services.ExamFinalizerService>();
+        services.AddScoped<IWordQuestionBankService, WordQuestionBankService>();
         services.AddScoped<IExamsModuleApi, ExamsModuleApi>();
 
         // Register integration event handlers
         services.AddTransient<IIntegrationEventHandler<CourseDeletedIntegrationEvent>, EventHandlers.CourseDeletedIntegrationEventHandler>();
+        services.AddTransient<IIntegrationEventHandler<StudentUnenrolledIntegrationEvent>, EventHandlers.StudentUnenrolledIntegrationEventHandler>();
 
         return services;
     }
@@ -82,10 +95,16 @@ public static class ExamsModule
     {
         var dispatcher = app.ServiceProvider.GetService<IIntegrationEventDispatcher>();
         dispatcher?.RegisterEvent<CourseDeletedIntegrationEvent>();
+        dispatcher?.RegisterEvent<StudentUnenrolledIntegrationEvent>();
 
         var examsV1Group = app.MapGroup("/api/v1/exams")
             .WithTags("Exams");
 
+        examsV1Group.MapListExamRulesEndpoint();
+        examsV1Group.MapGetExamRuleEndpoint();
+        examsV1Group.MapCreateExamRuleEndpoint();
+        examsV1Group.MapUpdateExamRuleEndpoint();
+        examsV1Group.MapDeleteExamRuleEndpoint();
         examsV1Group.MapListExamsEndpoint();
         examsV1Group.MapCreateExamEndpoint();
         examsV1Group.MapUpdateExamEndpoint();
@@ -96,12 +115,17 @@ public static class ExamsModule
         examsV1Group.MapGetQuestionBankEndpoint();
         examsV1Group.MapUpdateQuestionBankEndpoint();
         examsV1Group.MapDeleteQuestionBankEndpoint();
+        examsV1Group.MapImportQuestionBankEndpoint();
+        examsV1Group.MapExportQuestionBankTemplateEndpoint();
         examsV1Group.MapListQuestionsEndpoint();
         examsV1Group.MapAddQuestionEndpoint();
         examsV1Group.MapGetQuestionEndpoint();
         examsV1Group.MapUpdateQuestionEndpoint();
         examsV1Group.MapDeleteQuestionEndpoint();
         examsV1Group.MapGetExamEndpoint();
+        examsV1Group.MapGetStudentExamOverviewEndpoint();
+        examsV1Group.MapGetExamSubmissionsEndpoint();
+        examsV1Group.MapGrantExamRetakeEndpoint();
         examsV1Group.MapStartExamEndpoint();
         examsV1Group.MapGetExamQuestionsEndpoint();
         examsV1Group.MapSaveAnswerEndpoint();

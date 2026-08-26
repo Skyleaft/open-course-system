@@ -19,7 +19,7 @@ public static class GetLessonEndpoint
                 return Results.Json(response, statusCode: response.StatusCode);
             })
             .WithName("GetLesson")
-            .WithSummary("Get a lesson by its identifier")
-            .RequireAuthorization();
+            .WithSummary("Retrieve details of a specific lesson")
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

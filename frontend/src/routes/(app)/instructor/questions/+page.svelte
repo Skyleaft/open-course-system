@@ -14,12 +14,19 @@
 		Check,
 		Clock,
 		AlertCircle,
-		HelpCircle
+		HelpCircle,
+		Download,
+		FileUp,
+		FileText,
+		ChevronDown,
+		ListFilter
 	} from 'lucide-svelte';
 	import { examsApi } from '$lib/api/exams.ts';
 	import type { QuestionBank } from '$lib/api/types.ts';
 	import { toast } from '$lib/stores/toast.svelte.ts';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
+	import QuestionBankModal from '$lib/components/exam/QuestionBankModal.svelte';
+	import ImportWordModal from '$lib/components/exam/ImportWordModal.svelte';
 
 	let questionBanks = $state<QuestionBank[]>([]);
 	let selectedCategory = $state<string>('All');
@@ -35,6 +42,15 @@
 	let bankCategory = $state('');
 	let bankDescription = $state('');
 	let bankTags = $state('');
+
+	// Import Word Modal
+	let isImportModalOpen = $state(false);
+	let importFile = $state<File | null>(null);
+	let importTitle = $state('');
+	let importCategory = $state('');
+	let importDescription = $state('');
+	let importTags = $state('');
+	let isDownloadingTemplate = $state(false);
 
 	// Delete Bank Modal
 	let isDeleteModalOpen = $state(false);
@@ -98,6 +114,65 @@
 		isBankModalOpen = true;
 	}
 
+	function openImportModal() {
+		importFile = null;
+		importTitle = '';
+		importCategory = '';
+		importDescription = '';
+		importTags = '';
+		isImportModalOpen = true;
+	}
+
+	async function handleDownloadTemplate() {
+		isDownloadingTemplate = true;
+		try {
+			const blob = await examsApi.downloadQuestionBankTemplate();
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = 'QuestionBank-Template.docx';
+			document.body.appendChild(a);
+			a.click();
+			window.URL.revokeObjectURL(url);
+			document.body.removeChild(a);
+			toast.success('Question Bank Word Template downloaded successfully.');
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to download Word template.');
+		} finally {
+			isDownloadingTemplate = false;
+		}
+	}
+
+	async function handleImportWord(payload: {
+		file: File;
+		title?: string;
+		category?: string;
+		description?: string;
+		tags?: string[];
+	}) {
+		const formData = new FormData();
+		formData.append('file', payload.file);
+		if (payload.title?.trim()) formData.append('title', payload.title.trim());
+		if (payload.category?.trim()) formData.append('category', payload.category.trim());
+		if (payload.description?.trim()) formData.append('description', payload.description.trim());
+		if (payload.tags && payload.tags.length > 0) formData.append('tags', payload.tags.join(', '));
+
+		isActionLoading = true;
+		try {
+			const result = await examsApi.importQuestionBank(formData);
+			toast.success(`Imported ${result.totalImportedQuestions} questions into "${result.bankTitle}"!`);
+			if (result.warnings && result.warnings.length > 0) {
+				toast.info(result.warnings.join(' | '));
+			}
+			isImportModalOpen = false;
+			await loadQuestionBanks();
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to import questions from Word document.');
+		} finally {
+			isActionLoading = false;
+		}
+	}
+
 	function openEditBank(bank: QuestionBank) {
 		modalMode = 'edit';
 		editingBankId = bank.id;
@@ -108,35 +183,30 @@
 		isBankModalOpen = true;
 	}
 
-	async function handleSaveBank() {
-		if (!bankTitle.trim()) {
+	async function handleSaveBank(data: { title: string; category: string; description: string; tags: string[] }) {
+		if (!data.title.trim()) {
 			toast.warning('Please enter a question pool title.');
 			return;
 		}
-
-		const tagsList = bankTags
-			.split(',')
-			.map((t) => t.trim())
-			.filter(Boolean);
 
 		isActionLoading = true;
 		try {
 			if (modalMode === 'create') {
 				await examsApi.createQuestionBank({
-					title: bankTitle.trim(),
-					category: bankCategory.trim() || undefined,
-					description: bankDescription.trim() || undefined,
-					tags: tagsList
+					title: data.title.trim(),
+					category: data.category.trim() || undefined,
+					description: data.description.trim() || undefined,
+					tags: data.tags
 				});
-				toast.success(`Question Bank '${bankTitle.trim()}' created successfully!`);
+				toast.success(`Question Bank '${data.title.trim()}' created successfully!`);
 			} else if (editingBankId) {
 				await examsApi.updateQuestionBank(editingBankId, {
-					title: bankTitle.trim(),
-					category: bankCategory.trim() || undefined,
-					description: bankDescription.trim() || undefined,
-					tags: tagsList
+					title: data.title.trim(),
+					category: data.category.trim() || undefined,
+					description: data.description.trim() || undefined,
+					tags: data.tags
 				});
-				toast.success(`Question Bank '${bankTitle.trim()}' updated successfully!`);
+				toast.success(`Question Bank '${data.title.trim()}' updated successfully!`);
 			}
 			isBankModalOpen = false;
 			await loadQuestionBanks();
@@ -182,14 +252,39 @@
 			</p>
 		</div>
 
-		<button
-			type="button"
-			class="btn btn-sm btn-primary gap-1.5 shadow-md shadow-primary/20"
-			onclick={openCreateBank}
-		>
-			<FolderPlus class="w-4 h-4" />
-			New Question Pool
-		</button>
+		<div class="flex items-center gap-2 flex-wrap">
+			<button
+				type="button"
+				class="btn btn-sm btn-ghost border border-base-content/10 gap-1.5 hover:bg-base-200"
+				onclick={handleDownloadTemplate}
+				disabled={isDownloadingTemplate}
+			>
+				{#if isDownloadingTemplate}
+					<span class="loading loading-spinner loading-xs"></span>
+				{:else}
+					<Download class="w-4 h-4 text-primary" />
+				{/if}
+				<span>Word Template</span>
+			</button>
+
+			<button
+				type="button"
+				class="btn btn-sm btn-outline btn-primary gap-1.5"
+				onclick={openImportModal}
+			>
+				<FileUp class="w-4 h-4" />
+				<span>Import Word (.docx)</span>
+			</button>
+
+			<button
+				type="button"
+				class="btn btn-sm btn-primary gap-1.5 shadow-md shadow-primary/20"
+				onclick={openCreateBank}
+			>
+				<FolderPlus class="w-4 h-4" />
+				<span>New Pool</span>
+			</button>
+		</div>
 	</div>
 
 	<!-- Stats Overview -->
@@ -226,7 +321,7 @@
 	</div>
 
 	<!-- Search & Filter Controls -->
-	<GlassCard class="p-4">
+	<GlassCard class="p-4 relative z-30 overflow-visible">
 		<div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
 			<div class="relative w-full sm:w-96">
 				<Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" />
@@ -238,15 +333,48 @@
 				/>
 			</div>
 
-			<div class="flex items-center gap-2 w-full sm:w-auto">
-				<select
-					bind:value={selectedCategory}
-					class="select select-bordered select-sm bg-base-100/50 text-xs font-semibold w-full sm:w-auto"
+			<!-- Category Filter Combobox / Dropdown with Blur -->
+			<div class="dropdown dropdown-end w-full sm:w-auto z-50">
+				<div
+					tabindex="0"
+					role="button"
+					class="btn btn-sm btn-outline border-base-content/20 bg-base-100/70 backdrop-blur-md rounded-xl text-xs font-semibold flex items-center justify-between gap-2 w-full sm:w-48 shadow-xs hover:bg-base-100/90"
+				>
+					<span class="flex items-center gap-1.5 truncate">
+						<Tag class="w-3.5 h-3.5 text-primary shrink-0" />
+						<span class="truncate">{selectedCategory === 'All' ? 'All Categories' : selectedCategory}</span>
+					</span>
+					<ChevronDown class="w-3.5 h-3.5 text-base-content/50 shrink-0" />
+				</div>
+				<ul
+					tabindex="0"
+					class="dropdown-content menu p-1.5 shadow-2xl bg-base-100/95 backdrop-blur-2xl border border-base-content/10 rounded-2xl w-56 z-50 mt-1.5 space-y-0.5 text-xs font-medium max-h-64 overflow-y-auto"
 				>
 					{#each categories as cat}
-						<option value={cat}>{cat === 'All' ? 'All Categories' : cat}</option>
+						<li>
+							<button
+								type="button"
+								class="rounded-xl flex items-center justify-between {selectedCategory === cat ? 'active bg-primary text-white font-bold' : ''}"
+								onclick={() => {
+									selectedCategory = cat;
+									(document.activeElement as HTMLElement)?.blur?.();
+								}}
+							>
+								<span class="flex items-center gap-2 truncate">
+									{#if cat === 'All'}
+										<ListFilter class="w-3.5 h-3.5 shrink-0" />
+									{:else}
+										<Tag class="w-3.5 h-3.5 shrink-0 {selectedCategory === cat ? 'text-white' : 'text-primary'}" />
+									{/if}
+									<span class="truncate">{cat === 'All' ? 'All Categories' : cat}</span>
+								</span>
+								{#if selectedCategory === cat}
+									<Check class="w-3.5 h-3.5 shrink-0" />
+								{/if}
+							</button>
+						</li>
 					{/each}
-				</select>
+				</ul>
 			</div>
 		</div>
 	</GlassCard>
@@ -373,106 +501,18 @@
 </div>
 
 <!-- Create / Edit Question Bank Modal -->
-{#if isBankModalOpen}
-	<div class="modal modal-open z-50">
-		<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-md">
-			<h3 class="font-bold text-base text-base-content flex items-center gap-2">
-				{#if modalMode === 'create'}
-					<FolderPlus class="w-5 h-5 text-primary" />
-					Create Question Bank Pool
-				{:else}
-					<Edit3 class="w-5 h-5 text-primary" />
-					Edit Question Bank Pool
-				{/if}
-			</h3>
-
-			<form
-				onsubmit={(e) => {
-					e.preventDefault();
-					handleSaveBank();
-				}}
-				class="space-y-4 mt-4"
-			>
-				<div>
-					<label for="bank-title-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Pool Title <span class="text-error">*</span>
-					</label>
-					<input
-						id="bank-title-input"
-						type="text"
-						bind:value={bankTitle}
-						placeholder="e.g. C# .NET 10 Core Certification Pool"
-						class="input input-bordered input-sm w-full bg-base-200/50"
-						required
-					/>
-				</div>
-
-				<div>
-					<label for="bank-cat-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Category
-					</label>
-					<input
-						id="bank-cat-input"
-						type="text"
-						bind:value={bankCategory}
-						placeholder="e.g. Software Engineering"
-						class="input input-bordered input-sm w-full bg-base-200/50"
-					/>
-				</div>
-
-				<div>
-					<label for="bank-desc-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Description (Optional)
-					</label>
-					<textarea
-						id="bank-desc-input"
-						bind:value={bankDescription}
-						rows="2"
-						placeholder="Coverage, purpose, or learning objectives..."
-						class="textarea textarea-bordered textarea-sm w-full bg-base-200/50"
-					></textarea>
-				</div>
-
-				<div>
-					<label for="bank-tags-input" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
-						Tags (Comma separated)
-					</label>
-					<input
-						id="bank-tags-input"
-						type="text"
-						bind:value={bankTags}
-						placeholder="e.g. csharp, efcore, architecture"
-						class="input input-bordered input-sm w-full bg-base-200/50"
-					/>
-				</div>
-
-				<div class="modal-action pt-2">
-					<button
-						type="button"
-						class="btn btn-sm btn-ghost"
-						onclick={() => (isBankModalOpen = false)}
-						disabled={isActionLoading}
-					>
-						Cancel
-					</button>
-					<button
-						type="submit"
-						class="btn btn-sm btn-primary gap-1.5"
-						disabled={isActionLoading || !bankTitle.trim()}
-					>
-						{#if isActionLoading}
-							<span class="loading loading-spinner loading-xs"></span>
-						{:else}
-							<Check class="w-4 h-4" />
-						{/if}
-						{modalMode === 'create' ? 'Create Pool' : 'Save Changes'}
-					</button>
-				</div>
-			</form>
-		</div>
-		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isBankModalOpen = false)}></div>
-	</div>
-{/if}
+<QuestionBankModal
+	isOpen={isBankModalOpen}
+	mode={modalMode}
+	title={bankTitle}
+	category={bankCategory}
+	description={bankDescription}
+	tags={bankTags}
+	suggestedCategories={categories.filter((c) => c !== 'All')}
+	isLoading={isActionLoading}
+	onClose={() => (isBankModalOpen = false)}
+	onSave={handleSaveBank}
+/>
 
 <!-- Delete Bank Confirmation Modal -->
 {#if isDeleteModalOpen && deletingBank}
@@ -512,3 +552,14 @@
 		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isDeleteModalOpen = false)}></div>
 	</div>
 {/if}
+
+<!-- Import Question Bank from Word Modal -->
+<ImportWordModal
+	isOpen={isImportModalOpen}
+	isDownloadingTemplate={isDownloadingTemplate}
+	isLoading={isActionLoading}
+	suggestedCategories={categories.filter((c) => c !== 'All')}
+	onClose={() => (isImportModalOpen = false)}
+	onDownloadTemplate={handleDownloadTemplate}
+	onImport={handleImportWord}
+/>

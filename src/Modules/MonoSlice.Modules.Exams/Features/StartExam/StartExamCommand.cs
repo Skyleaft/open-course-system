@@ -1,3 +1,4 @@
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
 
@@ -12,7 +13,8 @@ public sealed record ExamAttemptDto(
     Guid SubmissionId,
     Guid ExamId,
     string Title,
-    string Mode,
+    Guid? ExamRuleId,
+    ExamRuleConfigDto AppliedRules,
     int AttemptNumber,
     int MaxAttempts,
     DateTime StartedAtUtc,

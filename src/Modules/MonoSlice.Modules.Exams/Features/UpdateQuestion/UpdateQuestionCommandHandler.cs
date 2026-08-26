@@ -29,7 +29,7 @@ public sealed class UpdateQuestionCommandHandler : ICommandHandler<UpdateQuestio
     {
         if (!_currentUser.IsAuthenticated || !_currentUser.UserId.HasValue)
         {
-            throw new UnauthorizedAccessException("Authentication required to update questions.");
+            return ApiResponse.Fail<QuestionResultDto>("Authentication required to update questions.", 401);
         }
 
         var question = await _dbContext.BankQuestions
@@ -37,7 +37,7 @@ public sealed class UpdateQuestionCommandHandler : ICommandHandler<UpdateQuestio
 
         if (question is null)
         {
-            throw new NotFoundException("Question not found in question bank.");
+            return ApiResponse.Fail<QuestionResultDto>("Question not found in question bank.", 404);
         }
 
         var bank = await _dbContext.QuestionBanks
@@ -45,28 +45,36 @@ public sealed class UpdateQuestionCommandHandler : ICommandHandler<UpdateQuestio
 
         if (bank is null)
         {
-            throw new NotFoundException("Parent Question Bank not found.");
+            return ApiResponse.Fail<QuestionResultDto>("Parent Question Bank not found.", 404);
         }
 
-        if (!_currentUser.IsInRole("Admin") && _currentUser.UserId != bank.CreatedBy)
+        if (!_currentUser.IsInRole("Admin") && !_currentUser.IsInRole("Instructor") && _currentUser.UserId != bank.CreatedBy)
         {
-            throw new BusinessRuleException("You do not have permission to modify this question in the bank.");
+            return ApiResponse.Fail<QuestionResultDto>("You do not have permission to modify this question in the bank.", 403);
         }
 
-        var domainOptions = command.Options.Select(o => new QuestionOption(
-            o.Id ?? Guid.CreateVersion7(),
-            o.Text,
+        var domainOptions = (command.Options ?? []).Select(o => new QuestionOption(
+            o.Id.HasValue && o.Id.Value != Guid.Empty ? o.Id.Value : Guid.CreateVersion7(),
+            o.Text ?? string.Empty,
             o.IsCorrect
         )).ToList();
 
         question.Update(
             command.QuestionText,
             command.Type,
-            command.Points,
+            command.Points > 0 ? command.Points : 1m,
             command.Explanation,
             domainOptions);
 
-        bank.Update(_currentUser.UserId.Value, bank.Title, bank.Description, command.Category ?? bank.Category, command.Tags.Count > 0 ? command.Tags : bank.Tags);
+        if (!string.IsNullOrWhiteSpace(command.Category) || (command.Tags != null && command.Tags.Count > 0))
+        {
+            bank.Update(
+                _currentUser.UserId.Value,
+                bank.Title,
+                bank.Description,
+                command.Category ?? bank.Category,
+                command.Tags != null && command.Tags.Count > 0 ? command.Tags : bank.Tags);
+        }
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 

@@ -12,7 +12,13 @@ import type {
 	SubmissionResultDto,
 	CourseAccessType,
 	LessonType,
-	CourseFilterParams
+	CourseFilterParams,
+	EnrolledCourseDto,
+	CourseProgressDto,
+	LessonProgressResultDto,
+	CourseStudentEnrollmentDto,
+	AdminEnrollStudentRequest,
+	AdminEnrollStudentResultDto
 } from './types.ts';
 
 export const coursesApi = {
@@ -194,6 +200,24 @@ export const coursesApi = {
 		});
 	},
 
+	async getEnrolledCourses(customFetch?: typeof fetch): Promise<EnrolledCourseDto[]> {
+		return apiClient.get<EnrolledCourseDto[]>('/api/v1/courses/enrolled', undefined, customFetch);
+	},
+
+	async getCourseProgress(courseId: string, customFetch?: typeof fetch): Promise<CourseProgressDto> {
+		return apiClient.get<CourseProgressDto>(`/api/v1/courses/${courseId}/progress`, undefined, customFetch);
+	},
+
+	async completeLesson(
+		courseId: string,
+		lessonId: string,
+		isCompleted?: boolean
+	): Promise<LessonProgressResultDto> {
+		return apiClient.post<LessonProgressResultDto>(`/api/v1/courses/${courseId}/lessons/${lessonId}/complete`, {
+			isCompleted
+		});
+	},
+
 	async attachExam(
 		courseId: string,
 		examId: string,
@@ -208,6 +232,33 @@ export const coursesApi = {
 
 	async detachExam(courseId: string, examId: string): Promise<void> {
 		return apiClient.delete<void>(`/api/v1/courses/${courseId}/exams/${examId}`);
+	},
+
+	async getCourseEnrollments(
+		courseId: string,
+		params?: { pageIndex?: number; pageSize?: number; search?: string },
+		customFetch?: typeof fetch
+	): Promise<PaginatedList<CourseStudentEnrollmentDto>> {
+		const query = new URLSearchParams();
+		if (params?.pageIndex) query.set('pageIndex', params.pageIndex.toString());
+		if (params?.pageSize) query.set('pageSize', params.pageSize.toString());
+		if (params?.search) query.set('search', params.search);
+		const qs = query.toString() ? `?${query.toString()}` : '';
+		return apiClient.get<PaginatedList<CourseStudentEnrollmentDto>>(`/api/v1/courses/${courseId}/enrollments${qs}`, undefined, customFetch);
+	},
+
+	async adminEnrollStudent(
+		courseId: string,
+		data: AdminEnrollStudentRequest
+	): Promise<AdminEnrollStudentResultDto> {
+		return apiClient.post<AdminEnrollStudentResultDto>(`/api/v1/courses/${courseId}/enrollments`, data);
+	},
+
+	async adminRemoveEnrollment(
+		courseId: string,
+		enrollmentId: string
+	): Promise<boolean> {
+		return apiClient.delete<boolean>(`/api/v1/courses/${courseId}/enrollments/${enrollmentId}`);
 	}
 };
 

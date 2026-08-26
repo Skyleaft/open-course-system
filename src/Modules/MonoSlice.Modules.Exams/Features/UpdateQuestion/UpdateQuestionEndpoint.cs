@@ -18,6 +18,8 @@ public static class UpdateQuestionEndpoint
                 Type = command.Type,
                 Points = command.Points,
                 Explanation = command.Explanation,
+                Category = command.Category,
+                Tags = command.Tags,
                 Options = command.Options
             };
 
