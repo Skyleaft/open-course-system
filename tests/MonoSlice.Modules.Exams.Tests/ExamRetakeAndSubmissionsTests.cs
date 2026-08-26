@@ -33,11 +33,9 @@ public sealed class ExamRetakeAndSubmissionsTests
             instructorId,
             "Final Architecture Exam",
             "Test description",
-            QuizMode.RealExam,
             60,
             75m,
-            3,
-            2);
+            maxAttempts: 2);
 
         await db.Exams.AddAsync(exam);
 
@@ -47,7 +45,7 @@ public sealed class ExamRetakeAndSubmissionsTests
             60,
             12345,
             "session-token-123",
-            1);
+            attemptNumber: 1);
 
         submission.Disqualify("Multiple monitor detected");
 
@@ -98,11 +96,9 @@ public sealed class ExamRetakeAndSubmissionsTests
             instructorId,
             "Midterm Exam",
             "Test description",
-            QuizMode.RealExam,
             45,
             70m,
-            3,
-            1);
+            maxAttempts: 1);
 
         await db.Exams.AddAsync(exam);
 
@@ -112,7 +108,7 @@ public sealed class ExamRetakeAndSubmissionsTests
             45,
             54321,
             "session-token-abc",
-            1);
+            attemptNumber: 1);
 
         submission.Complete(85m, 70m);
         await db.Submissions.AddAsync(submission);

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Exams.Domain;
 using MonoSlice.Modules.Exams.Domain.Services;
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Modules.Exams.Features.SaveAnswer;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
@@ -123,16 +124,30 @@ public sealed class GetExamQuestionsQueryHandler : IQueryHandler<GetExamQuestion
             }
         }
 
+        var appliedRulesDto = new ExamRuleConfigDto(
+            submission.AppliedRules.Name,
+            submission.AppliedRules.CanTabSwitch,
+            submission.AppliedRules.MaxTabSwitchesAllowed,
+            submission.AppliedRules.RestrictClipboardAndMouse,
+            submission.AppliedRules.ForceFullscreen,
+            submission.AppliedRules.KeyboardDetection,
+            submission.AppliedRules.RequireCamera,
+            submission.AppliedRules.SnapshotIntervalSeconds,
+            submission.AppliedRules.RequireMicrophone,
+            submission.AppliedRules.MaxAllowedViolations,
+            submission.AppliedRules.AutoDisqualifyOnExceed);
+
         var paperDto = new StudentExamPaperDto(
             submission.Id,
             exam.Id,
             exam.Title,
-            exam.Mode.ToString(),
+            appliedRulesDto,
             submission.StartedAtUtc,
             submission.MaxAllowedEndTimeUtc,
             submission.ActiveSessionToken,
             questionDtos,
-            sectionSummaryList);
+            sectionSummaryList,
+            exam.ExamRuleId);
 
         return ApiResponse.Ok(paperDto);
     }

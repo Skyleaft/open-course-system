@@ -1,5 +1,5 @@
 using Sannr;
-using MonoSlice.Modules.Exams.Domain;
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
 
@@ -13,13 +13,13 @@ public sealed partial class CreateExamCommand : ICommand<ApiResponse<ExamDetailD
 
     public string? Description { get; init; }
 
-    public QuizMode Mode { get; init; } = QuizMode.RealExam;
+    public Guid? ExamRuleId { get; init; }
+
+    public ExamRuleConfigDto? RuleConfig { get; init; }
 
     public int DurationMinutes { get; init; } = 60;
 
     public decimal PassingScore { get; init; } = 70m;
-
-    public int MaxAllowedViolations { get; init; } = 3;
 
     public int MaxAttempts { get; init; } = 1;
 
@@ -37,10 +37,10 @@ public sealed record ExamDetailDto(
     Guid InstructorId,
     string Title,
     string? Description,
-    string Mode,
+    Guid? ExamRuleId,
+    ExamRuleConfigDto RuleConfig,
     int DurationMinutes,
     decimal PassingScore,
-    int MaxAllowedViolations,
     int MaxAttempts,
     DateTime? AvailableFromUtc,
     DateTime? AvailableToUtc,

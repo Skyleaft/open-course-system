@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { fade, scale } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import {
@@ -24,10 +26,15 @@
 		RotateCcw,
 		X,
 		Eye,
-		RefreshCw
+		RefreshCw,
+		Sliders,
+		Camera,
+		Mic,
+		Maximize
 	} from 'lucide-svelte';
 	import { examsApi } from '$lib/api/exams.ts';
-	import type { QuizExam, QuizSection, QuestionBank, QuizMode, ExamSubmissionDto } from '$lib/api/types.ts';
+	import { examRulesApi } from '$lib/api/exam-rules.ts';
+	import type { QuizExam, QuizSection, QuestionBank, QuizMode, ExamSubmissionDto, ExamRuleDto, ExamRuleConfig } from '$lib/api/types.ts';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import SectionBuilder from '$lib/components/exam/SectionBuilder.svelte';
@@ -38,6 +45,7 @@
 	const examId = (page.params.id || '') as string;
 	let exam = $state<QuizExam | null>(null);
 	let availableBanks = $state<QuestionBank[]>([]);
+	let availableRules = $state<ExamRuleDto[]>([]);
 	let isLoading = $state(true);
 	let isActionLoading = $state(false);
 
@@ -57,16 +65,30 @@
 	// Exam Settings State
 	let editTitle = $state('');
 	let editDescription = $state('');
-	let editMode = $state<QuizMode>('RealExam');
 	let editDurationMinutes = $state(60);
 	let editPassingScore = $state(70);
-	let editMaxViolations = $state(3);
 	let editMaxAttempts = $state(1);
 	let editAvailableFromLocal = $state('');
 	let editAvailableToLocal = $state('');
 	let editShuffleQuestions = $state(true);
 	let editShuffleOptions = $state(true);
 	let isSavingSettings = $state(false);
+
+	// Exam Rule State
+	let selectedRuleId = $state<string | 'custom'>('');
+	let customRule = $state<ExamRuleConfig>({
+		name: 'Custom Exam Policy',
+		canTabSwitch: false,
+		maxTabSwitchesAllowed: 2,
+		restrictClipboardAndMouse: true,
+		forceFullscreen: true,
+		keyboardDetection: true,
+		requireCamera: true,
+		snapshotIntervalSeconds: 30,
+		requireMicrophone: false,
+		maxAllowedViolations: 3,
+		autoDisqualifyOnExceed: true
+	});
 
 	// Delete Exam Modal
 	let isDeleteExamModalOpen = $state(false);
@@ -89,29 +111,78 @@
 		return isNaN(d.getTime()) ? undefined : d.toISOString();
 	}
 
+	function selectRule(rule: ExamRuleDto) {
+		selectedRuleId = rule.id;
+		customRule = {
+			name: rule.name,
+			canTabSwitch: rule.canTabSwitch,
+			maxTabSwitchesAllowed: rule.maxTabSwitchesAllowed,
+			restrictClipboardAndMouse: rule.restrictClipboardAndMouse,
+			forceFullscreen: rule.forceFullscreen,
+			keyboardDetection: rule.keyboardDetection,
+			requireCamera: rule.requireCamera,
+			snapshotIntervalSeconds: rule.snapshotIntervalSeconds,
+			requireMicrophone: rule.requireMicrophone,
+			maxAllowedViolations: rule.maxAllowedViolations,
+			autoDisqualifyOnExceed: rule.autoDisqualifyOnExceed
+		};
+	}
+
+	const activeRuleConfig = $derived.by<ExamRuleConfig>(() => {
+		if (selectedRuleId === 'custom' || !selectedRuleId) {
+			return customRule;
+		}
+		const found = availableRules.find((r) => r.id === selectedRuleId);
+		if (found) {
+			return {
+				name: found.name,
+				canTabSwitch: found.canTabSwitch,
+				maxTabSwitchesAllowed: found.maxTabSwitchesAllowed,
+				restrictClipboardAndMouse: found.restrictClipboardAndMouse,
+				forceFullscreen: found.forceFullscreen,
+				keyboardDetection: found.keyboardDetection,
+				requireCamera: found.requireCamera,
+				snapshotIntervalSeconds: found.snapshotIntervalSeconds,
+				requireMicrophone: found.requireMicrophone,
+				maxAllowedViolations: found.maxAllowedViolations,
+				autoDisqualifyOnExceed: found.autoDisqualifyOnExceed
+			};
+		}
+		return customRule;
+	});
+
 	async function loadExamAndBanks() {
 		isLoading = true;
 		try {
-			const [examData, banksData] = await Promise.all([
+			const [examData, banksData, rulesData] = await Promise.all([
 				examsApi.getExamById(examId),
-				examsApi.listQuestionBanks({ pageSize: 100 })
+				examsApi.listQuestionBanks({ pageSize: 100 }),
+				examRulesApi.listRules()
 			]);
 
 			exam = examData;
 			availableBanks = banksData.items || [];
+			availableRules = rulesData || [];
 
 			if (exam) {
 				editTitle = exam.title;
 				editDescription = exam.description || '';
-				editMode = (exam.mode as QuizMode) || 'RealExam';
 				editDurationMinutes = exam.durationMinutes || 60;
 				editPassingScore = exam.passingScore || 70;
-				editMaxViolations = exam.maxAllowedViolations ?? 3;
 				editMaxAttempts = exam.maxAttempts ?? 1;
 				editAvailableFromLocal = toLocalDatetimeString(exam.availableFromUtc);
 				editAvailableToLocal = toLocalDatetimeString(exam.availableToUtc);
 				editShuffleQuestions = exam.shuffleQuestions ?? true;
 				editShuffleOptions = exam.shuffleOptions ?? true;
+
+				if (exam.examRuleId) {
+					selectedRuleId = exam.examRuleId;
+				} else if (exam.ruleConfig) {
+					selectedRuleId = 'custom';
+					customRule = { ...exam.ruleConfig };
+				} else if (availableRules.length > 0) {
+					selectedRuleId = availableRules[0].id;
+				}
 			}
 		} catch (err: any) {
 			toast.error(err?.message || 'Failed to load examination details.');
@@ -141,10 +212,10 @@
 			const updated = await examsApi.updateExam(examId, {
 				title: editTitle.trim(),
 				description: editDescription.trim() || undefined,
-				mode: editMode,
+				examRuleId: selectedRuleId !== 'custom' && selectedRuleId ? selectedRuleId : undefined,
+				ruleConfig: activeRuleConfig,
 				durationMinutes: Number(editDurationMinutes),
 				passingScore: Number(editPassingScore),
-				maxAllowedViolations: editMode === 'RealExam' ? Number(editMaxViolations) : 0,
 				maxAttempts: Number(editMaxAttempts),
 				availableFromUtc: toUtcIso(editAvailableFromLocal),
 				availableToUtc: toUtcIso(editAvailableToLocal),
@@ -156,7 +227,8 @@
 			if (exam) {
 				exam.title = updated.title;
 				exam.description = updated.description;
-				exam.mode = updated.mode;
+				exam.examRuleId = updated.examRuleId;
+				exam.ruleConfig = updated.ruleConfig;
 				exam.durationMinutes = updated.durationMinutes;
 				exam.passingScore = updated.passingScore;
 			}
@@ -197,10 +269,10 @@
 			const updated = await examsApi.updateExam(examId, {
 				title: editTitle.trim(),
 				description: editDescription.trim() || undefined,
-				mode: editMode,
+				examRuleId: selectedRuleId !== 'custom' && selectedRuleId ? selectedRuleId : undefined,
+				ruleConfig: activeRuleConfig,
 				durationMinutes: Number(editDurationMinutes),
 				passingScore: Number(editPassingScore),
-				maxAllowedViolations: editMode === 'RealExam' ? Number(editMaxViolations) : 0,
 				maxAttempts: Number(editMaxAttempts),
 				availableFromUtc: toUtcIso(editAvailableFromLocal),
 				availableToUtc: toUtcIso(editAvailableToLocal),
@@ -213,7 +285,8 @@
 			if (exam) {
 				exam.title = updated.title;
 				exam.description = updated.description;
-				exam.mode = updated.mode;
+				exam.examRuleId = updated.examRuleId;
+				exam.ruleConfig = updated.ruleConfig;
 				exam.durationMinutes = updated.durationMinutes;
 				exam.passingScore = updated.passingScore;
 			}
@@ -242,10 +315,10 @@
 			await examsApi.updateExam(examId, {
 				title: editTitle.trim() || exam.title,
 				description: editDescription.trim() || exam.description || undefined,
-				mode: editMode,
+				examRuleId: selectedRuleId !== 'custom' && selectedRuleId ? selectedRuleId : undefined,
+				ruleConfig: activeRuleConfig,
 				durationMinutes: Number(editDurationMinutes),
 				passingScore: Number(editPassingScore),
-				maxAllowedViolations: editMode === 'RealExam' ? Number(editMaxViolations) : 0,
 				maxAttempts: Number(editMaxAttempts),
 				availableFromUtc: toUtcIso(editAvailableFromLocal),
 				availableToUtc: toUtcIso(editAvailableToLocal),
@@ -455,14 +528,14 @@
 
 		{#if activeTab === 'sections'}
 			<!-- Tab 1: Section Builder Studio -->
-			<GlassCard class="p-6">
+			<div class="rounded-3xl bg-base-100/60 border border-base-content/10 p-6 shadow-xl space-y-4">
 				<SectionBuilder
 					sections={exam.sections || []}
 					{availableBanks}
 					onSaveSections={handleSaveSections}
 					onCreateNewBank={() => goto('/instructor/questions')}
 				/>
-			</GlassCard>
+			</div>
 		{:else if activeTab === 'submissions'}
 			<!-- Tab 2: Candidate Submissions & Proctoring Audit -->
 			<GlassCard class="p-6 space-y-6">
@@ -648,17 +721,124 @@
 						/>
 					</div>
 
-					<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-						<div>
-							<label for="edit-mode" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80">
-								Exam Mode
-							</label>
-							<select id="edit-mode" bind:value={editMode} class="select select-bordered w-full bg-base-100/50 text-xs font-semibold">
-								<option value="RealExam">RealExam (Proctored Anti-Cheat)</option>
-								<option value="Simulation">Simulation (Practice Mode)</option>
-							</select>
+					<!-- Exam Rules Policy Selector -->
+					<div class="space-y-3">
+						<div class="flex items-center justify-between">
+							<span class="label-text text-xs font-bold uppercase tracking-wider text-base-content/80 block">
+								Exam Security & Proctoring Ruleset
+							</span>
+							<span class="badge badge-sm badge-primary font-bold">{activeRuleConfig.name}</span>
 						</div>
 
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+							{#each availableRules as rule (rule.id)}
+								<button
+									type="button"
+									class="p-3.5 rounded-2xl border text-left transition-all {selectedRuleId === rule.id
+										? 'border-primary bg-primary/10 ring-2 ring-primary/30 shadow-md'
+										: 'border-base-content/10 bg-base-100/40 hover:bg-base-200/50'}"
+									onclick={() => selectRule(rule)}
+								>
+									<div class="flex items-center justify-between mb-1.5">
+										<span class="font-bold text-xs text-base-content">{rule.name}</span>
+										{#if rule.requireCamera}
+											<Camera class="w-3.5 h-3.5 text-primary" />
+										{/if}
+									</div>
+									<p class="text-[11px] text-base-content/70 line-clamp-2">
+										{rule.description || (rule.canTabSwitch ? 'Permits browser tabs.' : 'Strict proctored environment.')}
+									</p>
+								</button>
+							{/each}
+
+							<button
+								type="button"
+								class="p-3.5 rounded-2xl border text-left transition-all {selectedRuleId === 'custom'
+									? 'border-accent bg-accent/10 ring-2 ring-accent/30 shadow-md'
+									: 'border-base-content/10 bg-base-100/40 hover:bg-base-200/50'}"
+								onclick={() => (selectedRuleId = 'custom')}
+							>
+								<div class="flex items-center justify-between mb-1.5">
+									<span class="font-bold text-xs text-accent">Custom Policy</span>
+									<Sliders class="w-3.5 h-3.5 text-accent" />
+								</div>
+								<p class="text-[11px] text-base-content/70">
+									Independently configure webcam, tab limits, clipboard lock, and strikes.
+								</p>
+							</button>
+						</div>
+
+						{#if selectedRuleId === 'custom'}
+							<div class="p-4 rounded-2xl bg-base-200/50 border border-accent/20 space-y-3">
+								<span class="text-xs font-bold text-accent uppercase tracking-wider block">Custom Security Controls</span>
+								<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+									<label class="flex items-center justify-between p-2.5 rounded-xl bg-base-100 border border-base-content/5 cursor-pointer">
+										<span class="font-semibold">Allow Tab Switching</span>
+										<input type="checkbox" class="toggle toggle-primary toggle-xs" bind:checked={customRule.canTabSwitch} />
+									</label>
+
+									<label class="flex items-center justify-between p-2.5 rounded-xl bg-base-100 border border-base-content/5 cursor-pointer">
+										<span class="font-semibold">Force Fullscreen</span>
+										<input type="checkbox" class="toggle toggle-primary toggle-xs" bind:checked={customRule.forceFullscreen} />
+									</label>
+
+									<label class="flex items-center justify-between p-2.5 rounded-xl bg-base-100 border border-base-content/5 cursor-pointer">
+										<span class="font-semibold">Restrict Clipboard</span>
+										<input type="checkbox" class="toggle toggle-primary toggle-xs" bind:checked={customRule.restrictClipboardAndMouse} />
+									</label>
+
+									<label class="flex items-center justify-between p-2.5 rounded-xl bg-base-100 border border-base-content/5 cursor-pointer">
+										<span class="font-semibold">Detect Keyboard Shortcuts</span>
+										<input type="checkbox" class="toggle toggle-primary toggle-xs" bind:checked={customRule.keyboardDetection} />
+									</label>
+
+									<label class="flex items-center justify-between p-2.5 rounded-xl bg-base-100 border border-base-content/5 cursor-pointer">
+										<span class="font-semibold">Require Camera</span>
+										<input type="checkbox" class="toggle toggle-info toggle-xs" bind:checked={customRule.requireCamera} />
+									</label>
+
+									<label class="flex items-center justify-between p-2.5 rounded-xl bg-base-100 border border-base-content/5 cursor-pointer">
+										<span class="font-semibold">Require Microphone</span>
+										<input type="checkbox" class="toggle toggle-secondary toggle-xs" bind:checked={customRule.requireMicrophone} />
+									</label>
+								</div>
+
+								<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+									<div>
+										<label for="edit-max-viol" class="label-text text-[11px] font-bold text-base-content/70 block mb-1">
+											Max Allowed Violations (Strikes)
+										</label>
+										<input
+											id="edit-max-viol"
+											type="number"
+											min="1"
+											max="10"
+											bind:value={customRule.maxAllowedViolations}
+											class="input input-bordered input-sm w-full bg-base-100 font-semibold"
+										/>
+									</div>
+
+									{#if customRule.requireCamera}
+										<div>
+											<label for="edit-snapshot-sec" class="label-text text-[11px] font-bold text-base-content/70 block mb-1">
+												Snapshot Interval (Seconds)
+											</label>
+											<input
+												id="edit-snapshot-sec"
+												type="number"
+												min="10"
+												max="300"
+												bind:value={customRule.snapshotIntervalSeconds}
+												class="input input-bordered input-sm w-full bg-base-100 font-semibold"
+											/>
+										</div>
+									{/if}
+								</div>
+							</div>
+						{/if}
+					</div>
+
+					<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
 						<div>
 							<label for="edit-duration" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80">
 								Duration (Minutes) <span class="text-error">*</span>
@@ -687,9 +867,7 @@
 								required
 							/>
 						</div>
-					</div>
 
-					<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div>
 							<label for="edit-attempts" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80">
 								Max Retake Attempts <span class="text-error">*</span>
@@ -702,21 +880,6 @@
 								bind:value={editMaxAttempts}
 								class="input input-bordered w-full bg-base-100/50 font-semibold"
 								required
-							/>
-						</div>
-
-						<div>
-							<label for="edit-viol" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80">
-								Max Violations (RealExam)
-							</label>
-							<input
-								id="edit-viol"
-								type="number"
-								min="1"
-								max="10"
-								bind:value={editMaxViolations}
-								class="input input-bordered w-full bg-base-100/50 font-semibold"
-								disabled={editMode !== 'RealExam'}
 							/>
 						</div>
 					</div>
@@ -807,8 +970,11 @@
 
 <!-- Grant Exam Retake Confirmation Modal -->
 {#if isRetakeModalOpen && retakeCandidate}
-	<div class="modal modal-open">
-		<div class="modal-box max-w-md rounded-3xl border border-white/10 bg-base-100/95 backdrop-blur-2xl p-6 space-y-4 shadow-2xl">
+	<div class="modal modal-open z-[100]" transition:fade={{ duration: 180 }}>
+		<div
+			class="modal-box max-w-md rounded-3xl border border-white/10 bg-base-100/95 backdrop-blur-2xl p-6 space-y-4 shadow-2xl"
+			transition:scale={{ duration: 220, start: 0.94, easing: cubicOut }}
+		>
 			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
 				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
 					<RotateCcw class="w-5 h-5 text-primary" />

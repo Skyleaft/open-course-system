@@ -34,6 +34,11 @@ using MonoSlice.Modules.Exams.Features.GetStudentExamOverview;
 using MonoSlice.Modules.Exams.Features.GetExamSubmissions;
 using MonoSlice.Modules.Exams.Features.GrantRetake;
 using MonoSlice.Modules.Exams.Features.ImportQuestionBank;
+using MonoSlice.Modules.Exams.Features.ExamRules.CreateExamRule;
+using MonoSlice.Modules.Exams.Features.ExamRules.DeleteExamRule;
+using MonoSlice.Modules.Exams.Features.ExamRules.GetExamRule;
+using MonoSlice.Modules.Exams.Features.ExamRules.ListExamRules;
+using MonoSlice.Modules.Exams.Features.ExamRules.UpdateExamRule;
 using MonoSlice.Modules.Exams.Features.ExportQuestionBankTemplate;
 using MonoSlice.Modules.Exams.Domain.Services;
 using MonoSlice.Modules.Exams.Services;
@@ -95,6 +100,11 @@ public static class ExamsModule
         var examsV1Group = app.MapGroup("/api/v1/exams")
             .WithTags("Exams");
 
+        examsV1Group.MapListExamRulesEndpoint();
+        examsV1Group.MapGetExamRuleEndpoint();
+        examsV1Group.MapCreateExamRuleEndpoint();
+        examsV1Group.MapUpdateExamRuleEndpoint();
+        examsV1Group.MapDeleteExamRuleEndpoint();
         examsV1Group.MapListExamsEndpoint();
         examsV1Group.MapCreateExamEndpoint();
         examsV1Group.MapUpdateExamEndpoint();

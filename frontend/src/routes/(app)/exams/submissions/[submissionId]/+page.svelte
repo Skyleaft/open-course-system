@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { examsApi } from '$lib/api/exams.ts';
-	import type { QuizQuestion, QuestionType, StudentExamSectionDto } from '$lib/api/types.ts';
+	import type { QuizQuestion, QuestionType, StudentExamSectionDto, ExamRuleConfig } from '$lib/api/types.ts';
 	import { ExamHubClient } from '$lib/signalr/exam-hub.svelte.ts';
 	import { bindSecurityInterceptors } from '$lib/utils/security.ts';
 	import ExamTimer from '$lib/components/exam/ExamTimer.svelte';
@@ -34,6 +34,7 @@
 	let currentIndex = $state(0);
 	let remainingSeconds = $state(0);
 	let mode = $state('RealExam');
+	let appliedRules = $state<ExamRuleConfig | null>(null);
 	let examTitle = $state('Examination');
 	let isLoading = $state(true);
 	let loadError = $state<string | null>(null);
@@ -62,7 +63,7 @@
 	let cameraStream = $state<MediaStream | null>(null);
 
 	const currentQuestion = $derived(questions[currentIndex]);
-	const isRealExam = $derived(mode === 'RealExam');
+	const isRealExam = $derived(appliedRules ? appliedRules.forceFullscreen || !appliedRules.canTabSwitch : mode === 'RealExam');
 
 	function isAnswered(questionId: string): boolean {
 		const ans = answers[questionId];
@@ -171,8 +172,12 @@
 			}
 
 			examTitle = res.title || 'Examination';
-			mode = res.mode || 'RealExam';
+			appliedRules = res.appliedRules || null;
+			mode = appliedRules?.name || res.mode || 'RealExam';
 			sections = res.sections || [];
+			if (appliedRules?.maxAllowedViolations) {
+				maxViolations = appliedRules.maxAllowedViolations;
+			}
 
 			// Map questions to match frontend QuizQuestion structure
 			questions = res.questions.map((q) => ({
@@ -249,9 +254,10 @@
 				});
 			}
 
-			// 5. Bind security interceptors (for RealExam mode)
-			if (mode === 'RealExam' && examHub) {
+			// 5. Bind security interceptors with dynamic rules
+			if (examHub) {
 				unbindSecurity = bindSecurityInterceptors({
+					rules: appliedRules ?? undefined,
 					onTabSwitch: () => {
 						examHub?.reportViolation(submissionId, 'TabSwitch', 'Student switched tabs');
 					},
@@ -399,8 +405,8 @@
 			</div>
 		</div>
 	{:else if questions.length > 0}
-		<!-- Headless Background Snapshot Capture Engine (RealExam only) -->
-		{#if isRealExam && examHub}
+		<!-- Headless Background Snapshot Capture Engine -->
+		{#if (appliedRules?.requireCamera ?? isRealExam) && examHub}
 			<SnapshotEngine {submissionId} stream={cameraStream} {examHub} />
 		{/if}
 

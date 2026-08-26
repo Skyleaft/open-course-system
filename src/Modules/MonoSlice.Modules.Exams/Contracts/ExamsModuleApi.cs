@@ -32,10 +32,10 @@ public sealed class ExamsModuleApi : IExamsModuleApi
         return new QuizExamContractDto(
             exam.Id,
             exam.Title,
-            exam.Mode.ToString(),
+            exam.RuleConfig.Name,
             exam.DurationMinutes,
             exam.PassingScore,
-            exam.MaxAllowedViolations,
+            exam.RuleConfig.MaxAllowedViolations,
             exam.IsPublished);
     }
 
@@ -56,7 +56,7 @@ public sealed class ExamsModuleApi : IExamsModuleApi
             submission.Id,
             submission.ExamId,
             submission.StudentId,
-            "RealExam",
+            submission.AppliedRules.Name,
             submission.StartedAtUtc,
             submission.MaxAllowedEndTimeUtc,
             submission.SubmittedAtUtc,
@@ -97,7 +97,7 @@ public sealed class ExamsModuleApi : IExamsModuleApi
                 s.Id,
                 s.ExamId,
                 s.StudentId,
-                "RealExam",
+                s.AppliedRules.Name,
                 s.StartedAtUtc,
                 s.MaxAllowedEndTimeUtc,
                 s.SubmittedAtUtc,
@@ -128,7 +128,7 @@ public sealed class ExamsModuleApi : IExamsModuleApi
                 s.Id,
                 s.ExamId,
                 s.StudentId,
-                "RealExam",
+                s.AppliedRules.Name,
                 s.StartedAtUtc,
                 s.MaxAllowedEndTimeUtc,
                 s.SubmittedAtUtc,

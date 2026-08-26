@@ -8,10 +8,10 @@ public sealed class QuizExam : AggregateRoot<Guid>
     public Guid InstructorId { get; private set; }
     public string Title { get; private set; } = string.Empty;
     public string? Description { get; private set; }
-    public QuizMode Mode { get; private set; } = QuizMode.RealExam;
+    public Guid? ExamRuleId { get; private set; }
+    public ExamRuleConfig RuleConfig { get; private set; } = ExamRuleConfig.StrictProctored();
     public int DurationMinutes { get; private set; } = 60;
     public decimal PassingScore { get; private set; } = 70m;
-    public int MaxAllowedViolations { get; private set; } = 3;
     public int MaxAttempts { get; private set; } = 1;
     public DateTime? AvailableFromUtc { get; private set; }
     public DateTime? AvailableToUtc { get; private set; }
@@ -32,10 +32,10 @@ public sealed class QuizExam : AggregateRoot<Guid>
         Guid instructorId,
         string title,
         string? description,
-        QuizMode mode,
         int durationMinutes,
         decimal passingScore,
-        int maxAllowedViolations = 3,
+        Guid? examRuleId = null,
+        ExamRuleConfig? ruleConfig = null,
         int maxAttempts = 1,
         DateTime? availableFromUtc = null,
         DateTime? availableToUtc = null,
@@ -81,10 +81,10 @@ public sealed class QuizExam : AggregateRoot<Guid>
             InstructorId = instructorId,
             Title = title.Trim(),
             Description = description?.Trim(),
-            Mode = mode,
+            ExamRuleId = examRuleId,
+            RuleConfig = ruleConfig ?? ExamRuleConfig.StrictProctored(),
             DurationMinutes = durationMinutes,
             PassingScore = passingScore,
-            MaxAllowedViolations = Math.Max(1, maxAllowedViolations),
             MaxAttempts = maxAttempts,
             AvailableFromUtc = availableFromUtc,
             AvailableToUtc = availableToUtc,
@@ -99,10 +99,10 @@ public sealed class QuizExam : AggregateRoot<Guid>
     public void Update(
         string title,
         string? description,
-        QuizMode mode,
         int durationMinutes,
         decimal passingScore,
-        int maxAllowedViolations,
+        Guid? examRuleId,
+        ExamRuleConfig? ruleConfig,
         int maxAttempts,
         DateTime? availableFromUtc,
         DateTime? availableToUtc,
@@ -137,10 +137,13 @@ public sealed class QuizExam : AggregateRoot<Guid>
 
         Title = title.Trim();
         Description = description?.Trim();
-        Mode = mode;
+        ExamRuleId = examRuleId;
+        if (ruleConfig != null)
+        {
+            RuleConfig = ruleConfig;
+        }
         DurationMinutes = durationMinutes;
         PassingScore = passingScore;
-        MaxAllowedViolations = Math.Max(1, maxAllowedViolations);
         MaxAttempts = maxAttempts;
         AvailableFromUtc = availableFromUtc;
         AvailableToUtc = availableToUtc;

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Exams.Domain;
 using MonoSlice.Modules.Exams.Features.AddQuestion;
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
@@ -98,15 +99,28 @@ public sealed class GetExamQueryHandler : IQueryHandler<GetExamQuery, ApiRespons
             ));
         }
 
+        var ruleConfigDto = new ExamRuleConfigDto(
+            exam.RuleConfig.Name,
+            exam.RuleConfig.CanTabSwitch,
+            exam.RuleConfig.MaxTabSwitchesAllowed,
+            exam.RuleConfig.RestrictClipboardAndMouse,
+            exam.RuleConfig.ForceFullscreen,
+            exam.RuleConfig.KeyboardDetection,
+            exam.RuleConfig.RequireCamera,
+            exam.RuleConfig.SnapshotIntervalSeconds,
+            exam.RuleConfig.RequireMicrophone,
+            exam.RuleConfig.MaxAllowedViolations,
+            exam.RuleConfig.AutoDisqualifyOnExceed);
+
         var dto = new ExamFullDetailDto(
             exam.Id,
             exam.InstructorId,
             exam.Title,
             exam.Description,
-            exam.Mode.ToString(),
+            exam.ExamRuleId,
+            ruleConfigDto,
             exam.DurationMinutes,
             exam.PassingScore,
-            exam.MaxAllowedViolations,
             exam.MaxAttempts,
             exam.AvailableFromUtc,
             exam.AvailableToUtc,

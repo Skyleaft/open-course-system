@@ -52,10 +52,11 @@ export const examsApi = {
 	async createExam(data: {
 		title: string;
 		description?: string;
-		mode: string;
+		examRuleId?: string;
+		ruleConfig?: import('./types.ts').ExamRuleConfig;
+		mode?: string;
 		durationMinutes: number;
 		passingScore: number;
-		maxAllowedViolations?: number;
 		maxAttempts?: number;
 		availableFromUtc?: string;
 		availableToUtc?: string;
@@ -68,10 +69,11 @@ export const examsApi = {
 	async updateExam(id: string, data: {
 		title: string;
 		description?: string;
-		mode: string;
+		examRuleId?: string;
+		ruleConfig?: import('./types.ts').ExamRuleConfig;
+		mode?: string;
 		durationMinutes: number;
 		passingScore: number;
-		maxAllowedViolations?: number;
 		maxAttempts?: number;
 		availableFromUtc?: string;
 		availableToUtc?: string;

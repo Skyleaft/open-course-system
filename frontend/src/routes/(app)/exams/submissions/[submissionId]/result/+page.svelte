@@ -29,7 +29,9 @@
 	let loadError = $state<string | null>(null);
 	let selectedFilter = $state<'all' | 'correct' | 'incorrect' | 'essay'>('all');
 
-	const isSimulation = $derived(result?.mode === 'Simulation');
+	const isSimulation = $derived(
+		result?.appliedRules ? result.appliedRules.canTabSwitch : result?.mode === 'Simulation'
+	);
 	const isPassed = $derived(
 		result?.isPassed === true || (result?.score != null && Number(result.score) >= 70)
 	);

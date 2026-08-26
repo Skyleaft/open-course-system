@@ -20,7 +20,10 @@
 		FolderPlus,
 		AlertCircle,
 		Download,
-		FileUp
+		FileUp,
+		ListFilter,
+		ChevronDown,
+		AlignLeft
 	} from 'lucide-svelte';
 	import { examsApi } from '$lib/api/exams.ts';
 	import type { QuestionBank, BankQuestion, QuestionType, QuestionOption } from '$lib/api/types.ts';
@@ -543,7 +546,7 @@
 		</div>
 
 		<!-- Search & Filter Controls -->
-		<GlassCard class="p-4">
+		<GlassCard class="p-4 relative z-30 overflow-visible">
 			<div class="flex flex-col sm:flex-row gap-3 items-center justify-between">
 				<div class="relative w-full sm:w-96">
 					<Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-base-content/40" />
@@ -555,17 +558,128 @@
 					/>
 				</div>
 
-				<div class="flex items-center gap-2 w-full sm:w-auto">
-					<select
-						bind:value={selectedType}
-						class="select select-bordered select-sm bg-base-100/50 text-xs font-semibold w-full sm:w-auto"
+				<!-- Type Filter Combobox / Dropdown with Blur -->
+				<div class="dropdown dropdown-end w-full sm:w-auto z-50">
+					<div
+						tabindex="0"
+						role="button"
+						class="btn btn-sm btn-outline border-base-content/20 bg-base-100/70 backdrop-blur-md rounded-xl text-xs font-semibold flex items-center justify-between gap-2 w-full sm:w-44 shadow-xs hover:bg-base-100/90"
 					>
-						<option value="All">All Types</option>
-						<option value="SingleChoice">Single Choice</option>
-						<option value="MultipleChoice">Multiple Choice</option>
-						<option value="TrueFalse">True / False</option>
-						<option value="Essay">Essay</option>
-					</select>
+						<span class="flex items-center gap-1.5 truncate">
+							{#if selectedType === 'All'}
+								<ListFilter class="w-3.5 h-3.5 text-base-content/60" />
+								<span>All Types</span>
+							{:else if selectedType === 'SingleChoice'}
+								<CheckCircle2 class="w-3.5 h-3.5 text-primary" />
+								<span>Single Choice</span>
+							{:else if selectedType === 'MultipleChoice'}
+								<CheckSquare class="w-3.5 h-3.5 text-info" />
+								<span>Multiple Choice</span>
+							{:else if selectedType === 'TrueFalse'}
+								<Tag class="w-3.5 h-3.5 text-warning" />
+								<span>True / False</span>
+							{:else if selectedType === 'Essay'}
+								<AlignLeft class="w-3.5 h-3.5 text-secondary" />
+								<span>Essay</span>
+							{/if}
+						</span>
+						<ChevronDown class="w-3.5 h-3.5 text-base-content/50 shrink-0" />
+					</div>
+					<ul
+						tabindex="0"
+						class="dropdown-content menu p-1.5 shadow-2xl bg-base-100/95 backdrop-blur-2xl border border-base-content/10 rounded-2xl w-52 z-50 mt-1.5 space-y-0.5 text-xs font-medium"
+					>
+						<li>
+							<button
+								type="button"
+								class="rounded-xl flex items-center justify-between {selectedType === 'All' ? 'active bg-primary text-white font-bold' : ''}"
+								onclick={() => {
+									selectedType = 'All';
+									(document.activeElement as HTMLElement)?.blur?.();
+								}}
+							>
+								<span class="flex items-center gap-2">
+									<ListFilter class="w-3.5 h-3.5" />
+									All Types
+								</span>
+								{#if selectedType === 'All'}
+									<Check class="w-3.5 h-3.5" />
+								{/if}
+							</button>
+						</li>
+						<li>
+							<button
+								type="button"
+								class="rounded-xl flex items-center justify-between {selectedType === 'SingleChoice' ? 'active bg-primary text-white font-bold' : ''}"
+								onclick={() => {
+									selectedType = 'SingleChoice';
+									(document.activeElement as HTMLElement)?.blur?.();
+								}}
+							>
+								<span class="flex items-center gap-2">
+									<CheckCircle2 class="w-3.5 h-3.5 text-primary {selectedType === 'SingleChoice' ? 'text-white' : ''}" />
+									Single Choice
+								</span>
+								{#if selectedType === 'SingleChoice'}
+									<Check class="w-3.5 h-3.5" />
+								{/if}
+							</button>
+						</li>
+						<li>
+							<button
+								type="button"
+								class="rounded-xl flex items-center justify-between {selectedType === 'MultipleChoice' ? 'active bg-primary text-white font-bold' : ''}"
+								onclick={() => {
+									selectedType = 'MultipleChoice';
+									(document.activeElement as HTMLElement)?.blur?.();
+								}}
+							>
+								<span class="flex items-center gap-2">
+									<CheckSquare class="w-3.5 h-3.5 text-info {selectedType === 'MultipleChoice' ? 'text-white' : ''}" />
+									Multiple Choice
+								</span>
+								{#if selectedType === 'MultipleChoice'}
+									<Check class="w-3.5 h-3.5" />
+								{/if}
+							</button>
+						</li>
+						<li>
+							<button
+								type="button"
+								class="rounded-xl flex items-center justify-between {selectedType === 'TrueFalse' ? 'active bg-primary text-white font-bold' : ''}"
+								onclick={() => {
+									selectedType = 'TrueFalse';
+									(document.activeElement as HTMLElement)?.blur?.();
+								}}
+							>
+								<span class="flex items-center gap-2">
+									<Tag class="w-3.5 h-3.5 text-warning {selectedType === 'TrueFalse' ? 'text-white' : ''}" />
+									True / False
+								</span>
+								{#if selectedType === 'TrueFalse'}
+									<Check class="w-3.5 h-3.5" />
+								{/if}
+							</button>
+						</li>
+						<li>
+							<button
+								type="button"
+								class="rounded-xl flex items-center justify-between {selectedType === 'Essay' ? 'active bg-primary text-white font-bold' : ''}"
+								onclick={() => {
+									selectedType = 'Essay';
+									(document.activeElement as HTMLElement)?.blur?.();
+								}}
+							>
+								<span class="flex items-center gap-2">
+									<AlignLeft class="w-3.5 h-3.5 text-secondary {selectedType === 'Essay' ? 'text-white' : ''}" />
+									Essay
+								</span>
+								{#if selectedType === 'Essay'}
+									<Check class="w-3.5 h-3.5" />
+								{/if}
+							</button>
+						</li>
+					</ul>
 				</div>
 			</div>
 		</GlassCard>

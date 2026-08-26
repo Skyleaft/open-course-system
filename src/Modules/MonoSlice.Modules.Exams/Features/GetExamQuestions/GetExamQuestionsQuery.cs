@@ -1,3 +1,4 @@
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
 
@@ -9,12 +10,13 @@ public sealed record StudentExamPaperDto(
     Guid SubmissionId,
     Guid ExamId,
     string Title,
-    string Mode,
+    ExamRuleConfigDto AppliedRules,
     DateTime StartedAtUtc,
     DateTime MaxAllowedEndTimeUtc,
     string ActiveSessionToken,
     IReadOnlyList<StudentQuestionDto> Questions,
-    IReadOnlyList<StudentExamSectionDto>? Sections = null);
+    IReadOnlyList<StudentExamSectionDto>? Sections = null,
+    Guid? ExamRuleId = null);
 
 public sealed record StudentExamSectionDto(
     Guid Id,

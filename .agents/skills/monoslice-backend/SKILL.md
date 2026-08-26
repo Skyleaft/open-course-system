@@ -230,6 +230,30 @@ public sealed class AddQuestionCommandHandler : ICommandHandler<AddQuestionComma
 }
 ```
 
+### Endpoint Pattern & Role-Based Authorization Policy
+
+> [!IMPORTANT]
+> **MANDATORY ROLE-BASED AUTHORIZATION POLICY ON ENDPOINTS**:
+> Whenever securing an endpoint with `.RequireAuthorization()`, **NEVER** use parameterless `.RequireAuthorization()`. Always specify explicit role-based requirements via policy lambda `.RequireAuthorization(policy => policy.RequireRole(...))`:
+> - **Management & Authoring Endpoints (Instructor/Admin)**:
+>   ```csharp
+>   .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin"));
+>   ```
+> - **System Admin / Platform Governance Endpoints**:
+>   ```csharp
+>   .RequireAuthorization(policy => policy.RequireRole("Admin"));
+>   ```
+> - **Student & Candidate Action Endpoints**:
+>   ```csharp
+>   .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
+>   ```
+> - **Proctor / Monitor Endpoints**:
+>   ```csharp
+>   .RequireAuthorization(policy => policy.RequireRole("Instructor", "Admin", "Proctor"));
+>   ```
+>
+> Public endpoints must be explicitly marked with `.AllowAnonymous()`. Never leave an endpoint with ambiguous or unconstrained authentication.
+
 ---
 
 ## 4. Entity Framework Core & PostgreSQL Multi-Schema Conventions

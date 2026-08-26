@@ -267,6 +267,59 @@ export type QuizMode = 'Simulation' | 'RealExam';
 export type QuestionType = 'SingleChoice' | 'MultipleChoice' | 'Essay' | 'TrueFalse';
 export type SubmissionStatus = 'InProgress' | 'Completed' | 'Disqualified' | 'TimedOut';
 
+export interface ExamRuleConfig {
+	name: string;
+	canTabSwitch: boolean;
+	maxTabSwitchesAllowed: number;
+	restrictClipboardAndMouse: boolean;
+	forceFullscreen: boolean;
+	keyboardDetection: boolean;
+	requireCamera: boolean;
+	snapshotIntervalSeconds: number;
+	requireMicrophone: boolean;
+	maxAllowedViolations: number;
+	autoDisqualifyOnExceed: boolean;
+}
+
+export interface ExamRuleDto {
+	id: string;
+	name: string;
+	description?: string | null;
+	isSystemPreset: boolean;
+	canTabSwitch: boolean;
+	maxTabSwitchesAllowed: number;
+	restrictClipboardAndMouse: boolean;
+	forceFullscreen: boolean;
+	keyboardDetection: boolean;
+	requireCamera: boolean;
+	snapshotIntervalSeconds: number;
+	requireMicrophone: boolean;
+	maxAllowedViolations: number;
+	autoDisqualifyOnExceed: boolean;
+	createdBy?: string | null;
+	createdAtUtc: string;
+	updatedAtUtc?: string | null;
+}
+
+export interface CreateExamRuleRequest {
+	name: string;
+	description?: string;
+	canTabSwitch?: boolean;
+	maxTabSwitchesAllowed?: number;
+	restrictClipboardAndMouse?: boolean;
+	forceFullscreen?: boolean;
+	keyboardDetection?: boolean;
+	requireCamera?: boolean;
+	snapshotIntervalSeconds?: number;
+	requireMicrophone?: boolean;
+	maxAllowedViolations?: number;
+	autoDisqualifyOnExceed?: boolean;
+}
+
+export interface UpdateExamRuleRequest extends CreateExamRuleRequest {
+	id: string;
+}
+
 export interface QuestionOption {
 	id: string;
 	text: string;
@@ -364,7 +417,9 @@ export interface StudentExamPaperDto {
 	submissionId: string;
 	examId: string;
 	title: string;
-	mode: QuizMode | string;
+	appliedRules: ExamRuleConfig;
+	mode?: string;
+	examRuleId?: string | null;
 	startedAtUtc: string;
 	maxAllowedEndTimeUtc: string;
 	activeSessionToken: string;
@@ -394,7 +449,9 @@ export interface ExamResultDetailsDto {
 	submissionId: string;
 	examId: string;
 	examTitle: string;
-	mode: string;
+	appliedRules?: ExamRuleConfig;
+	mode?: string;
+	examRuleId?: string | null;
 	status: string;
 	score?: number | null;
 	isPassed?: boolean | null;
@@ -404,7 +461,9 @@ export interface ExamResultDetailsDto {
 }
 
 export interface ListExamsParams {
-	mode?: QuizMode | string;
+	examRuleId?: string;
+	ruleName?: string;
+	mode?: string;
 	isPublished?: boolean;
 	search?: string;
 	searchTerm?: string;
@@ -417,10 +476,12 @@ export interface ExamSummaryDto {
 	instructorId: string;
 	title: string;
 	description?: string | null;
-	mode: QuizMode | string;
+	examRuleId?: string | null;
+	ruleConfig?: ExamRuleConfig;
+	mode?: string;
 	durationMinutes: number;
 	passingScore: number;
-	maxAllowedViolations: number;
+	maxAllowedViolations?: number;
 	isPublished: boolean;
 	sectionsCount?: number;
 	questionsCount: number;
@@ -433,10 +494,12 @@ export interface StudentExamOverviewDto {
 	id: string;
 	title: string;
 	description?: string | null;
-	mode: QuizMode | string;
+	examRuleId?: string | null;
+	ruleConfig?: ExamRuleConfig;
+	mode?: string;
 	durationMinutes: number;
 	passingScore: number;
-	maxAllowedViolations: number;
+	maxAllowedViolations?: number;
 	maxAttempts: number;
 	availableFromUtc?: string | null;
 	availableToUtc?: string | null;
@@ -456,7 +519,9 @@ export interface QuizExam {
 	instructorId?: string;
 	title: string;
 	description?: string | null;
-	mode: QuizMode | string;
+	examRuleId?: string | null;
+	ruleConfig?: ExamRuleConfig;
+	mode?: string;
 	durationMinutes: number;
 	passingScore: number;
 	maxAllowedViolations: number;

@@ -20,6 +20,6 @@ public static class GetCourseProgressEndpoint
             })
             .WithName("GetCourseProgress")
             .WithSummary("Retrieve student progression and completion data for a specific course")
-            .RequireAuthorization();
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

@@ -84,7 +84,7 @@ Sebagai **Open Course System**, platform ini dirancang dengan kapabilitas kustom
 4. **Exams (`exams` schema)**:
    - **Question Bank Engine**: Pool bank soal mandiri (`QuestionBank`), dikategorisasi dan ditandai (tags) dengan audit trail (`CreatedBy`, `UpdatedBy`), mendukung reusabilitas lintas ujian.
    - **Section-Based Exam Engine**: Ujian (`QuizExam`) mandiri (tanpa dependensi statis ke satu kursus), tersusun dari `QuizSection` yang mereferensikan pertanyaan dari `QuestionBank`.
-   - **Dual-Mode Engine**: `Simulation` (bebas tab switch, feedback instan) vs `RealExam` (strict fullscreen, oncam/onmic, anti-cheat, diskualifikasi otomatis).
+   - **Configurable Exam Rule Engine**: Aturan ujian dan anti-cheat modular (`ExamRule`) dengan konfigurasi granular (Rule Name, Tab Switching & Grace Limits, Clipboard & Mouse Lock, Force Fullscreen, Keyboard Shortcut Detection, Web Camera & Periodic Snapshots, Audio & Microphone Level Monitoring, Customizable Violation Limits, Auto Disqualification). Mendukung Standard Presets maupun Custom Rules per ujian.
    - **Deterministic PRNG Fisher-Yates Shuffle**: Seed acak disimpan di sesi submission untuk pengacakan konsisten.
    - **High-Concurrency Redis Autosave**: Penampungan jawaban di cache Redis selama ujian; batch-flush ke PostgreSQL saat submit atau timeout.
 
@@ -98,7 +98,7 @@ Sebagai **Open Course System**, platform ini dirancang dengan kapabilitas kustom
    - Forum diskusi bertingkat (Discussion Threads & Nested Comments).
 
 7. **Realtime Proctoring & SignalR**:
-   - `ExamHub` untuk sinkronisasi timer, heartbeat, broadcast pelanggaran, dan direct proctor commands (warning / force disconnect).
+   - `ExamHub` untuk sinkronisasi timer, heartbeat, broadcast pelanggaran berbasis ruleset aktif, dan direct proctor commands (warning / force disconnect).
    - `NotificationHub` untuk broadcast sistem dan notifikasi nilai.
 
 8. **Customization & Website Settings (`customization` schema)**:
@@ -135,17 +135,23 @@ Sebagai **Open Course System**, platform ini dirancang dengan kapabilitas kustom
 |  └── BankQuestion (Entity) [0..*]                                                                |
 |      - Id, BankId, QuestionText, Type, Points, OrderIndex, Explanation, Options (JSONB)           |
 |                                                                                                   |
+|  ExamRule (Aggregate Root - Ruleset Presets & Policies)                                           |
+|  - Id, Name, Description, IsSystemPreset, CanTabSwitch, MaxTabSwitchesAllowed                     |
+|  - RestrictClipboardAndMouse, ForceFullscreen, KeyboardDetection                                 |
+|  - RequireCamera, SnapshotIntervalSeconds, RequireMicrophone                                     |
+|  - MaxAllowedViolations, AutoDisqualifyOnExceed, CreatedBy, CreatedAtUtc, UpdatedAtUtc            |
+|                                                                                                   |
 |  QuizExam (Aggregate Root)                                                                        |
-|  - Id, InstructorId, Title, Description, Mode, DurationMinutes, PassingScore, MaxAllowedViolations|
-|  - MaxAttempts, AvailableFromUtc, AvailableToUtc, IsPublished, ShuffleQuestions, ShuffleOptions   |
-|  - CreatedBy, UpdatedBy, CreatedAtUtc, UpdatedAtUtc                                               |
+|  - Id, InstructorId, Title, Description, ExamRuleId (FK -> ExamRule, nullable), RuleConfig (JSONB)|
+|  - DurationMinutes, PassingScore, MaxAttempts, AvailableFromUtc, AvailableToUtc, IsPublished     |
+|  - ShuffleQuestions, ShuffleOptions, CreatedBy, UpdatedBy, CreatedAtUtc, UpdatedAtUtc              |
 |  └── QuizSection (Entity) [1..*]                                                                  |
 |      - Id, ExamId, QuestionBankId (FK -> QuestionBank), Title, Description, OrderIndex            |
 |      - PointsOverride, QuestionCount                                                             |
 |                                                                                                   |
 |  QuizSubmission (Aggregate Root)                                                                  |
-|  - Id, ExamId, StudentId, Mode, StartedAtUtc, MaxAllowedEndTimeUtc, FinishedAtUtc, Status         |
-|  - Score, IsPassed, RandomSeed, ActiveSessionToken, Violations (JSONB)                            |
+|  - Id, ExamId, StudentId, AppliedRules (JSONB), StartedAtUtc, MaxAllowedEndTimeUtc, FinishedAtUtc  |
+|  - Status, Score, IsPassed, RandomSeed, ActiveSessionToken, Violations (JSONB)                    |
 |  ├── StudentAnswer (Entity) [0..*] (Ref -> BankQuestion.Id)                                       |
 |  └── ProctoringSnapshot (Entity) [0..*]                                                           |
 |                                                                                                   |
@@ -181,25 +187,34 @@ Sebagai **Open Course System**, platform ini dirancang dengan kapabilitas kustom
   - Mengelola daftar `BankQuestion`. Setiap pertanyaan menyimpan default points, options JSONB, explanation, serta orderIndex.
   - Opsi jawaban minimal 2 untuk pilihan ganda, dan tepat 1 kunci benar untuk `SingleChoice` & `TrueFalse`.
 
-### 3.3 QuizExam Aggregate
+### 3.3 ExamRule Aggregate
+- **Root**: `ExamRule`
+- **Invariants**:
+  - Merepresentasikan template kebijakan / aturan ujian (ruleset preset) atau aturan khusus.
+  - Standard System Presets (`IsSystemPreset = true`) dilindungi agar tidak dapat dihapus sembarangan oleh instruktur umum.
+  - Mengatur parameter keamanan klien: `CanTabSwitch`, `MaxTabSwitchesAllowed`, `RestrictClipboardAndMouse`, `ForceFullscreen`, `KeyboardDetection`, `RequireCamera`, `SnapshotIntervalSeconds` (minimal 15s), `RequireMicrophone`, `MaxAllowedViolations`, dan `AutoDisqualifyOnExceed`.
+
+### 3.4 QuizExam Aggregate
 - **Root**: `QuizExam`
 - **Child Entities**: `QuizSection`
 - **Invariants**:
   - Tidak memiliki dependensi langsung terhadap `CourseId`, sehingga reusable.
   - Memiliki audit tracking (`CreatedBy`, `UpdatedBy`).
+  - Mengaitkan `ExamRule` (opsional melalui `ExamRuleId`) dan menyimpan snapshot `RuleConfig` mandiri sehingga modifikasi template global tidak merusak aturan ujian aktif.
   - Terdiri dari satu atau lebih `QuizSection`. Setiap section mereferensikan paket `QuestionBank` dengan urutan, opsi `PointsOverride` (override nilai soal di tingkat seksi), dan batas jumlah soal `QuestionCount`.
   - Ujian berstatus `IsPublished = true` tidak dapat dimodifikasi struktur section dan soalnya jika telah memiliki submission aktif.
 
-### 3.4 QuizSubmission Aggregate
+### 3.5 QuizSubmission Aggregate
 - **Root**: `QuizSubmission`
 - **Child Entities**: `StudentAnswer`, `ProctoringSnapshot`
 - **Invariants**:
   - `MaxAllowedEndTimeUtc = StartedAtUtc + DurationMinutes`.
+  - Menyimpan salinan snapshot `AppliedRules` saat sesi pengerjaan dimulai (`StartExam`).
   - Satu submission memegang satu `ActiveSessionToken`. Jika token di Redis berbeda, akses langsung ditolak.
   - Pengacakan soal dan opsi jawaban menggunakan PRNG Fisher-Yates berbasis `RandomSeed`.
-  - Pada mode `RealExam`, jika `Violations.Count >= MaxAllowedViolations`, submission otomatis berstatus `Disqualified`.
+  - Jika `AppliedRules.AutoDisqualifyOnExceed = true` dan `Violations.Count >= AppliedRules.MaxAllowedViolations`, submission otomatis berstatus `Disqualified`.
 
-### 3.5 SiteSetting Aggregate
+### 3.6 SiteSetting Aggregate
 - **Root**: `SiteSetting`
 - **Invariants**:
   - `SettingKey` unik di seluruh sistem (misal: `branding.general`, `theme.styling`, `features.toggles`, `security.proctoring_defaults`, `localization.general`).
@@ -207,7 +222,7 @@ Sebagai **Open Course System**, platform ini dirancang dengan kapabilitas kustom
   - Properti `IsPublic = true` mengekspos setting ke endpoint publik tanpa memerlukan autentikasi. Setting privat (seperti secret keys, internal proctoring thresholds) dilindungi otorisasi `Admin`.
   - Setiap pembaruan setting otomatis merekam snapshot ke `SettingsAuditLog` dan menginvalidasi cache Redis `customization:public`.
 
-### 3.6 LandingSection Aggregate
+### 3.7 LandingSection Aggregate
 - **Root**: `LandingSection`
 - **Invariants**:
   - `SectionType` didukung: `Hero`, `StatsCounter`, `FeaturedCourses`, `FeaturesGrid`, `Testimonials`, `FaqAccordion`, `CtaBanner`.
@@ -361,15 +376,36 @@ CREATE TABLE exams.bank_questions (
 );
 CREATE INDEX idx_bank_questions_bank ON exams.bank_questions(bank_id);
 
+CREATE TABLE exams.exam_rules (
+    id UUID PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    is_system_preset BOOLEAN NOT NULL DEFAULT FALSE,
+    can_tab_switch BOOLEAN NOT NULL DEFAULT FALSE,
+    max_tab_switches_allowed INT NOT NULL DEFAULT 0,
+    restrict_clipboard_and_mouse BOOLEAN NOT NULL DEFAULT TRUE,
+    force_fullscreen BOOLEAN NOT NULL DEFAULT TRUE,
+    keyboard_detection BOOLEAN NOT NULL DEFAULT TRUE,
+    require_camera BOOLEAN NOT NULL DEFAULT TRUE,
+    snapshot_interval_seconds INT NOT NULL DEFAULT 45,
+    require_microphone BOOLEAN NOT NULL DEFAULT FALSE,
+    max_allowed_violations INT NOT NULL DEFAULT 3,
+    auto_disqualify_on_exceed BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by UUID,
+    created_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at_utc TIMESTAMPTZ
+);
+CREATE INDEX idx_exam_rules_preset ON exams.exam_rules(is_system_preset);
+
 CREATE TABLE exams.quiz_exams (
     id UUID PRIMARY KEY,
     instructor_id UUID NOT NULL,
     title VARCHAR(255) NOT NULL,
     description TEXT,
-    mode VARCHAR(50) NOT NULL, -- Simulation, RealExam
+    exam_rule_id UUID REFERENCES exams.exam_rules(id) ON DELETE SET NULL,
+    rule_config JSONB NOT NULL DEFAULT '{}',
     duration_minutes INT NOT NULL DEFAULT 60,
     passing_score NUMERIC(5, 2) NOT NULL DEFAULT 70.00,
-    max_allowed_violations INT NOT NULL DEFAULT 3,
     max_attempts INT NOT NULL DEFAULT 1,
     available_from_utc TIMESTAMPTZ,
     available_to_utc TIMESTAMPTZ,
@@ -385,6 +421,7 @@ CREATE TABLE exams.quiz_exams (
 CREATE INDEX idx_exams_instructor ON exams.quiz_exams(instructor_id);
 CREATE INDEX idx_exams_is_published ON exams.quiz_exams(is_published);
 CREATE INDEX idx_exams_created_by ON exams.quiz_exams(created_by);
+CREATE INDEX idx_exams_rule ON exams.quiz_exams(exam_rule_id);
 
 CREATE TABLE exams.quiz_sections (
     id UUID PRIMARY KEY,
@@ -403,7 +440,7 @@ CREATE TABLE exams.quiz_submissions (
     id UUID PRIMARY KEY,
     exam_id UUID NOT NULL REFERENCES exams.quiz_exams(id) ON DELETE CASCADE,
     student_id UUID NOT NULL,
-    mode VARCHAR(50) NOT NULL,
+    applied_rules JSONB NOT NULL DEFAULT '{}',
     started_at_utc TIMESTAMPTZ NOT NULL,
     max_allowed_end_time_utc TIMESTAMPTZ NOT NULL,
     submitted_at_utc TIMESTAMPTZ,
@@ -573,6 +610,27 @@ CREATE INDEX idx_settings_audit_key ON customization.settings_audit_logs(setting
 - Saat memulai attempt (`StartExam`), dihasilkan `randomSeed = Random.Shared.Next()`.
 - Algoritma PRNG Fisher-Yates mengacak urutan section, daftar soal dari Question Bank, dan opsi pilihan ganda secara deterministik menggunakan seed tersebut sehingga urutan konsisten pada setiap query ulang sesi siswa.
 
+### 5.3 Granular Anti-Cheat Interceptors & Ruleset Protocol
+SvelteKit Client mengaktifkan modul pencegahan kecurangan secara reaktif berdasarkan payload `appliedRules` yang diterima saat `StartExam`:
+1. **Tab & Window Visibility (`CanTabSwitch: false`)**:
+   - Memonitor event `document.visibilitychange` dan `window.onblur`.
+   - Mengizinkan toleransi grace attempt hingga `MaxTabSwitchesAllowed`. Jika melebihi batas toleransi, memicu SignalR `ReportViolation("TabSwitch", details)`.
+2. **Clipboard & Mouse Interaction Lock (`RestrictClipboardAndMouse: true`)**:
+   - Mencegah `contextmenu` (klik kanan), `copy`, `paste`, `cut`, `selectstart` (pemblokiran seleksi teks), dan drag-and-drop.
+3. **Strict Fullscreen Enforcement (`ForceFullscreen: true`)**:
+   - Meminta `document.documentElement.requestFullscreen()` saat inisialisasi ujian.
+   - Mendengarkan event `fullscreenchange`. Jika peserta keluar dari mode layar penuh (ESC), antarmuka ujian diblokir dengan modal verifikasi dan dikirim pelanggaran ke server.
+4. **Keyboard Shortcut Interception (`KeyboardDetection: true`)**:
+   - Memonitor event `keydown` dan membatalkan kombinasi tombol terlarang: `Alt+Tab`, `PrintScreen`, `F12` / DevTools (`Ctrl+Shift+I`, `Ctrl+Shift+J`), `Ctrl+U` (view source), `Ctrl+P` (print), `Alt+F4`, dan tombol sistem (`Meta`/`Windows`).
+5. **Webcam Video & Snapshot Engine (`RequireCamera: true`)**:
+   - Memvalidasi izin `navigator.mediaDevices.getUserMedia({ video: true })` sebelum ujian dapat dimulai.
+   - Web Worker mengambil frame kanvas secara periodik setiap `SnapshotIntervalSeconds` (default: 45 detik) dan mengunggahnya langsung ke MinIO S3 via Presigned URL, lalu mencatatnya ke SignalR `ReportSnapshotUploaded`.
+6. **Microphone Audio Level Analyzer (`RequireMicrophone: true`)**:
+   - Memvalidasi izin `navigator.mediaDevices.getUserMedia({ audio: true })`.
+   - Menjalankan `AudioContext` & `AnalyserNode` untuk mendeteksi lonjakan intensitas suara percakapan yang mencurigakan di sekitar peserta.
+7. **Automated Disqualification & Proctor Escalation**:
+   - Jika `AutoDisqualifyOnExceed = true` dan `Violations.Count >= MaxAllowedViolations`, SignalR `ExamHub` otomatis mendiskualifikasi submission, melakukan flush jawaban dari Redis, dan memutuskan sambungan klien secara permanen.
+
 ---
 
 ## 6. SvelteKit V3 RC Frontend Architecture
@@ -581,5 +639,6 @@ CREATE INDEX idx_settings_audit_key ON customization.settings_audit_logs(setting
 - **Design System & Dynamic Theming**: Glassmorphism (`backdrop-blur-xl`, translucent surface, vibrant glow borders) didukung oleh daisyUI 5 & Tailwind CSS 4. Token OKLCH dan variabel warna diinjeksikan secara reaktif dari payload `customization:public`.
 - **White-Label & Dynamic Metadata**: Site title, favicon, logo (light & dark mode), hero banners, dan footer copyright dimuat saat SSR di `+layout.server.ts` tanpa latency.
 - **Rich Text Engine**: Edra (Tiptap + Svelte 5 Runes) untuk editing soal, LaTeX KaTeX formulas, code syntax highlighting, dan callouts.
-- **Anti-Cheat Loop**: Web Worker snapshot generator acak (30–60s) dengan direct PUT ke MinIO presigned URL, fullscreen lock, dan tab visibility listeners.
-- **Modular Admin Customization Studio**: Antarmuka visual untuk mengubah palet warna, konfigurasi landing page builder, toggle modul/fitur, dan upload aset brand ke MinIO.
+- **Dynamic Rule-Driven Exam Runner**: Client component yang secara reaktif mengaktifkan proctoring hooks (Fullscreen lock, Tab visibility detector, Keyboard interceptors, Web Worker Snapshot uploader, dan Audio Analyzer) sesuai spesifikasi `appliedRules`.
+- **Modular Admin Customization Studio**: Antarmuka visual untuk mengubah palet warna, konfigurasi landing page builder, toggle modul/fitur, manajemen ruleset ujian preset, dan upload aset brand ke MinIO.
+

@@ -18,7 +18,7 @@ public static class GetEnrolledCoursesEndpoint
                 return Results.Json(response, statusCode: response.StatusCode);
             })
             .WithName("GetEnrolledCourses")
-            .WithSummary("List all courses the authenticated student is currently enrolled in with progression stats")
-            .RequireAuthorization();
+            .WithSummary("Retrieve all courses the currently authenticated student is enrolled in")
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }

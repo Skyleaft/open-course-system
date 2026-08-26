@@ -13,31 +13,110 @@
 		AlertTriangle,
 		Save,
 		Eye,
-		HelpCircle
+		HelpCircle,
+		Sliders,
+		Camera,
+		Mic,
+		Maximize,
+		Layers,
+		Lock,
+		BookOpen
 	} from 'lucide-svelte';
 	import { examsApi } from '$lib/api/exams.ts';
-	import type { QuizMode } from '$lib/api/types.ts';
+	import { examRulesApi } from '$lib/api/exam-rules.ts';
+	import type { ExamRuleDto, ExamRuleConfig } from '$lib/api/types.ts';
 	import { toast } from '$lib/stores/toast.svelte.ts';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
 	import RichEditor from '$lib/components/editor/RichEditor.svelte';
+	import { onMount } from 'svelte';
 
 	// Form State
 	let title = $state('');
 	let description = $state('');
-	let mode = $state<QuizMode>('RealExam');
 	let durationMinutes = $state(60);
 	let passingScore = $state(70);
-	let maxAllowedViolations = $state(3);
 	let maxAttempts = $state(1);
 	let availableFromLocal = $state('');
 	let availableToLocal = $state('');
 	let shuffleQuestions = $state(true);
 	let shuffleOptions = $state(true);
 
+	// Exam Rules State
+	let availableRules = $state<ExamRuleDto[]>([]);
+	let selectedRuleId = $state<string | 'custom'>('');
+	let customRule = $state<ExamRuleConfig>({
+		name: 'Custom Exam Policy',
+		canTabSwitch: false,
+		maxTabSwitchesAllowed: 2,
+		restrictClipboardAndMouse: true,
+		forceFullscreen: true,
+		keyboardDetection: true,
+		requireCamera: true,
+		snapshotIntervalSeconds: 30,
+		requireMicrophone: false,
+		maxAllowedViolations: 3,
+		autoDisqualifyOnExceed: true
+	});
+
 	// UI State
 	let isSubmitting = $state(false);
+	let isRulesLoading = $state(true);
 
-	// Helper to format ISO to Local String or null
+	onMount(async () => {
+		try {
+			const rules = await examRulesApi.listRules();
+			availableRules = rules || [];
+			if (availableRules.length > 0) {
+				const strictRule = availableRules.find(r => r.name.toLowerCase().includes('strict')) || availableRules[0];
+				selectedRuleId = strictRule.id;
+			}
+		} catch (err) {
+			console.warn('Failed to fetch exam rules presets:', err);
+		} finally {
+			isRulesLoading = false;
+		}
+	});
+
+	function selectRule(rule: ExamRuleDto) {
+		selectedRuleId = rule.id;
+		customRule = {
+			name: rule.name,
+			canTabSwitch: rule.canTabSwitch,
+			maxTabSwitchesAllowed: rule.maxTabSwitchesAllowed,
+			restrictClipboardAndMouse: rule.restrictClipboardAndMouse,
+			forceFullscreen: rule.forceFullscreen,
+			keyboardDetection: rule.keyboardDetection,
+			requireCamera: rule.requireCamera,
+			snapshotIntervalSeconds: rule.snapshotIntervalSeconds,
+			requireMicrophone: rule.requireMicrophone,
+			maxAllowedViolations: rule.maxAllowedViolations,
+			autoDisqualifyOnExceed: rule.autoDisqualifyOnExceed
+		};
+	}
+
+	const activeRuleConfig = $derived.by<ExamRuleConfig>(() => {
+		if (selectedRuleId === 'custom' || !selectedRuleId) {
+			return customRule;
+		}
+		const found = availableRules.find(r => r.id === selectedRuleId);
+		if (found) {
+			return {
+				name: found.name,
+				canTabSwitch: found.canTabSwitch,
+				maxTabSwitchesAllowed: found.maxTabSwitchesAllowed,
+				restrictClipboardAndMouse: found.restrictClipboardAndMouse,
+				forceFullscreen: found.forceFullscreen,
+				keyboardDetection: found.keyboardDetection,
+				requireCamera: found.requireCamera,
+				snapshotIntervalSeconds: found.snapshotIntervalSeconds,
+				requireMicrophone: found.requireMicrophone,
+				maxAllowedViolations: found.maxAllowedViolations,
+				autoDisqualifyOnExceed: found.autoDisqualifyOnExceed
+			};
+		}
+		return customRule;
+	});
+
 	function toUtcIso(localDatetime: string): string | undefined {
 		if (!localDatetime) return undefined;
 		const d = new Date(localDatetime);
@@ -76,10 +155,10 @@
 			const examRes = await examsApi.createExam({
 				title: title.trim(),
 				description: description.trim() || undefined,
-				mode,
+				examRuleId: selectedRuleId !== 'custom' && selectedRuleId ? selectedRuleId : undefined,
+				ruleConfig: activeRuleConfig,
 				durationMinutes: Number(durationMinutes),
 				passingScore: Number(passingScore),
-				maxAllowedViolations: mode === 'RealExam' ? Number(maxAllowedViolations) : 0,
 				maxAttempts: Number(maxAttempts),
 				availableFromUtc: toUtcIso(availableFromLocal),
 				availableToUtc: toUtcIso(availableToLocal),
@@ -139,7 +218,7 @@
 			<GlassCard class="p-6 space-y-5">
 				<div class="flex items-center gap-2 pb-3 border-b border-base-content/10">
 					<GraduationCap class="w-5 h-5 text-primary" />
-					<h2 class="text-base font-bold text-base-content">1. Basic Information & Mode</h2>
+					<h2 class="text-base font-bold text-base-content">1. Basic Information</h2>
 				</div>
 
 				<div class="space-y-4">
@@ -158,50 +237,6 @@
 						/>
 					</div>
 
-					<!-- Exam Mode Selector Cards -->
-					<div class="space-y-2">
-						<span class="label-text text-xs font-bold uppercase tracking-wider text-base-content/70 block">
-							Examination Mode <span class="text-error">*</span>
-						</span>
-						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-							<!-- Real Exam Card -->
-							<button
-								type="button"
-								class="p-4 rounded-2xl border text-left transition-all {mode === 'RealExam'
-									? 'border-primary bg-primary/10 ring-2 ring-primary/30 shadow-md'
-									: 'border-base-content/10 bg-base-100/40 hover:bg-base-200/50'}"
-								onclick={() => (mode = 'RealExam')}
-							>
-								<div class="flex items-center justify-between mb-2">
-									<span class="badge badge-sm badge-primary font-bold">Proctored Real Exam</span>
-									<ShieldAlert class="w-4 h-4 text-primary" />
-								</div>
-								<h3 class="font-bold text-sm text-base-content">Strict Examination</h3>
-								<p class="text-[11px] text-base-content/70 mt-1 leading-relaxed">
-									Webcam verification snapshots, tab-switch detection, and automatic disqualification upon violation limits.
-								</p>
-							</button>
-
-							<!-- Simulation Card -->
-							<button
-								type="button"
-								class="p-4 rounded-2xl border text-left transition-all {mode === 'Simulation'
-									? 'border-secondary bg-secondary/10 ring-2 ring-secondary/30 shadow-md'
-									: 'border-base-content/10 bg-base-100/40 hover:bg-base-200/50'}"
-								onclick={() => (mode = 'Simulation')}
-							>
-								<div class="flex items-center justify-between mb-2">
-									<span class="badge badge-sm badge-secondary font-bold">Self-Paced Practice</span>
-									<Clock class="w-4 h-4 text-secondary" />
-								</div>
-								<h3 class="font-bold text-sm text-base-content">Practice Simulation</h3>
-								<p class="text-[11px] text-base-content/70 mt-1 leading-relaxed">
-									Ungraded or relaxed learning mode without active telemetry proctoring or penalty enforcement.
-								</p>
-							</button>
-						</div>
-					</div>
-
 					<!-- Candidate Instructions / Overview -->
 					<div class="space-y-1.5">
 						<div class="flex items-center justify-between">
@@ -218,11 +253,178 @@
 				</div>
 			</GlassCard>
 
-			<!-- Section 2: Timing, Scoring & Proctoring Rules -->
+			<!-- Section 2: Exam Rules & Proctoring Policy -->
+			<GlassCard class="p-6 space-y-5">
+				<div class="flex items-center justify-between pb-3 border-b border-base-content/10">
+					<div class="flex items-center gap-2">
+						<ShieldAlert class="w-5 h-5 text-primary" />
+						<h2 class="text-base font-bold text-base-content">2. Security & Proctoring Rule Policy</h2>
+					</div>
+					<span class="badge badge-sm badge-primary font-bold">{activeRuleConfig.name}</span>
+				</div>
+
+				<!-- Presets Grid -->
+				<div class="space-y-3">
+					<span class="label-text text-xs font-bold uppercase tracking-wider text-base-content/70 block">
+						Select Security Ruleset Preset <span class="text-error">*</span>
+					</span>
+
+					<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+						{#each availableRules as rule (rule.id)}
+							<button
+								type="button"
+								class="p-4 rounded-2xl border text-left transition-all {selectedRuleId === rule.id
+									? 'border-primary bg-primary/10 ring-2 ring-primary/30 shadow-md'
+									: 'border-base-content/10 bg-base-100/40 hover:bg-base-200/50'}"
+								onclick={() => selectRule(rule)}
+							>
+								<div class="flex items-center justify-between mb-2">
+									<span class="badge badge-sm badge-primary font-bold">{rule.name}</span>
+									{#if rule.requireCamera}
+										<Camera class="w-3.5 h-3.5 text-primary" />
+									{:else}
+										<BookOpen class="w-3.5 h-3.5 text-secondary" />
+									{/if}
+								</div>
+								<p class="text-[11px] text-base-content/70 mt-1 leading-relaxed line-clamp-2">
+									{rule.description || (rule.canTabSwitch ? 'Permits browser research.' : 'Strict proctored environment.')}
+								</p>
+								<div class="flex flex-wrap gap-1 mt-2 text-[10px]">
+									<span class="badge badge-xs {rule.canTabSwitch ? 'badge-success' : 'badge-neutral'}">
+										{rule.canTabSwitch ? 'Tabs OK' : 'No Tabs'}
+									</span>
+									<span class="badge badge-xs {rule.forceFullscreen ? 'badge-primary' : 'badge-ghost'}">
+										{rule.forceFullscreen ? 'Fullscreen' : 'Windowed'}
+									</span>
+									{#if rule.requireCamera}
+										<span class="badge badge-xs badge-info">Webcam</span>
+									{/if}
+								</div>
+							</button>
+						{/each}
+
+						<!-- Custom Rule Preset Option -->
+						<button
+							type="button"
+							class="p-4 rounded-2xl border text-left transition-all {selectedRuleId === 'custom'
+								? 'border-accent bg-accent/10 ring-2 ring-accent/30 shadow-md'
+								: 'border-base-content/10 bg-base-100/40 hover:bg-base-200/50'}"
+							onclick={() => (selectedRuleId = 'custom')}
+						>
+							<div class="flex items-center justify-between mb-2">
+								<span class="badge badge-sm badge-accent font-bold">Custom Policy</span>
+								<Sliders class="w-3.5 h-3.5 text-accent" />
+							</div>
+							<p class="text-[11px] text-base-content/70 mt-1 leading-relaxed">
+								Independently configure webcam intervals, tab limits, clipboard restrictions, and penalties.
+							</p>
+						</button>
+					</div>
+				</div>
+
+				<!-- Granular Policy Parameters (Customizable) -->
+				{#if selectedRuleId === 'custom'}
+					<div class="p-4 rounded-2xl bg-base-200/50 border border-accent/20 space-y-4">
+						<div class="flex items-center justify-between">
+							<span class="text-xs font-bold text-accent uppercase tracking-wider">Custom Security Controls</span>
+						</div>
+
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+							<!-- Tab Switch Toggle -->
+							<label class="flex items-center justify-between p-3 rounded-xl bg-base-100 border border-base-content/5 cursor-pointer">
+								<div>
+									<span class="font-semibold block">Allow Tab Switching</span>
+									<span class="text-[10px] text-base-content/60">Permit candidate to open other browser tabs</span>
+								</div>
+								<input type="checkbox" class="toggle toggle-primary toggle-sm" bind:checked={customRule.canTabSwitch} />
+							</label>
+
+							<!-- Force Fullscreen Toggle -->
+							<label class="flex items-center justify-between p-3 rounded-xl bg-base-100 border border-base-content/5 cursor-pointer">
+								<div>
+									<span class="font-semibold block">Force Fullscreen</span>
+									<span class="text-[10px] text-base-content/60">Exit triggers strike violation</span>
+								</div>
+								<input type="checkbox" class="toggle toggle-primary toggle-sm" bind:checked={customRule.forceFullscreen} />
+							</label>
+
+							<!-- Clipboard & Mouse Lock -->
+							<label class="flex items-center justify-between p-3 rounded-xl bg-base-100 border border-base-content/5 cursor-pointer">
+								<div>
+									<span class="font-semibold block">Restrict Clipboard & Mouse</span>
+									<span class="text-[10px] text-base-content/60">Block copy, paste, and right-click menu</span>
+								</div>
+								<input type="checkbox" class="toggle toggle-primary toggle-sm" bind:checked={customRule.restrictClipboardAndMouse} />
+							</label>
+
+							<!-- Keyboard Detection -->
+							<label class="flex items-center justify-between p-3 rounded-xl bg-base-100 border border-base-content/5 cursor-pointer">
+								<div>
+									<span class="font-semibold block">Detect Keyboard Shortcuts</span>
+									<span class="text-[10px] text-base-content/60">Block F12, DevTools, Alt+Tab</span>
+								</div>
+								<input type="checkbox" class="toggle toggle-primary toggle-sm" bind:checked={customRule.keyboardDetection} />
+							</label>
+
+							<!-- Require Webcam -->
+							<label class="flex items-center justify-between p-3 rounded-xl bg-base-100 border border-base-content/5 cursor-pointer">
+								<div>
+									<span class="font-semibold block">Require Webcam Snapshots</span>
+									<span class="text-[10px] text-base-content/60">Capture periodic proctoring pictures</span>
+								</div>
+								<input type="checkbox" class="toggle toggle-info toggle-sm" bind:checked={customRule.requireCamera} />
+							</label>
+
+							<!-- Require Microphone -->
+							<label class="flex items-center justify-between p-3 rounded-xl bg-base-100 border border-base-content/5 cursor-pointer">
+								<div>
+									<span class="font-semibold block">Require Microphone</span>
+									<span class="text-[10px] text-base-content/60">Verify candidate audio device</span>
+								</div>
+								<input type="checkbox" class="toggle toggle-secondary toggle-sm" bind:checked={customRule.requireMicrophone} />
+							</label>
+						</div>
+
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+							<div>
+								<label for="custom-strikes-input" class="label-text text-[11px] font-bold text-base-content/70 block mb-1">
+									Max Allowed Violations (Strikes)
+								</label>
+								<input
+									id="custom-strikes-input"
+									type="number"
+									min="1"
+									max="10"
+									bind:value={customRule.maxAllowedViolations}
+									class="input input-bordered input-sm w-full bg-base-100 font-semibold"
+								/>
+							</div>
+
+							{#if customRule.requireCamera}
+								<div>
+									<label for="custom-interval-input" class="label-text text-[11px] font-bold text-base-content/70 block mb-1">
+										Webcam Snapshot Interval (Seconds)
+									</label>
+									<input
+										id="custom-interval-input"
+										type="number"
+										min="10"
+										max="300"
+										bind:value={customRule.snapshotIntervalSeconds}
+										class="input input-bordered input-sm w-full bg-base-100 font-semibold"
+									/>
+								</div>
+							{/if}
+						</div>
+					</div>
+				{/if}
+			</GlassCard>
+
+			<!-- Section 3: Timing & Scoring Rules -->
 			<GlassCard class="p-6 space-y-5">
 				<div class="flex items-center gap-2 pb-3 border-b border-base-content/10">
 					<Award class="w-5 h-5 text-secondary" />
-					<h2 class="text-base font-bold text-base-content">2. Scoring & Security Rules</h2>
+					<h2 class="text-base font-bold text-base-content">3. Timing & Scoring Thresholds</h2>
 				</div>
 
 				<div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -278,40 +480,13 @@
 						<span class="text-[10px] text-base-content/50 mt-1 block">Allowed submissions</span>
 					</div>
 				</div>
-
-				<!-- Anti-cheat violations if RealExam -->
-				{#if mode === 'RealExam'}
-					<div class="p-4 rounded-2xl bg-error/5 border border-error/20 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-						<div class="space-y-1">
-							<div class="flex items-center gap-2 text-error font-bold text-xs">
-								<ShieldAlert class="w-4 h-4" />
-								<span>Proctoring Disqualification Threshold</span>
-							</div>
-							<p class="text-[11px] text-base-content/70 max-w-md">
-								Number of suspicious tab-outs, window blurs, or missing webcam frames before automatic disqualification.
-							</p>
-						</div>
-
-						<div class="w-full sm:w-36 flex-shrink-0">
-							<input
-								type="number"
-								min="1"
-								max="10"
-								bind:value={maxAllowedViolations}
-								class="input input-bordered input-sm w-full bg-base-100 text-center font-bold text-error"
-								required
-							/>
-							<span class="text-[10px] text-base-content/50 text-center block mt-1">Allowed strikes</span>
-						</div>
-					</div>
-				{/if}
 			</GlassCard>
 
-			<!-- Section 3: Availability Window & Randomization -->
+			<!-- Section 4: Availability Window & Randomization -->
 			<GlassCard class="p-6 space-y-5">
 				<div class="flex items-center gap-2 pb-3 border-b border-base-content/10">
 					<Calendar class="w-5 h-5 text-accent" />
-					<h2 class="text-base font-bold text-base-content">3. Availability Windows & Randomization</h2>
+					<h2 class="text-base font-bold text-base-content">4. Availability Windows & Randomization</h2>
 				</div>
 
 				<!-- Schedule Windows -->
@@ -388,9 +563,9 @@
 				<!-- Key parameters preview -->
 				<div class="space-y-3 text-xs">
 					<div class="flex items-center justify-between">
-						<span class="text-base-content/60">Mode:</span>
-						<span class="badge badge-sm {mode === 'RealExam' ? 'badge-primary' : 'badge-secondary'} font-bold text-[11px]">
-							{mode === 'RealExam' ? 'Proctored Exam' : 'Practice Test'}
+						<span class="text-base-content/60">Ruleset Policy:</span>
+						<span class="badge badge-sm badge-primary font-bold text-[11px]">
+							{activeRuleConfig.name}
 						</span>
 					</div>
 
@@ -409,12 +584,17 @@
 						<span class="font-bold text-base-content">{maxAttempts} attempt(s)</span>
 					</div>
 
-					{#if mode === 'RealExam'}
-						<div class="flex items-center justify-between">
-							<span class="text-base-content/60">Max Violations:</span>
-							<span class="font-bold text-error">{maxAllowedViolations} strikes</span>
-						</div>
-					{/if}
+					<div class="flex items-center justify-between">
+						<span class="text-base-content/60">Max Strikes:</span>
+						<span class="font-bold text-error">{activeRuleConfig.maxAllowedViolations} strikes</span>
+					</div>
+
+					<div class="flex items-center justify-between">
+						<span class="text-base-content/60">Webcam:</span>
+						<span class="font-bold {activeRuleConfig.requireCamera ? 'text-info' : 'text-base-content/60'}">
+							{activeRuleConfig.requireCamera ? `Every ${activeRuleConfig.snapshotIntervalSeconds}s` : 'Disabled'}
+						</span>
+					</div>
 
 					<div class="flex items-center justify-between">
 						<span class="text-base-content/60">Randomization:</span>

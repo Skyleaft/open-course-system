@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Exams.Domain;
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
 using MonoSlice.Shared.Abstractions.Exceptions;
 using MonoSlice.Shared.Abstractions.Interfaces;
-
 using MonoSlice.Shared.Abstractions.Contracts;
 
 namespace MonoSlice.Modules.Exams.Features.StartExam;
@@ -104,12 +104,26 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
             }
             else
             {
+                var existingRuleConfigDto = new ExamRuleConfigDto(
+                    existing.AppliedRules.Name,
+                    existing.AppliedRules.CanTabSwitch,
+                    existing.AppliedRules.MaxTabSwitchesAllowed,
+                    existing.AppliedRules.RestrictClipboardAndMouse,
+                    existing.AppliedRules.ForceFullscreen,
+                    existing.AppliedRules.KeyboardDetection,
+                    existing.AppliedRules.RequireCamera,
+                    existing.AppliedRules.SnapshotIntervalSeconds,
+                    existing.AppliedRules.RequireMicrophone,
+                    existing.AppliedRules.MaxAllowedViolations,
+                    existing.AppliedRules.AutoDisqualifyOnExceed);
+
                 // Return existing attempt
                 var existingAttempt = new ExamAttemptDto(
                     existing.Id,
                     exam.Id,
                     exam.Title,
-                    exam.Mode.ToString(),
+                    exam.ExamRuleId,
+                    existingRuleConfigDto,
                     existing.AttemptNumber,
                     exam.MaxAttempts,
                     existing.StartedAtUtc,
@@ -143,6 +157,7 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
             exam.DurationMinutes,
             randomSeed,
             activeSessionToken,
+            exam.RuleConfig,
             attemptNumber,
             exam.AvailableToUtc);
 
@@ -153,11 +168,25 @@ public sealed class StartExamCommandHandler : ICommandHandler<StartExamCommand, 
         var ttl = TimeSpan.FromMinutes(exam.DurationMinutes + 15);
         await _cacheService.SetAsync($"exam_session:{submission.Id}", activeSessionToken, ttl, cancellationToken);
 
+        var ruleConfigDto = new ExamRuleConfigDto(
+            submission.AppliedRules.Name,
+            submission.AppliedRules.CanTabSwitch,
+            submission.AppliedRules.MaxTabSwitchesAllowed,
+            submission.AppliedRules.RestrictClipboardAndMouse,
+            submission.AppliedRules.ForceFullscreen,
+            submission.AppliedRules.KeyboardDetection,
+            submission.AppliedRules.RequireCamera,
+            submission.AppliedRules.SnapshotIntervalSeconds,
+            submission.AppliedRules.RequireMicrophone,
+            submission.AppliedRules.MaxAllowedViolations,
+            submission.AppliedRules.AutoDisqualifyOnExceed);
+
         var dto = new ExamAttemptDto(
             submission.Id,
             exam.Id,
             exam.Title,
-            exam.Mode.ToString(),
+            exam.ExamRuleId,
+            ruleConfigDto,
             submission.AttemptNumber,
             exam.MaxAttempts,
             submission.StartedAtUtc,

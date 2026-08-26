@@ -67,7 +67,7 @@ public class ExamExecutionCommandHandlerTests
         _dbContext.QuestionBanks.Add(qb);
 
         // Create exam and link section to QuestionBank
-        var exam = QuizExam.Create(instructorId, "Unit Test Quiz", "Desc", QuizMode.RealExam, 45, passingScore: 50m);
+        var exam = QuizExam.Create(instructorId, "Unit Test Quiz", "Desc", 45, passingScore: 50m, ruleConfig: ExamRuleConfig.StrictProctored());
         exam.AddSection(qb.Id, "Main Section");
 
         exam.Publish();

@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
-using MonoSlice.Modules.Exams.Domain;
 
 namespace MonoSlice.Modules.Exams.Features.ListExams;
 
@@ -12,7 +11,8 @@ public static class ListExamsEndpoint
     public static void MapListExamsEndpoint(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGet("", async (
-            [FromQuery] QuizMode? mode,
+            [FromQuery] Guid? examRuleId,
+            [FromQuery] string? ruleName,
             [FromQuery] bool? isPublished,
             [FromQuery] string? search,
             [FromQuery] int pageIndex,
@@ -21,7 +21,8 @@ public static class ListExamsEndpoint
             CancellationToken cancellationToken) =>
         {
             var query = new ListExamsQuery(
-                mode,
+                examRuleId,
+                ruleName,
                 isPublished,
                 search,
                 pageIndex <= 0 ? 1 : pageIndex,

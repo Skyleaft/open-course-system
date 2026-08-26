@@ -20,9 +20,9 @@ public static class CompleteLessonEndpoint
                 var response = await mediator.Send(command, ct);
                 return Results.Json(response, statusCode: response.StatusCode);
             })
-            .WithName("CompleteCourseLesson")
-            .WithSummary("Mark or toggle a lesson as completed for the authenticated student")
-            .RequireAuthorization();
+            .WithName("CompleteLesson")
+            .WithSummary("Mark a specific lesson as completed for the authenticated student")
+            .RequireAuthorization(policy => policy.RequireRole("Student", "Instructor", "Admin"));
     }
 }
 

@@ -1,7 +1,7 @@
-using Mapster;
 using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Exams.Domain;
 using MonoSlice.Modules.Exams.Features.CreateExam;
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
@@ -45,13 +45,42 @@ public sealed class UpdateExamCommandHandler : ICommandHandler<UpdateExamCommand
             throw new BusinessRuleException("Cannot modify exam parameters while students have active in-progress attempts.");
         }
 
+        ExamRuleConfig? ruleConfig = null;
+        if (command.RuleConfig != null)
+        {
+            ruleConfig = new ExamRuleConfig
+            {
+                Name = command.RuleConfig.Name,
+                CanTabSwitch = command.RuleConfig.CanTabSwitch,
+                MaxTabSwitchesAllowed = command.RuleConfig.MaxTabSwitchesAllowed,
+                RestrictClipboardAndMouse = command.RuleConfig.RestrictClipboardAndMouse,
+                ForceFullscreen = command.RuleConfig.ForceFullscreen,
+                KeyboardDetection = command.RuleConfig.KeyboardDetection,
+                RequireCamera = command.RuleConfig.RequireCamera,
+                SnapshotIntervalSeconds = command.RuleConfig.SnapshotIntervalSeconds,
+                RequireMicrophone = command.RuleConfig.RequireMicrophone,
+                MaxAllowedViolations = command.RuleConfig.MaxAllowedViolations,
+                AutoDisqualifyOnExceed = command.RuleConfig.AutoDisqualifyOnExceed
+            };
+        }
+        else if (command.ExamRuleId.HasValue && command.ExamRuleId != exam.ExamRuleId)
+        {
+            var rule = await _dbContext.ExamRules
+                .AsNoTracking()
+                .FirstOrDefaultAsync(r => r.Id == command.ExamRuleId.Value, cancellationToken);
+            if (rule != null)
+            {
+                ruleConfig = rule.ToConfig();
+            }
+        }
+
         exam.Update(
             command.Title,
             command.Description,
-            command.Mode,
             command.DurationMinutes,
             command.PassingScore,
-            command.MaxAllowedViolations,
+            command.ExamRuleId,
+            ruleConfig,
             command.MaxAttempts,
             command.AvailableFromUtc,
             command.AvailableToUtc,
@@ -118,10 +147,37 @@ public sealed class UpdateExamCommandHandler : ICommandHandler<UpdateExamCommand
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
-        var dto = exam.Adapt<ExamDetailDto>() with
-        {
-            Mode = exam.Mode.ToString()
-        };
+        var ruleConfigDto = new ExamRuleConfigDto(
+            exam.RuleConfig.Name,
+            exam.RuleConfig.CanTabSwitch,
+            exam.RuleConfig.MaxTabSwitchesAllowed,
+            exam.RuleConfig.RestrictClipboardAndMouse,
+            exam.RuleConfig.ForceFullscreen,
+            exam.RuleConfig.KeyboardDetection,
+            exam.RuleConfig.RequireCamera,
+            exam.RuleConfig.SnapshotIntervalSeconds,
+            exam.RuleConfig.RequireMicrophone,
+            exam.RuleConfig.MaxAllowedViolations,
+            exam.RuleConfig.AutoDisqualifyOnExceed);
+
+        var dto = new ExamDetailDto(
+            exam.Id,
+            exam.InstructorId,
+            exam.Title,
+            exam.Description,
+            exam.ExamRuleId,
+            ruleConfigDto,
+            exam.DurationMinutes,
+            exam.PassingScore,
+            exam.MaxAttempts,
+            exam.AvailableFromUtc,
+            exam.AvailableToUtc,
+            exam.IsPublished,
+            exam.ShuffleQuestions,
+            exam.ShuffleOptions,
+            exam.CreatedBy,
+            exam.UpdatedBy,
+            exam.CreatedAtUtc);
 
         return ApiResponse.Ok(dto, "Exam updated successfully.");
     }

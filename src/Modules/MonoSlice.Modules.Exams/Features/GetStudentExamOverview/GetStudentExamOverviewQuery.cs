@@ -1,3 +1,4 @@
+using MonoSlice.Modules.Exams.Features.ExamRules;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
 
@@ -9,10 +10,10 @@ public sealed record StudentExamOverviewDto(
     Guid Id,
     string Title,
     string? Description,
-    string Mode,
+    Guid? ExamRuleId,
+    ExamRuleConfigDto RuleConfig,
     int DurationMinutes,
     decimal PassingScore,
-    int MaxAllowedViolations,
     int MaxAttempts,
     DateTime? AvailableFromUtc,
     DateTime? AvailableToUtc,

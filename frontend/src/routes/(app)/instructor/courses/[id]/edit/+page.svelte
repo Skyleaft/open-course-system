@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { fade, scale } from 'svelte/transition';
+	import { cubicOut } from 'svelte/easing';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { coursesApi } from '$lib/api/courses.ts';
@@ -1110,7 +1112,7 @@
 			</GlassCard>
 		{:else if activeTab === 'exams'}
 			<!-- Tab 2: Reusable Exams Attachment -->
-			<GlassCard class="p-6">
+			<div class="rounded-3xl bg-base-100/60 border border-base-content/10 p-6 shadow-xl space-y-4">
 				<CourseExamAttachment
 					courseExams={course.exams || []}
 					{allExams}
@@ -1118,7 +1120,7 @@
 					onDetachExam={handleDetachExam}
 					isLoading={isActionLoading}
 				/>
-			</GlassCard>
+			</div>
 		{:else}
 			<!-- Tab 3: Course Settings Studio -->
 			<GlassCard class="p-6 sm:p-8">
@@ -1237,9 +1239,17 @@
 
 <!-- Add Section Modal -->
 {#if isAddSectionModalOpen}
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in" role="dialog" aria-modal="true">
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		transition:fade={{ duration: 180 }}
+	>
 		<div class="fixed inset-0" onclick={() => (isAddSectionModalOpen = false)} role="presentation"></div>
-		<div class="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4">
+		<div
+			class="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4"
+			transition:scale={{ duration: 220, start: 0.94, easing: cubicOut }}
+		>
 			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
 				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
 					<Layers class="w-5 h-5 text-primary" />
@@ -1277,9 +1287,17 @@
 
 <!-- Edit Section Modal -->
 {#if isEditSectionModalOpen}
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in" role="dialog" aria-modal="true">
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		transition:fade={{ duration: 180 }}
+	>
 		<div class="fixed inset-0" onclick={() => (isEditSectionModalOpen = false)} role="presentation"></div>
-		<div class="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4">
+		<div
+			class="relative z-10 w-full max-w-md overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4"
+			transition:scale={{ duration: 220, start: 0.94, easing: cubicOut }}
+		>
 			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
 				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
 					<Edit3 class="w-5 h-5 text-primary" />
@@ -1316,9 +1334,17 @@
 
 <!-- Add Lesson Modal -->
 {#if isAddLessonModalOpen}
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in" role="dialog" aria-modal="true">
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		transition:fade={{ duration: 180 }}
+	>
 		<div class="fixed inset-0" onclick={() => (isAddLessonModalOpen = false)} role="presentation"></div>
-		<div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+		<div
+			class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+			transition:scale={{ duration: 220, start: 0.94, easing: cubicOut }}
+		>
 			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
 				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
 					<Plus class="w-5 h-5 text-primary" />
@@ -1417,9 +1443,17 @@
 
 <!-- Edit Lesson Modal -->
 {#if isEditLessonModalOpen}
-	<div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in" role="dialog" aria-modal="true">
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		transition:fade={{ duration: 180 }}
+	>
 		<div class="fixed inset-0" onclick={() => (isEditLessonModalOpen = false)} role="presentation"></div>
-		<div class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+		<div
+			class="relative z-10 w-full max-w-2xl overflow-hidden rounded-2xl border border-base-content/10 bg-base-100/95 p-6 shadow-2xl backdrop-blur-2xl space-y-4 max-h-[90vh] overflow-y-auto"
+			transition:scale={{ duration: 220, start: 0.94, easing: cubicOut }}
+		>
 			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
 				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
 					<Edit3 class="w-5 h-5 text-primary" />

@@ -45,7 +45,7 @@ public class ProctorControlCommandHandlerTests
     [Fact]
     public async Task WarnCandidate_ShouldDispatchSignalRMessage()
     {
-        var exam = QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", QuizMode.RealExam, 60, 70m);
+        var exam = QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", 60, 70m);
         var studentId = Guid.CreateVersion7();
         var submission = QuizSubmission.Create(exam.Id, studentId, 60, 12345, "token123");
 
@@ -67,7 +67,7 @@ public class ProctorControlCommandHandlerTests
     [Fact]
     public async Task ForceDisconnectCandidate_ShouldDisqualifyAndSendSignalR()
     {
-        var exam = QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", QuizMode.RealExam, 60, 70m);
+        var exam = QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", 60, 70m);
         var studentId = Guid.CreateVersion7();
         var submission = QuizSubmission.Create(exam.Id, studentId, 60, 12345, "token123");
 
@@ -91,10 +91,10 @@ public class ProctorControlCommandHandlerTests
     [Fact]
     public async Task GetLiveCandidates_ShouldReturnCandidateMetrics()
     {
-        var exam = QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", QuizMode.RealExam, 60, 70m);
+        var exam = QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", 60, 70m);
         var studentId = Guid.CreateVersion7();
-        var submission = QuizSubmission.Create(exam.Id, studentId, 60, 12345, "token123");
-        submission.RecordViolation("TAB_SWITCH", "Switched tabs", 5);
+        var submission = QuizSubmission.Create(exam.Id, studentId, 60, 12345, "token123", appliedRules: new ExamRuleConfig { MaxAllowedViolations = 5 });
+        submission.RecordViolation("TAB_SWITCH", "Switched tabs");
 
         await _dbContext.Exams.AddAsync(exam);
         await _dbContext.Submissions.AddAsync(submission);

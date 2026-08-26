@@ -20,7 +20,7 @@ public class ExamsModuleApiTests
         var dbContext = new ExamsDbContext(options);
         var cacheService = Substitute.For<ICacheService>();
 
-        var exam = QuizExam.Create(Guid.CreateVersion7(), "System Architecture Exam", "Desc", QuizMode.RealExam, 60, 70m);
+        var exam = QuizExam.Create(Guid.CreateVersion7(), "System Architecture Exam", "Desc", 60, 70m, ruleConfig: ExamRuleConfig.StrictProctored());
         await dbContext.Exams.AddAsync(exam);
         await dbContext.SaveChangesAsync();
 
@@ -30,6 +30,6 @@ public class ExamsModuleApiTests
         Assert.NotNull(contract);
         Assert.Equal(exam.Id, contract.Id);
         Assert.Equal("System Architecture Exam", contract.Title);
-        Assert.Equal("RealExam", contract.Mode);
+        Assert.Equal("Strict Proctored", contract.Mode);
     }
 }
