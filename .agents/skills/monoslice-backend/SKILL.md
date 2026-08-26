@@ -118,22 +118,37 @@ Each module has its own PostgreSQL schema:
 - `exams`    -> `ExamsDbContext`
 - `assessments` -> `AssessmentsDbContext`
 - `communications` -> `CommunicationsDbContext`
+- `customization` -> `CustomizationDbContext`
 
 ```csharp
 protected override void OnModelCreating(ModelBuilder modelBuilder)
 {
     base.OnModelCreating(modelBuilder);
-    modelBuilder.HasDefaultSchema("exams");
+    modelBuilder.HasDefaultSchema("customization");
 }
 ```
 
-### Adding New Migrations via EF Tools
+### Adding New Migrations via EF Tools (Mandatory on Any Schema Change)
+
+> [!IMPORTANT]
+> **MANDATORY EF CORE MIGRATION RULE**:
+> Whenever creating a new `DbContext`, adding new entities, or modifying entity configurations/table structures in any module, you **MUST IMMEDIATELY** generate the corresponding EF Core migration files before finalizing your changes. Never leave a DbContext without its migration snapshot.
+
 Always run with the module project as `--project`, Host as `--startup-project`, and explicit `--context`:
 ```bash
 dotnet ef migrations add <MigrationName> \
-  --project src/Modules/MonoSlice.Modules.Exams/MonoSlice.Modules.Exams.csproj \
+  --project src/Modules/MonoSlice.Modules.<ModuleName>/MonoSlice.Modules.<ModuleName>.csproj \
   --startup-project src/MonoSlice.Host/MonoSlice.Host.csproj \
-  --context ExamsDbContext \
+  --context <Module>DbContext \
+  --output-dir Persistence/Migrations
+```
+
+**Example for Customization**:
+```bash
+dotnet ef migrations add InitialCustomizationMigration \
+  --project src/Modules/MonoSlice.Modules.Customization/MonoSlice.Modules.Customization.csproj \
+  --startup-project src/MonoSlice.Host/MonoSlice.Host.csproj \
+  --context CustomizationDbContext \
   --output-dir Persistence/Migrations
 ```
 

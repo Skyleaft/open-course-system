@@ -1,7 +1,7 @@
 # Software Design Document (SDD)
-## LMS & Online Examination Platform with Realtime Anti-Cheat Engine
+## Open Course System: Customizable LMS & Online Examination Platform with Realtime Anti-Cheat Engine
 
-**Document Version:** 2.0  
+**Document Version:** 2.1  
 **Status:** Approved & Active  
 **Architecture:** Vertical Slice Architecture (VSA) + Domain-Driven Design (DDD) Modular Monolith  
 **Backend Framework:** ASP.NET Core (.NET 10)  
@@ -15,15 +15,17 @@
 
 Sistem dibangun sebagai **Modular Monolith** berkinerja tinggi yang menggabungkan prinsip **Vertical Slice Architecture (VSA)** di level penataan fitur dan **Domain-Driven Design (DDD)** di level core business domain. Seluruh bounded context berjalan dalam satu proses host runtime .NET 10 namun terisolasi secara mutlak di tingkat database melalui **PostgreSQL Multi-Schema**.
 
+Sebagai **Open Course System**, platform ini dirancang dengan kapabilitas kustomisasi tinggi (white-labeling, dynamic theme tokens, dynamic landing page builder, dan modular feature switchboard) sehingga dapat diadaptasi untuk institusi pendidikan, korporat, maupun penyedia pelatihan mandiri.
+
 ```
 +---------------------------------------------------------------------------------------------------------+
 |                                    CLIENT LAYER (SvelteKit V3 RC SPA/SSR)                               |
 |                                                                                                         |
-|  [ Student Portal ]                 [ Instructor Dashboard ]             [ Proctor / Live Monitor ]     |
+|  [ Student Portal ]                 [ Instructor & Admin Studio ]        [ Proctor / Live Monitor ]     |
 |  - Course Catalog & Checkout        - Curriculum & Section Builder       - Realtime Violation Feed      |
 |  - Video / PDF / Lesson Player      - Question Bank & Rubrics            - Force Disconnect / Warning   |
-|  - Realtime Exam Runner             - Exam & Section Builder             - Candidate Snapshot Timeline  |
-|  - Certificate Verification         - Course-Exam Attachment             - Live Liveness Status         |
+|  - Realtime Exam Runner             - Dynamic Theme & Brand Customizer   - Candidate Snapshot Timeline  |
+|  - Certificate Verification         - Landing Section & Feature Switch   - Live Liveness Status         |
 |                                                                                                         |
 |  Client Interceptors: Fullscreen Lock | Tab Visibility Detector | Audio/Video Analyser | Snapshot Engine|
 +------------------------------------+--------------------------------+-----------------------------------+
@@ -35,6 +37,7 @@ Sistem dibangun sebagai **Modular Monolith** berkinerja tinggi yang menggabungka
 |  [ In-Memory Cross-Module Mediator & Event Bus ]       |   |  Bucket: `exam-snapshots` (Lifecycle 30d)  |
 |  [ OpenTelemetry .NET 10 SDK ]                         |   |  Bucket: `course-materials` (PDF/Video)    |
 |    └── OTLP gRPC ──► OpenTelemetry Collector ──► Jaeger|   |  Bucket: `assignment-submissions`          |
+|                                                        |   |  Bucket: `branding-assets` (Logos/Banners) |
 +-------------------+----------------+-------------------+   +--------------------------------------------+
                     │                │
                     │ Caching & Auth │ Event Streams (XADD / XREADGROUP)
@@ -42,7 +45,7 @@ Sistem dibangun sebagai **Modular Monolith** berkinerja tinggi yang menggabungka
 +-------------------+----------------+--------------------------------------------------------------------+
 |                                         REDIS ENGINE (Latest)                                           |
 |                                                                                                         |
-|  - Cache Store: Course Curriculum, Lesson Data, Fast Enrollment Lookups                                 |
+|  - Cache Store: Public Customization (`customization:public`), Course Curriculum, Fast Lookups          |
 |  - In-Memory Exam Buffer: `exam_answers:{submissionId}` (Zero DB writes during active exam)             |
 |  - One-Time Session Token Guard: Single Active Device / Tab Enforcement                                 |
 |  - Redis Streams (MAXLEN ~ 100k): `stream:grading-queue`, `stream:proctoring-events`                    |
@@ -53,7 +56,7 @@ Sistem dibangun sebagai **Modular Monolith** berkinerja tinggi yang menggabungka
                                      ▼
 +---------------------------------------------------------------------------------------------------------+
 |                                    PostgreSQL Database (Multi-Schema)                                    |
-|   Schemas: identity  │  payments  │  courses  │  exams  │  assessments  │  communications               |
+|   Schemas: identity  │  payments  │  courses  │  exams  │  assessments  │  communications │ customization   |
 +---------------------------------------------------------------------------------------------------------+
 ```
 
@@ -98,6 +101,13 @@ Sistem dibangun sebagai **Modular Monolith** berkinerja tinggi yang menggabungka
    - `ExamHub` untuk sinkronisasi timer, heartbeat, broadcast pelanggaran, dan direct proctor commands (warning / force disconnect).
    - `NotificationHub` untuk broadcast sistem dan notifikasi nilai.
 
+8. **Customization & Website Settings (`customization` schema)**:
+   - Manajemen identitas branding platform (Site Name, Tagline, Favicon, Light/Dark Logos, Footer copyright).
+   - Dynamic Theme & Styling Engine (OKLCH color palettes, daisyUI themes, typography font choices, glassmorphism overrides).
+   - Modular Feature Switchboard (Public catalog, registration mode, payment gateway activation, certificate issuance, proctoring defaults, maintenance mode).
+   - Landing Page Section Builder (Hero, Stats, Featured Courses, Feature Matrix, Testimonials, FAQ, CTA).
+   - High-speed Redis caching (`customization:public`) dengan instant invalidation dan SSR hydration di SvelteKit.
+
 ---
 
 ## 3. Domain Aggregate Models & Invariants
@@ -139,6 +149,18 @@ Sistem dibangun sebagai **Modular Monolith** berkinerja tinggi yang menggabungka
 |  ├── StudentAnswer (Entity) [0..*] (Ref -> BankQuestion.Id)                                       |
 |  └── ProctoringSnapshot (Entity) [0..*]                                                           |
 |                                                                                                   |
+|  -----------------------------------------------------------------------------------------------  |
+|                                                                                                   |
+|  [CUSTOMIZATION BOUNDED CONTEXT]                                                                  |
+|  SiteSetting (Aggregate Root)                                                                     |
+|  - Id, Category, SettingKey, Value (JSONB), IsPublic, Description, UpdatedBy, UpdatedAtUtc         |
+|                                                                                                   |
+|  LandingSection (Aggregate Root)                                                                  |
+|  - Id, SectionType, Title, Subtitle, OrderIndex, IsActive, Config (JSONB), CreatedAtUtc            |
+|                                                                                                   |
+|  SettingsAuditLog (Audit Record)                                                                  |
+|  - Id, SettingKey, OldValue (JSONB), NewValue (JSONB), ChangedBy, ChangedAtUtc, IpAddress         |
+|                                                                                                   |
 +---------------------------------------------------------------------------------------------------+
 ```
 
@@ -177,6 +199,21 @@ Sistem dibangun sebagai **Modular Monolith** berkinerja tinggi yang menggabungka
   - Pengacakan soal dan opsi jawaban menggunakan PRNG Fisher-Yates berbasis `RandomSeed`.
   - Pada mode `RealExam`, jika `Violations.Count >= MaxAllowedViolations`, submission otomatis berstatus `Disqualified`.
 
+### 3.5 SiteSetting Aggregate
+- **Root**: `SiteSetting`
+- **Invariants**:
+  - `SettingKey` unik di seluruh sistem (misal: `branding.general`, `theme.styling`, `features.toggles`, `security.proctoring_defaults`, `localization.general`).
+  - Nilai konfigurasi disimpan sebagai JSONB dengan skema ter-validasi per `Category`.
+  - Properti `IsPublic = true` mengekspos setting ke endpoint publik tanpa memerlukan autentikasi. Setting privat (seperti secret keys, internal proctoring thresholds) dilindungi otorisasi `Admin`.
+  - Setiap pembaruan setting otomatis merekam snapshot ke `SettingsAuditLog` dan menginvalidasi cache Redis `customization:public`.
+
+### 3.6 LandingSection Aggregate
+- **Root**: `LandingSection`
+- **Invariants**:
+  - `SectionType` didukung: `Hero`, `StatsCounter`, `FeaturedCourses`, `FeaturesGrid`, `Testimonials`, `FaqAccordion`, `CtaBanner`.
+  - `OrderIndex` menentukan posisi rendering pada landing page publik.
+  - Bagian non-aktif (`IsActive = false`) difilter secara otomatis dari endpoint publik.
+
 ---
 
 ## 4. PostgreSQL Multi-Schema Database DDL
@@ -189,6 +226,7 @@ CREATE SCHEMA IF NOT EXISTS courses;
 CREATE SCHEMA IF NOT EXISTS exams;
 CREATE SCHEMA IF NOT EXISTS assessments;
 CREATE SCHEMA IF NOT EXISTS communications;
+CREATE SCHEMA IF NOT EXISTS customization;
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -472,6 +510,47 @@ CREATE TABLE communications.thread_comments (
     created_at_utc TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX idx_comments_thread ON communications.thread_comments(thread_id);
+
+-- ============================================================================
+-- SCHEMA: customization
+-- ============================================================================
+CREATE TABLE customization.site_settings (
+    id UUID PRIMARY KEY,
+    category VARCHAR(50) NOT NULL, -- 'Branding', 'Theme', 'Features', 'Localization', 'Security', 'Landing'
+    setting_key VARCHAR(100) NOT NULL UNIQUE,
+    value JSONB NOT NULL,
+    is_public BOOLEAN NOT NULL DEFAULT FALSE,
+    description TEXT,
+    updated_by UUID,
+    updated_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    xmin XID
+);
+CREATE INDEX idx_settings_category ON customization.site_settings(category);
+CREATE INDEX idx_settings_public ON customization.site_settings(is_public);
+
+CREATE TABLE customization.landing_sections (
+    id UUID PRIMARY KEY,
+    section_type VARCHAR(50) NOT NULL, -- 'Hero', 'StatsCounter', 'FeaturedCourses', 'FeaturesGrid', 'Testimonials', 'FaqAccordion', 'CtaBanner'
+    title VARCHAR(255),
+    subtitle TEXT,
+    order_index INT NOT NULL DEFAULT 1,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    config JSONB NOT NULL DEFAULT '{}',
+    created_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at_utc TIMESTAMPTZ
+);
+CREATE INDEX idx_landing_sections_active ON customization.landing_sections(is_active, order_index);
+
+CREATE TABLE customization.settings_audit_logs (
+    id UUID PRIMARY KEY,
+    setting_key VARCHAR(100) NOT NULL,
+    old_value JSONB,
+    new_value JSONB NOT NULL,
+    changed_by UUID NOT NULL,
+    changed_at_utc TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    ip_address VARCHAR(45)
+);
+CREATE INDEX idx_settings_audit_key ON customization.settings_audit_logs(setting_key);
 ```
 
 ---
@@ -499,6 +578,8 @@ CREATE INDEX idx_comments_thread ON communications.thread_comments(thread_id);
 ## 6. SvelteKit V3 RC Frontend Architecture
 
 - **Path Aliasing**: Menggunakan `#lib` untuk seluruh shared services, API wrappers, dan UI components.
-- **Design System**: Glassmorphism (`backdrop-blur-xl`, translucent surface, vibrant glow borders) didukung oleh daisyUI 5 & Tailwind CSS 4.
+- **Design System & Dynamic Theming**: Glassmorphism (`backdrop-blur-xl`, translucent surface, vibrant glow borders) didukung oleh daisyUI 5 & Tailwind CSS 4. Token OKLCH dan variabel warna diinjeksikan secara reaktif dari payload `customization:public`.
+- **White-Label & Dynamic Metadata**: Site title, favicon, logo (light & dark mode), hero banners, dan footer copyright dimuat saat SSR di `+layout.server.ts` tanpa latency.
 - **Rich Text Engine**: Edra (Tiptap + Svelte 5 Runes) untuk editing soal, LaTeX KaTeX formulas, code syntax highlighting, dan callouts.
 - **Anti-Cheat Loop**: Web Worker snapshot generator acak (30–60s) dengan direct PUT ke MinIO presigned URL, fullscreen lock, dan tab visibility listeners.
+- **Modular Admin Customization Studio**: Antarmuka visual untuk mengubah palet warna, konfigurasi landing page builder, toggle modul/fitur, dan upload aset brand ke MinIO.

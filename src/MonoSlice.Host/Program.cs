@@ -8,6 +8,8 @@ using MonoSlice.Modules.Catalog;
 using MonoSlice.Modules.Catalog.Persistence;
 using MonoSlice.Modules.Communications;
 using MonoSlice.Modules.Communications.Persistence;
+using MonoSlice.Modules.Customization;
+using MonoSlice.Modules.Customization.Persistence;
 using MonoSlice.Modules.Exams;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Modules.Orders;
@@ -42,7 +44,8 @@ builder.Services.AddMonoSliceMapping(
     typeof(CatalogModule).Assembly,
     typeof(ExamsModule).Assembly,
     typeof(AssessmentsModule).Assembly,
-    typeof(CommunicationsModule).Assembly);
+    typeof(CommunicationsModule).Assembly,
+    typeof(CustomizationModule).Assembly);
 
 // Source-Generated Mediator Dispatcher
 builder.Services.AddMediator(options =>
@@ -57,6 +60,7 @@ builder.Services.AddCatalogModule(builder.Configuration);
 builder.Services.AddExamsModule(builder.Configuration);
 builder.Services.AddAssessmentsModule(builder.Configuration);
 builder.Services.AddCommunicationsModule(builder.Configuration);
+builder.Services.AddCustomizationModule(builder.Configuration);
 
 // Health Checks
 builder.Services.AddHealthChecks();
@@ -114,7 +118,11 @@ using (var scope = app.Services.CreateScope())
         var commsDb = scope.ServiceProvider.GetRequiredService<CommunicationsDbContext>();
         await commsDb.Database.MigrateAsync();
 
-        logger.LogInformation("Database schemas migrated successfully.");
+        var customDb = scope.ServiceProvider.GetRequiredService<CustomizationDbContext>();
+        await customDb.Database.MigrateAsync();
+        await CustomizationDbSeeder.SeedDefaultsAsync(customDb, logger);
+
+        logger.LogInformation("Database schemas migrated and seeded successfully.");
     }
     catch (Exception ex)
     {
@@ -153,6 +161,7 @@ app.MapCatalogEndpoints();
 app.MapExamsEndpoints();
 app.MapAssessmentsEndpoints();
 app.MapCommunicationsEndpoints();
+app.MapCustomizationEndpoints();
 
 // Realtime SignalR Hubs
 app.MapHub<MonoSlice.Modules.Exams.Hubs.ExamHub>("/hubs/exam");

@@ -25,6 +25,7 @@
     <ProjectReference Include="..\Modules\MonoSlice.Modules.Exams\MonoSlice.Modules.Exams.csproj" />
     <ProjectReference Include="..\Modules\MonoSlice.Modules.Assessments\MonoSlice.Modules.Assessments.csproj" />
     <ProjectReference Include="..\Modules\MonoSlice.Modules.Communications\MonoSlice.Modules.Communications.csproj" />
+    <ProjectReference Include="..\Modules\MonoSlice.Modules.Customization\MonoSlice.Modules.Customization.csproj" />
   </ItemGroup>
 
 </Project>
