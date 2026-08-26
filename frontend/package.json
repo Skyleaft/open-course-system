@@ -29,7 +29,7 @@
 		"svelte-sonner": "^1.2.1",
 		"tailwind-variants": "^3.3.1",
 		"tailwindcss": "^4.3.0",
-		"typescript": "^6.0.3",
+		"typescript": "^7.0.2",
 		"vite": "^8.1.5"
 	},
 	"imports": {
@@ -63,7 +63,7 @@
 		"@tiptap/suggestion": "^3.30.2",
 		"clsx": "^2.1.1",
 		"daisyui": "^5.7.20",
-		"katex": "^0.17.0",
+		"katex": "^0.18.4",
 		"lowlight": "^3.3.0",
 		"lucide-svelte": "^1.0.1",
 		"mermaid": "^11.17.0",
