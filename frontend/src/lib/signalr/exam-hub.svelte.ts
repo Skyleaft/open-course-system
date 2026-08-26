@@ -89,7 +89,7 @@ export class ExamHubClient {
 		});
 	}
 
-	onViolationWarning(callback: (currentCount: number, maxAllowed: number) => void) {
+	onViolationWarning(callback: (currentCount: number, maxAllowed: number, reason?: string) => void) {
 		this.connection?.on('ViolationWarning', callback);
 	}
 
@@ -97,15 +97,49 @@ export class ExamHubClient {
 		this.connection?.on('ForceDisconnectExam', callback);
 	}
 
+	onProctorMessage(callback: (message: string) => void) {
+		this.connection?.on('ProctorMessage', callback);
+	}
+
+	// Proctor Hub Operations
+	async joinProctorRoom(examId: string): Promise<void> {
+		if (!this.connection || this.connection.state !== signalR.HubConnectionState.Connected) {
+			await this.start();
+		}
+		if (this.connection) {
+			await this.connection.invoke('JoinProctorRoom', examId);
+		}
+	}
+
+	async broadcastExamMessage(examId: string, message: string): Promise<void> {
+		if (this.connection?.state === signalR.HubConnectionState.Connected) {
+			await this.connection.invoke('BroadcastExamMessage', examId, message);
+		}
+	}
+
 	// Server-to-Proctor Event Listeners
+	onCandidateJoined(callback: (studentId: string, submissionId: string, connectionId: string) => void) {
+		this.connection?.on('CandidateJoined', callback);
+	}
+
+	onCandidateStatusChanged(callback: (submissionId: string, status: string) => void) {
+		this.connection?.on('CandidateStatusChanged', callback);
+	}
+
 	onProctorViolationAlert(
-		callback: (studentId: string, submissionId: string, violationType: string, count: number) => void
+		callback: (studentId: string, submissionId: string, violationType: string, count: number, reason?: string) => void
 	) {
 		this.connection?.on('ProctorViolationAlert', callback);
 	}
 
-	onProctorSnapshotReceived(callback: (studentId: string, snapshotPresignedViewUrl: string) => void) {
+	onProctorSnapshotReceived(
+		callback: (studentId: string, submissionId: string, snapshotPresignedViewUrl: string, timestampUtc: string) => void
+	) {
 		this.connection?.on('ProctorSnapshotReceived', callback);
+	}
+
+	onRoomBroadcastSent(callback: (message: string, timestampUtc: string) => void) {
+		this.connection?.on('RoomBroadcastSent', callback);
 	}
 
 	private startHeartbeat(submissionId: string, sessionToken: string) {
