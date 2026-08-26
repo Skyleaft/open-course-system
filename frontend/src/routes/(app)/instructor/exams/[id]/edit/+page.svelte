@@ -36,6 +36,7 @@
 	import { examRulesApi } from '$lib/api/exam-rules.ts';
 	import type { QuizExam, QuizSection, QuestionBank, QuizMode, ExamSubmissionDto, ExamRuleDto, ExamRuleConfig } from '$lib/api/types.ts';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
+	import SegmentedTabs from '$lib/components/ui/SegmentedTabs.svelte';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import SectionBuilder from '$lib/components/exam/SectionBuilder.svelte';
 	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
@@ -486,42 +487,17 @@
 				</div>
 
 				<div class="flex items-center gap-2 flex-shrink-0">
-					<!-- Tabs switch -->
-					<div class="flex items-center gap-1 rounded-2xl p-1 bg-base-200/70 border border-base-content/10">
-						<button
-							type="button"
-							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'sections'
-								? 'btn-primary text-primary-content shadow-xs'
-								: 'btn-ghost text-base-content/70'}"
-							onclick={() => (activeTab = 'sections')}
-						>
-							<Layers class="w-3.5 h-3.5" />
-							Exam Sections ({exam.sections?.length || 0})
-						</button>
-						<button
-							type="button"
-							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'submissions'
-								? 'btn-primary text-primary-content shadow-xs'
-								: 'btn-ghost text-base-content/70'}"
-							onclick={() => {
-								activeTab = 'submissions';
-								loadSubmissions();
-							}}
-						>
-							<Users class="w-3.5 h-3.5" />
-							Submissions ({submissionsTotal})
-						</button>
-						<button
-							type="button"
-							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'settings'
-								? 'btn-primary text-primary-content shadow-xs'
-								: 'btn-ghost text-base-content/70'}"
-							onclick={() => (activeTab = 'settings')}
-						>
-							<Settings class="w-3.5 h-3.5" />
-							Parameters
-						</button>
-					</div>
+					<SegmentedTabs
+						tabs={[
+							{ id: 'sections', label: 'Exam Sections', icon: Layers, count: exam.sections?.length || 0 },
+							{ id: 'submissions', label: 'Submissions', icon: Users, count: submissionsTotal },
+							{ id: 'settings', label: 'Parameters', icon: Settings }
+						]}
+						bind:active={activeTab}
+						onChange={(tabId) => {
+							if (tabId === 'submissions') loadSubmissions();
+						}}
+					/>
 				</div>
 			</div>
 		</GlassCard>

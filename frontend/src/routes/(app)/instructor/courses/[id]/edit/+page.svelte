@@ -17,6 +17,7 @@
 		CourseStudentExamProgressDto
 	} from '$lib/api/types.ts';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
+	import SegmentedTabs from '$lib/components/ui/SegmentedTabs.svelte';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import RichEditor from '$lib/components/editor/RichEditor.svelte';
 	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
@@ -659,72 +660,18 @@
 				</div>
 
 				<div class="flex items-center gap-2 flex-shrink-0">
-					<!-- Tabs switch -->
-					<div class="flex items-center gap-1 rounded-2xl p-1 bg-base-200/70 border border-base-content/10">
-						<button
-							type="button"
-							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'curriculum'
-								? 'btn-primary text-primary-content shadow-xs'
-								: 'btn-ghost text-base-content/70'}"
-							onclick={() => (activeTab = 'curriculum')}
-						>
-							<Layers class="w-3.5 h-3.5" />
-							Curriculum ({course.sections?.length || 0})
-						</button>
-						<button
-							type="button"
-							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'students'
-								? 'btn-primary text-primary-content shadow-xs'
-								: 'btn-ghost text-base-content/70'}"
-							onclick={() => {
-								activeTab = 'students';
-								loadEnrollments();
-							}}
-						>
-							<Users class="w-3.5 h-3.5" />
-							Students ({totalEnrollments})
-						</button>
-						<button
-							type="button"
-							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'exams'
-								? 'btn-primary text-primary-content shadow-xs'
-								: 'btn-ghost text-base-content/70'}"
-							onclick={() => (activeTab = 'exams')}
-						>
-							<FileText class="w-3.5 h-3.5" />
-							Exams ({course.exams?.length || 0})
-						</button>
-						<button
-							type="button"
-							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'settings'
-								? 'btn-primary text-primary-content shadow-xs'
-								: 'btn-ghost text-base-content/70'}"
-							onclick={() => (activeTab = 'settings')}
-						>
-							<Settings class="w-3.5 h-3.5" />
-							Settings
-						</button>
-					</div>
-
-					{#if activeTab === 'curriculum'}
-						<button
-							type="button"
-							class="btn btn-primary btn-xs rounded-xl text-primary-content font-bold shadow-sm gap-1"
-							onclick={() => (isAddSectionModalOpen = true)}
-						>
-							<Plus class="w-3.5 h-3.5" />
-							Add Section
-						</button>
-					{:else if activeTab === 'students'}
-						<button
-							type="button"
-							class="btn btn-primary btn-xs rounded-xl text-primary-content font-bold shadow-sm gap-1"
-							onclick={() => (isEnrollModalOpen = true)}
-						>
-							<UserPlus class="w-3.5 h-3.5" />
-							Enroll Student
-						</button>
-					{/if}
+					<SegmentedTabs
+						tabs={[
+							{ id: 'curriculum', label: 'Curriculum', icon: Layers, count: course.sections?.length || 0 },
+							{ id: 'students', label: 'Students', icon: Users, count: totalEnrollments },
+							{ id: 'exams', label: 'Exams', icon: FileText, count: course.exams?.length || 0 },
+							{ id: 'settings', label: 'Settings', icon: Settings }
+						]}
+						bind:active={activeTab}
+						onChange={(tabId) => {
+							if (tabId === 'students') loadEnrollments();
+						}}
+					/>
 				</div>
 			</div>
 		</GlassCard>
