@@ -196,6 +196,16 @@ export interface LessonProgressResultDto {
 	updatedCourseProgressPercent: number;
 }
 
+export interface CourseStudentExamProgressDto {
+	examId: string;
+	examTitle: string;
+	status: string;
+	score?: number | null;
+	isPassed?: boolean | null;
+	startedAtUtc?: string | null;
+	finishedAtUtc?: string | null;
+}
+
 export interface CourseStudentEnrollmentDto {
 	enrollmentId: string;
 	userId: string;
@@ -209,6 +219,33 @@ export interface CourseStudentEnrollmentDto {
 	completedAssignmentsCount: number;
 	totalAssignmentsCount: number;
 	lastAccessedAtUtc?: string | null;
+	exams?: CourseStudentExamProgressDto[];
+}
+
+export interface ViolationSummaryDto {
+	type: string;
+	reason: string;
+	timestampUtc: string;
+}
+
+export interface ExamSubmissionDto {
+	id: string;
+	examId: string;
+	examTitle: string;
+	studentId: string;
+	studentName: string;
+	studentEmail: string;
+	studentPicture?: string | null;
+	attemptNumber: number;
+	maxAttempts: number;
+	startedAtUtc: string;
+	submittedAtUtc?: string | null;
+	status: string;
+	score?: number | null;
+	isPassed?: boolean | null;
+	violationsCount: number;
+	violations: ViolationSummaryDto[];
+	snapshotsCount: number;
 }
 
 export interface AdminEnrollStudentRequest {

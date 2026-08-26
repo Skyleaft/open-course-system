@@ -119,6 +119,19 @@ public sealed class GetCourseEnrollmentsQueryHandler
             .GroupBy(s => s.StudentId)
             .ToDictionary(g => g.Key, g => g.Select(s => s.QuizId).Distinct().Count());
 
+        // Fetch exam titles for course exams
+        var examTitleDict = new Dictionary<Guid, string>();
+        foreach (var cExam in course.Exams)
+        {
+            var examContract = await _examsModuleApi.GetExamByIdAsync(cExam.ExamId, cancellationToken);
+            examTitleDict[cExam.ExamId] = examContract?.Title ?? "Examination";
+        }
+
+        // Group all exam submissions by student
+        var studentExamSubmissionsGroup = examSubmissions
+            .GroupBy(s => s.StudentId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
         var items = new List<CourseStudentEnrollmentDto>();
 
         foreach (var enrollment in pagedEnrollments)
@@ -150,6 +163,28 @@ public sealed class GetCourseEnrollmentsQueryHandler
 
             var email = user?.Email ?? string.Empty;
 
+            var studentSubmissions = studentExamSubmissionsGroup.GetValueOrDefault(enrollment.UserId) ?? new List<QuizSubmissionContractDto>();
+            var studentExamsList = new List<CourseStudentExamProgressDto>();
+
+            foreach (var cExam in course.Exams)
+            {
+                var sub = studentSubmissions
+                    .Where(s => s.QuizId == cExam.ExamId)
+                    .OrderByDescending(s => s.StartedAtUtc)
+                    .FirstOrDefault();
+
+                var examTitle = examTitleDict.GetValueOrDefault(cExam.ExamId) ?? "Examination";
+
+                studentExamsList.Add(new CourseStudentExamProgressDto(
+                    cExam.ExamId,
+                    examTitle,
+                    sub?.Status ?? "NotStarted",
+                    sub?.TotalScore,
+                    sub != null && string.Equals(sub.Status, "Completed", StringComparison.OrdinalIgnoreCase) ? (bool?)(sub.TotalScore >= 70m) : null,
+                    sub?.StartedAtUtc,
+                    sub?.FinishedAtUtc));
+            }
+
             items.Add(new CourseStudentEnrollmentDto(
                 enrollment.Id,
                 enrollment.UserId,
@@ -162,7 +197,8 @@ public sealed class GetCourseEnrollmentsQueryHandler
                 totalLessons,
                 completedAssignmentsCount,
                 totalAssignments,
-                lastAccessedAt));
+                lastAccessedAt,
+                studentExamsList));
         }
 
         // Search filtering in-memory if search parameter is provided

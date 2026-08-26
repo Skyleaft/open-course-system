@@ -4,7 +4,16 @@
 	import { goto } from '$app/navigation';
 	import { coursesApi } from '$lib/api/courses.ts';
 	import { examsApi } from '$lib/api/exams.ts';
-	import type { Course, CourseSection, Lesson, LessonType, CourseExam, QuizExam, CourseStudentEnrollmentDto } from '$lib/api/types.ts';
+	import type {
+		Course,
+		CourseSection,
+		Lesson,
+		LessonType,
+		CourseExam,
+		QuizExam,
+		CourseStudentEnrollmentDto,
+		CourseStudentExamProgressDto
+	} from '$lib/api/types.ts';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import RichEditor from '$lib/components/editor/RichEditor.svelte';
@@ -37,7 +46,13 @@
 		UserPlus,
 		UserMinus,
 		Search,
-		GraduationCap
+		GraduationCap,
+		RefreshCw,
+		Eye,
+		ShieldAlert,
+		RotateCcw,
+		Award,
+		Zap
 	} from 'lucide-svelte';
 
 	const courseId = (page.params.id || '') as string;
@@ -61,6 +76,57 @@
 	let isUnenrollModalOpen = $state(false);
 	let removingEnrollment = $state<CourseStudentEnrollmentDto | null>(null);
 	let isRemovingEnrollment = $state(false);
+
+	// Student Detail & Retake Modals
+	let selectedStudentForDetail = $state<CourseStudentEnrollmentDto | null>(null);
+	let isStudentDetailModalOpen = $state(false);
+	let isRetakeModalOpen = $state(false);
+	let retakeTarget = $state<{
+		examId: string;
+		examTitle: string;
+		studentId: string;
+		studentName: string;
+	} | null>(null);
+	let retakeReason = $state('');
+	let isGrantingRetake = $state(false);
+
+	function openStudentDetail(student: CourseStudentEnrollmentDto) {
+		selectedStudentForDetail = student;
+		isStudentDetailModalOpen = true;
+	}
+
+	function openRetakeModal(student: CourseStudentEnrollmentDto, exam: CourseStudentExamProgressDto) {
+		retakeTarget = {
+			examId: exam.examId,
+			examTitle: exam.examTitle,
+			studentId: student.userId,
+			studentName: student.fullName
+		};
+		retakeReason = '';
+		isRetakeModalOpen = true;
+	}
+
+	async function handleGrantRetake() {
+		if (!retakeTarget) return;
+		isGrantingRetake = true;
+		try {
+			await examsApi.grantRetake(retakeTarget.examId, retakeTarget.studentId, retakeReason.trim() || undefined);
+			toast.success(`Retake permission granted for ${retakeTarget.studentName} on ${retakeTarget.examTitle}!`);
+			isRetakeModalOpen = false;
+			retakeTarget = null;
+			await loadEnrollments();
+			if (selectedStudentForDetail) {
+				const updatedStudent = enrolledStudents.find(s => s.userId === selectedStudentForDetail?.userId);
+				if (updatedStudent) {
+					selectedStudentForDetail = updatedStudent;
+				}
+			}
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to grant retake.');
+		} finally {
+			isGrantingRetake = false;
+		}
+	}
 
 	// Course Settings State
 	let editCourseTitle = $state('');
@@ -886,6 +952,7 @@
 									<th>Course Progression</th>
 									<th>Lessons</th>
 									<th>Assignments</th>
+									<th>Examinations & Status</th>
 									<th>Last Active</th>
 									<th class="text-right">Actions</th>
 								</tr>
@@ -895,23 +962,30 @@
 									{@const isFinished = student.progressPercent >= 100}
 									<tr class="hover:bg-base-100/40 transition-colors">
 										<td>
-											<div class="flex items-center gap-3">
+											<button
+												type="button"
+												class="flex items-center gap-3 text-left group"
+												onclick={() => openStudentDetail(student)}
+											>
 												<div class="avatar placeholder">
-													<div class="w-8 h-8 rounded-xl bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">
+													<div class="w-8 h-8 rounded-xl bg-primary/10 text-primary font-bold text-xs flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-colors">
 														{student.fullName ? student.fullName.substring(0, 2).toUpperCase() : 'ST'}
 													</div>
 												</div>
 												<div>
-													<div class="font-bold text-base-content">{student.fullName}</div>
+													<div class="font-bold text-base-content group-hover:text-primary transition-colors flex items-center gap-1">
+														<span>{student.fullName}</span>
+														<Eye class="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+													</div>
 													<div class="text-[10px] text-base-content/50">{student.email}</div>
 												</div>
-											</div>
+											</button>
 										</td>
 										<td class="text-base-content/70">
 											{new Date(student.enrolledAtUtc).toLocaleDateString()}
 										</td>
 										<td>
-											<div class="space-y-1 w-32">
+											<div class="space-y-1 w-28">
 												<div class="flex items-center justify-between text-[10px] font-bold">
 													<span class="{isFinished ? 'text-success' : 'text-primary'}">
 														{student.progressPercent}%
@@ -935,21 +1009,97 @@
 												{student.completedAssignmentsCount} / {student.totalAssignmentsCount}
 											</span>
 										</td>
+										<td>
+											{#if !student.exams || student.exams.length === 0}
+												<span class="text-base-content/40 text-[11px] italic">No exams</span>
+											{:else}
+												<div class="space-y-1.5 max-w-xs">
+													{#each student.exams as exam}
+														<div class="flex items-center justify-between gap-1.5 bg-base-200/50 p-1 rounded-lg border border-white/5">
+															<span class="font-medium text-[11px] truncate max-w-[110px]" title={exam.examTitle}>
+																{exam.examTitle}
+															</span>
+
+															<div class="flex items-center gap-1 shrink-0">
+																{#if exam.status === 'Completed'}
+																	<span class="badge badge-success text-white badge-xs font-bold">
+																		{exam.score !== null && exam.score !== undefined ? `${exam.score}%` : 'Done'}
+																	</span>
+																	<button
+																		type="button"
+																		class="btn btn-ghost btn-xs h-5 px-1 text-primary hover:bg-primary/10 rounded"
+																		onclick={() => openRetakeModal(student, exam)}
+																		title="Grant exam retake"
+																	>
+																		<RotateCcw class="w-3 h-3" />
+																	</button>
+																{:else if exam.status === 'Disqualified'}
+																	<span class="badge badge-error text-white badge-xs font-bold">
+																		Disqualified
+																	</span>
+																	<button
+																		type="button"
+																		class="btn btn-primary btn-xs h-5 px-1.5 text-white font-bold rounded shadow-xs"
+																		onclick={() => openRetakeModal(student, exam)}
+																		title="Allow student to retake"
+																	>
+																		<RotateCcw class="w-3 h-3 mr-0.5" />
+																		Retake
+																	</button>
+																{:else if exam.status === 'TimedOut'}
+																	<span class="badge badge-warning badge-xs font-bold">
+																		Timed Out
+																	</span>
+																	<button
+																		type="button"
+																		class="btn btn-primary btn-xs h-5 px-1.5 text-white font-bold rounded shadow-xs"
+																		onclick={() => openRetakeModal(student, exam)}
+																		title="Allow student to retake"
+																	>
+																		<RotateCcw class="w-3 h-3 mr-0.5" />
+																		Retake
+																	</button>
+																{:else if exam.status === 'InProgress'}
+																	<span class="badge badge-info text-white badge-xs font-semibold animate-pulse">
+																		In Progress
+																	</span>
+																{:else}
+																	<span class="badge badge-ghost badge-xs text-base-content/50">
+																		Not Started
+																	</span>
+																{/if}
+															</div>
+														</div>
+													{/each}
+												</div>
+											{/if}
+										</td>
 										<td class="text-base-content/60 text-[11px]">
 											{student.lastAccessedAtUtc
 												? new Date(student.lastAccessedAtUtc).toLocaleString()
 												: 'Never'}
 										</td>
 										<td class="text-right">
-											<button
-												type="button"
-												class="btn btn-ghost btn-xs text-error hover:bg-error/10 rounded-lg gap-1"
-												onclick={() => openUnenrollModal(student)}
-												title="Unenroll student"
-											>
-												<UserMinus class="w-3.5 h-3.5" />
-												Unenroll
-											</button>
+											<div class="flex items-center justify-end gap-1">
+												<button
+													type="button"
+													class="btn btn-ghost btn-xs text-primary hover:bg-primary/10 rounded-lg gap-1"
+													onclick={() => openStudentDetail(student)}
+													title="Inspect Student Progress"
+												>
+													<Eye class="w-3.5 h-3.5" />
+													Inspect
+												</button>
+
+												<button
+													type="button"
+													class="btn btn-ghost btn-xs text-error hover:bg-error/10 rounded-lg gap-1"
+													onclick={() => openUnenrollModal(student)}
+													title="Unenroll student"
+												>
+													<UserMinus class="w-3.5 h-3.5" />
+												</button>
+											</div>
 										</td>
 									</tr>
 								{/each}
@@ -1476,3 +1626,175 @@
 	onConfirm={handleAdminRemoveEnrollment}
 	onCancel={() => { isUnenrollModalOpen = false; removingEnrollment = null; }}
 />
+
+<!-- Student Detailed Progress Inspection Modal -->
+{#if isStudentDetailModalOpen && selectedStudentForDetail}
+	<div class="modal modal-open">
+		<div class="modal-box max-w-2xl rounded-3xl border border-white/10 bg-base-100/95 backdrop-blur-2xl p-6 sm:p-8 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-4">
+				<div class="flex items-center gap-3">
+					<div class="avatar placeholder">
+						<div class="w-12 h-12 rounded-2xl bg-primary/15 text-primary font-extrabold text-base flex items-center justify-center border border-primary/20">
+							{selectedStudentForDetail.fullName ? selectedStudentForDetail.fullName.substring(0, 2).toUpperCase() : 'ST'}
+						</div>
+					</div>
+					<div>
+						<h3 class="font-extrabold text-lg text-base-content">{selectedStudentForDetail.fullName}</h3>
+						<p class="text-xs text-base-content/60">{selectedStudentForDetail.email}</p>
+					</div>
+				</div>
+				<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => (isStudentDetailModalOpen = false)}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			<!-- Progress Snapshot Summary Cards -->
+			<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+				<div class="bg-base-200/50 p-3 rounded-2xl border border-white/5 space-y-1">
+					<span class="text-[10px] uppercase font-bold text-base-content/50">Overall Progress</span>
+					<div class="text-lg font-black text-primary">{selectedStudentForDetail.progressPercent}%</div>
+				</div>
+				<div class="bg-base-200/50 p-3 rounded-2xl border border-white/5 space-y-1">
+					<span class="text-[10px] uppercase font-bold text-base-content/50">Lessons Done</span>
+					<div class="text-lg font-black text-base-content">{selectedStudentForDetail.completedLessonsCount} / {selectedStudentForDetail.totalLessonsCount}</div>
+				</div>
+				<div class="bg-base-200/50 p-3 rounded-2xl border border-white/5 space-y-1">
+					<span class="text-[10px] uppercase font-bold text-base-content/50">Assignments</span>
+					<div class="text-lg font-black text-base-content">{selectedStudentForDetail.completedAssignmentsCount} / {selectedStudentForDetail.totalAssignmentsCount}</div>
+				</div>
+				<div class="bg-base-200/50 p-3 rounded-2xl border border-white/5 space-y-1">
+					<span class="text-[10px] uppercase font-bold text-base-content/50">Enrolled Date</span>
+					<div class="text-xs font-semibold text-base-content/80 pt-1">{new Date(selectedStudentForDetail.enrolledAtUtc).toLocaleDateString()}</div>
+				</div>
+			</div>
+
+			<!-- Course Examinations Progression & Retake Controls -->
+			<div class="space-y-3">
+				<h4 class="text-xs font-bold uppercase tracking-wider text-base-content/80 flex items-center gap-2">
+					<Award class="w-4 h-4 text-primary" />
+					Course Examinations & Attempt Supervision
+				</h4>
+
+				{#if !selectedStudentForDetail.exams || selectedStudentForDetail.exams.length === 0}
+					<div class="p-4 rounded-2xl bg-base-200/40 text-center text-xs text-base-content/60 border border-dashed border-base-300">
+						No examinations are attached to this course curriculum.
+					</div>
+				{:else}
+					<div class="space-y-2.5">
+						{#each selectedStudentForDetail.exams as exam}
+							<div class="glass-card p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+								<div class="space-y-1">
+									<div class="font-bold text-sm text-base-content">{exam.examTitle}</div>
+									<div class="flex items-center gap-2 text-xs text-base-content/60">
+										<span>Status:</span>
+										{#if exam.status === 'Completed'}
+											<span class="badge badge-success text-white badge-xs font-bold">Completed ({exam.score}%)</span>
+										{:else if exam.status === 'Disqualified'}
+											<span class="badge badge-error text-white badge-xs font-bold">Disqualified (Anti-cheat)</span>
+										{:else if exam.status === 'TimedOut'}
+											<span class="badge badge-warning badge-xs font-bold">Timed Out</span>
+										{:else if exam.status === 'InProgress'}
+											<span class="badge badge-info text-white badge-xs font-semibold">Active Session</span>
+										{:else}
+											<span class="badge badge-ghost badge-xs">Not Attempted</span>
+										{/if}
+										{#if exam.finishedAtUtc}
+											<span>• Submitted: {new Date(exam.finishedAtUtc).toLocaleDateString()}</span>
+										{/if}
+									</div>
+								</div>
+
+								<div class="flex items-center gap-2 shrink-0">
+									{#if exam.status !== 'NotStarted'}
+										<button
+											type="button"
+											class="btn btn-primary btn-sm rounded-xl text-white font-bold gap-1.5 shadow-md"
+											onclick={() => openRetakeModal(selectedStudentForDetail!, exam)}
+										>
+											<RotateCcw class="w-3.5 h-3.5" />
+											Grant Exam Retake
+										</button>
+									{:else}
+										<span class="text-xs text-base-content/40 italic">Candidate has not started</span>
+									{/if}
+								</div>
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
+
+			<div class="flex justify-end pt-4 border-t border-base-content/10">
+				<button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick={() => (isStudentDetailModalOpen = false)}>
+					Close
+				</button>
+			</div>
+		</div>
+		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isStudentDetailModalOpen = false)}></div>
+	</div>
+{/if}
+
+<!-- Grant Exam Retake Confirmation Modal -->
+{#if isRetakeModalOpen && retakeTarget}
+	<div class="modal modal-open">
+		<div class="modal-box max-w-md rounded-3xl border border-white/10 bg-base-100/95 backdrop-blur-2xl p-6 space-y-4 shadow-2xl">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
+				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
+					<RotateCcw class="w-5 h-5 text-primary" />
+					Grant Examination Retake
+				</h3>
+				<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => (isRetakeModalOpen = false)}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			<div class="space-y-3">
+				<p class="text-xs text-base-content/80 leading-relaxed">
+					Are you sure you want to allow <strong>{retakeTarget.studentName}</strong> to retake <strong>{retakeTarget.examTitle}</strong>?
+				</p>
+
+				<div class="p-3 bg-primary/10 rounded-2xl border border-primary/20 text-[11px] text-primary space-y-1">
+					<p class="font-bold">What happens when you grant a retake:</p>
+					<ul class="list-disc pl-4 space-y-0.5 opacity-90">
+						<li>Previous blocked, timed-out, or disqualified attempt will be reset.</li>
+						<li>Active Redis session locks will be flushed immediately.</li>
+						<li>The student can immediately launch a fresh attempt.</li>
+					</ul>
+				</div>
+
+				<div class="space-y-1">
+					<label for="retake-reason" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+						Reason / Note (Optional)
+					</label>
+					<input
+						id="retake-reason"
+						type="text"
+						bind:value={retakeReason}
+						placeholder="e.g. Technical network glitch / False positive resolved"
+						class="input input-bordered input-sm w-full rounded-xl bg-base-200/50 text-xs"
+					/>
+				</div>
+			</div>
+
+			<div class="flex justify-end gap-2 pt-3 border-t border-base-content/10">
+				<button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick={() => (isRetakeModalOpen = false)}>
+					Cancel
+				</button>
+				<button
+					type="button"
+					class="btn btn-sm btn-primary gradient-accent text-white font-bold rounded-xl gap-1.5 shadow-md border-0"
+					onclick={handleGrantRetake}
+					disabled={isGrantingRetake}
+				>
+					{#if isGrantingRetake}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else}
+						<RotateCcw class="w-3.5 h-3.5" />
+					{/if}
+					Confirm & Unlock Retake
+				</button>
+			</div>
+		</div>
+		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isRetakeModalOpen = false)}></div>
+	</div>
+{/if}

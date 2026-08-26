@@ -19,10 +19,15 @@
 		BookOpen,
 		Sparkles,
 		Calendar,
-		AlertTriangle
+		AlertTriangle,
+		Users,
+		RotateCcw,
+		X,
+		Eye,
+		RefreshCw
 	} from 'lucide-svelte';
 	import { examsApi } from '$lib/api/exams.ts';
-	import type { QuizExam, QuizSection, QuestionBank, QuizMode } from '$lib/api/types.ts';
+	import type { QuizExam, QuizSection, QuestionBank, QuizMode, ExamSubmissionDto } from '$lib/api/types.ts';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
 	import ConfirmModal from '$lib/components/ui/ConfirmModal.svelte';
 	import SectionBuilder from '$lib/components/exam/SectionBuilder.svelte';
@@ -36,8 +41,18 @@
 	let isLoading = $state(true);
 	let isActionLoading = $state(false);
 
-	// Tabs: 'sections' | 'settings'
-	let activeTab = $state<'sections' | 'settings'>('sections');
+	// Tabs: 'sections' | 'submissions' | 'settings'
+	let activeTab = $state<'sections' | 'submissions' | 'settings'>('sections');
+
+	// Submissions & Proctoring State
+	let submissions = $state<ExamSubmissionDto[]>([]);
+	let isSubmissionsLoading = $state(false);
+	let submissionsTotal = $state(0);
+	let submissionFilterStatus = $state<string>('All');
+	let isRetakeModalOpen = $state(false);
+	let retakeCandidate = $state<ExamSubmissionDto | null>(null);
+	let retakeReason = $state('');
+	let isGrantingRetake = $state(false);
 
 	// Exam Settings State
 	let editTitle = $state('');
@@ -277,6 +292,44 @@
 			isDeleteExamModalOpen = false;
 		}
 	}
+
+	async function loadSubmissions() {
+		isSubmissionsLoading = true;
+		try {
+			const res = await examsApi.getExamSubmissions(examId, {
+				status: submissionFilterStatus !== 'All' ? submissionFilterStatus : undefined,
+				pageSize: 50
+			});
+			submissions = res.items || [];
+			submissionsTotal = res.totalCount || 0;
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to load submissions.');
+		} finally {
+			isSubmissionsLoading = false;
+		}
+	}
+
+	function openRetakeModal(sub: ExamSubmissionDto) {
+		retakeCandidate = sub;
+		retakeReason = '';
+		isRetakeModalOpen = true;
+	}
+
+	async function handleGrantRetake() {
+		if (!retakeCandidate) return;
+		isGrantingRetake = true;
+		try {
+			await examsApi.grantRetake(examId, retakeCandidate.studentId, retakeReason.trim() || undefined);
+			toast.success(`Retake permission granted for ${retakeCandidate.studentName}!`);
+			isRetakeModalOpen = false;
+			retakeCandidate = null;
+			await loadSubmissions();
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to grant retake.');
+		} finally {
+			isGrantingRetake = false;
+		}
+	}
 </script>
 
 <div class="space-y-6 max-w-6xl mx-auto pb-16">
@@ -374,6 +427,19 @@
 						</button>
 						<button
 							type="button"
+							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'submissions'
+								? 'btn-primary text-primary-content shadow-xs'
+								: 'btn-ghost text-base-content/70'}"
+							onclick={() => {
+								activeTab = 'submissions';
+								loadSubmissions();
+							}}
+						>
+							<Users class="w-3.5 h-3.5" />
+							Submissions ({submissionsTotal})
+						</button>
+						<button
+							type="button"
 							class="btn btn-xs rounded-xl font-bold transition-all gap-1.5 {activeTab === 'settings'
 								? 'btn-primary text-primary-content shadow-xs'
 								: 'btn-ghost text-base-content/70'}"
@@ -397,8 +463,166 @@
 					onCreateNewBank={() => goto('/instructor/questions')}
 				/>
 			</GlassCard>
+		{:else if activeTab === 'submissions'}
+			<!-- Tab 2: Candidate Submissions & Proctoring Audit -->
+			<GlassCard class="p-6 space-y-6">
+				<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+					<div>
+						<h3 class="text-base font-bold text-base-content flex items-center gap-2">
+							<Users class="w-5 h-5 text-primary" />
+							Candidate Submissions & Proctoring Audit ({submissionsTotal})
+						</h3>
+						<p class="text-xs text-base-content/70">
+							Review candidate scores, integrity violation logs, snapshot counts, and manage retake permissions.
+						</p>
+					</div>
+
+					<!-- Filter Pills -->
+					<div class="flex items-center gap-1.5 bg-base-200/60 p-1 rounded-2xl border border-white/5">
+						{#each ['All', 'Completed', 'Disqualified', 'TimedOut', 'InProgress'] as filter}
+							<button
+								type="button"
+								class="btn btn-xs rounded-xl font-bold transition-all {submissionFilterStatus === filter
+									? 'btn-primary text-white shadow-xs'
+									: 'btn-ghost text-base-content/60'}"
+								onclick={() => {
+									submissionFilterStatus = filter;
+									loadSubmissions();
+								}}
+							>
+								{filter}
+							</button>
+						{/each}
+					</div>
+				</div>
+
+				{#if isSubmissionsLoading}
+					<div class="space-y-3">
+						{#each Array(3) as _}
+							<div class="h-16 rounded-2xl bg-base-200/50 animate-pulse"></div>
+						{/each}
+					</div>
+				{:else if submissions.length === 0}
+					<div class="py-12 text-center bg-base-200/40 rounded-2xl border border-dashed border-base-300 space-y-2">
+						<Users class="w-10 h-10 text-base-content/30 mx-auto" />
+						<p class="text-sm font-semibold text-base-content/80">No candidate submissions found</p>
+						<p class="text-xs text-base-content/50 max-w-sm mx-auto">
+							When enrolled students attempt this examination, their attempts, scores, and integrity logs will be recorded here.
+						</p>
+					</div>
+				{:else}
+					<div class="overflow-x-auto rounded-2xl border border-base-content/10">
+						<table class="table table-sm w-full text-xs">
+							<thead class="bg-base-200/70 text-base-content/70">
+								<tr>
+									<th>Candidate</th>
+									<th>Attempt</th>
+									<th>Status</th>
+									<th>Score / Result</th>
+									<th>Violations</th>
+									<th>Started Time</th>
+									<th>Submitted Time</th>
+									<th class="text-right">Actions</th>
+								</tr>
+							</thead>
+							<tbody class="divide-y divide-base-content/5">
+								{#each submissions as sub (sub.id)}
+									<tr class="hover:bg-base-100/40 transition-colors">
+										<td>
+											<div class="flex items-center gap-3">
+												<div class="avatar placeholder">
+													<div class="w-8 h-8 rounded-xl bg-primary/10 text-primary font-bold text-xs flex items-center justify-center">
+														{sub.studentName ? sub.studentName.substring(0, 2).toUpperCase() : 'ST'}
+													</div>
+												</div>
+												<div>
+													<div class="font-bold text-base-content">{sub.studentName}</div>
+													<div class="text-[10px] text-base-content/50">{sub.studentEmail}</div>
+												</div>
+											</div>
+										</td>
+										<td>
+											<span class="badge badge-ghost badge-xs font-semibold">
+												Attempt #{sub.attemptNumber} / {sub.maxAttempts}
+											</span>
+										</td>
+										<td>
+											{#if sub.status === 'Completed'}
+												<span class="badge badge-success text-white badge-xs font-bold">
+													Completed
+												</span>
+											{:else if sub.status === 'Disqualified'}
+												<span class="badge badge-error text-white badge-xs font-bold">
+													Disqualified
+												</span>
+											{:else if sub.status === 'TimedOut'}
+												<span class="badge badge-warning badge-xs font-bold">
+													Timed Out
+												</span>
+											{:else if sub.status === 'InProgress'}
+												<span class="badge badge-info text-white badge-xs font-semibold animate-pulse">
+													In Progress
+												</span>
+											{:else}
+												<span class="badge badge-ghost badge-xs">
+													{sub.status}
+												</span>
+											{/if}
+										</td>
+										<td>
+											{#if sub.score !== null && sub.score !== undefined}
+												<div class="flex items-center gap-1.5">
+													<span class="font-bold {sub.isPassed ? 'text-success' : 'text-error'}">
+														{sub.score}%
+													</span>
+													{#if sub.isPassed}
+														<span class="badge badge-success text-white badge-xs">Passed</span>
+													{:else}
+														<span class="badge badge-error text-white badge-xs">Failed</span>
+													{/if}
+												</div>
+											{:else}
+												<span class="text-base-content/40 italic">—</span>
+											{/if}
+										</td>
+										<td>
+											{#if sub.violationsCount > 0}
+												<div class="tooltip tooltip-bottom" data-tip={sub.violations.map(v => `${v.type}: ${v.reason}`).join(' | ')}>
+													<span class="badge badge-error text-white badge-xs font-bold gap-1 cursor-pointer">
+														<ShieldAlert class="w-3 h-3" />
+														{sub.violationsCount} Flags
+													</span>
+												</div>
+											{:else}
+												<span class="badge badge-ghost badge-xs text-success font-semibold">0 Flags</span>
+											{/if}
+										</td>
+										<td class="text-base-content/60 text-[11px]">
+											{new Date(sub.startedAtUtc).toLocaleString()}
+										</td>
+										<td class="text-base-content/60 text-[11px]">
+											{sub.submittedAtUtc ? new Date(sub.submittedAtUtc).toLocaleString() : 'Active session'}
+										</td>
+										<td class="text-right">
+											<button
+												type="button"
+												class="btn btn-primary btn-xs rounded-lg text-white font-bold gap-1 shadow-xs"
+												onclick={() => openRetakeModal(sub)}
+												title="Grant candidate permission to retake exam"
+											>
+												<RotateCcw class="w-3 h-3" />
+												Grant Retake
+											</button>
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				{/if}
+			</GlassCard>
 		{:else}
-			<!-- Tab 2: Exam Settings Studio -->
+			<!-- Tab 3: Exam Settings Studio -->
 			<GlassCard class="p-6 sm:p-8">
 				<form onsubmit={handleSaveSettings} class="space-y-6 max-w-3xl">
 					<div>
@@ -580,3 +804,68 @@
 	onConfirm={handleDeleteExam}
 	onCancel={() => (isDeleteExamModalOpen = false)}
 />
+
+<!-- Grant Exam Retake Confirmation Modal -->
+{#if isRetakeModalOpen && retakeCandidate}
+	<div class="modal modal-open">
+		<div class="modal-box max-w-md rounded-3xl border border-white/10 bg-base-100/95 backdrop-blur-2xl p-6 space-y-4 shadow-2xl">
+			<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
+				<h3 class="font-bold text-base text-base-content flex items-center gap-2">
+					<RotateCcw class="w-5 h-5 text-primary" />
+					Grant Candidate Retake
+				</h3>
+				<button type="button" class="btn btn-ghost btn-xs btn-square" onclick={() => (isRetakeModalOpen = false)}>
+					<X class="w-4 h-4" />
+				</button>
+			</div>
+
+			<div class="space-y-3">
+				<p class="text-xs text-base-content/80 leading-relaxed">
+					Are you sure you want to grant a retake for candidate <strong>{retakeCandidate.studentName}</strong>?
+				</p>
+
+				<div class="p-3 bg-primary/10 rounded-2xl border border-primary/20 text-[11px] text-primary space-y-1">
+					<p class="font-bold">What happens when you grant a retake:</p>
+					<ul class="list-disc pl-4 space-y-0.5 opacity-90">
+						<li>Attempt #{retakeCandidate.attemptNumber} will be reset from the active attempt counter.</li>
+						<li>Active Redis session locks will be purged.</li>
+						<li>The candidate can launch a new exam attempt immediately.</li>
+					</ul>
+				</div>
+
+				<div class="space-y-1">
+					<label for="exam-retake-reason" class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/70">
+						Retake Justification / Note (Optional)
+					</label>
+					<input
+						id="exam-retake-reason"
+						type="text"
+						bind:value={retakeReason}
+						placeholder="e.g. Approved retake / Anti-cheat false positive cleared"
+						class="input input-bordered input-sm w-full rounded-xl bg-base-200/50 text-xs"
+					/>
+				</div>
+			</div>
+
+			<div class="flex justify-end gap-2 pt-3 border-t border-base-content/10">
+				<button type="button" class="btn btn-sm btn-ghost rounded-xl" onclick={() => (isRetakeModalOpen = false)}>
+					Cancel
+				</button>
+				<button
+					type="button"
+					class="btn btn-sm btn-primary gradient-accent text-white font-bold rounded-xl gap-1.5 shadow-md border-0"
+					onclick={handleGrantRetake}
+					disabled={isGrantingRetake}
+				>
+					{#if isGrantingRetake}
+						<span class="loading loading-spinner loading-xs"></span>
+					{:else}
+						<RotateCcw class="w-3.5 h-3.5" />
+					{/if}
+					Unlock Retake
+				</button>
+			</div>
+		</div>
+		<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isRetakeModalOpen = false)}></div>
+	</div>
+{/if}

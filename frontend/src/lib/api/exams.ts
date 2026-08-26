@@ -317,5 +317,39 @@ export const examsApi = {
 		customFetch?: typeof fetch
 	): Promise<ExamResultDetailsDto> {
 		return apiClient.get<ExamResultDetailsDto>(`/api/v1/exams/submissions/${submissionId}/result`, undefined, customFetch);
+	},
+
+	async getExamSubmissions(
+		examId: string,
+		params?: {
+			studentId?: string;
+			status?: string;
+			pageIndex?: number;
+			pageSize?: number;
+		},
+		customFetch?: typeof fetch
+	): Promise<PaginatedList<import('./types.ts').ExamSubmissionDto>> {
+		const searchParams = new URLSearchParams();
+		if (params?.studentId) searchParams.set('studentId', params.studentId);
+		if (params?.status) searchParams.set('status', params.status);
+		if (params?.pageIndex) searchParams.set('page', String(params.pageIndex));
+		if (params?.pageSize) searchParams.set('pageSize', String(params.pageSize));
+
+		const qs = searchParams.toString();
+		return apiClient.get<PaginatedList<import('./types.ts').ExamSubmissionDto>>(
+			`/api/v1/exams/${examId}/submissions${qs ? `?${qs}` : ''}`,
+			undefined,
+			customFetch
+		);
+	},
+
+	async grantRetake(
+		examId: string,
+		studentId: string,
+		reason?: string
+	): Promise<boolean> {
+		return apiClient.post<boolean>(`/api/v1/exams/${examId}/students/${studentId}/retake`, {
+			reason
+		});
 	}
 };

@@ -9,6 +9,15 @@ public sealed record GetCourseEnrollmentsQuery(
     int PageSize = 20,
     string? Search = null) : IQuery<ApiResponse<PaginatedList<CourseStudentEnrollmentDto>>>;
 
+public sealed record CourseStudentExamProgressDto(
+    Guid ExamId,
+    string ExamTitle,
+    string Status,
+    decimal? Score,
+    bool? IsPassed,
+    DateTime? StartedAtUtc,
+    DateTime? FinishedAtUtc);
+
 public sealed record CourseStudentEnrollmentDto(
     Guid EnrollmentId,
     Guid UserId,
@@ -21,4 +30,5 @@ public sealed record CourseStudentEnrollmentDto(
     int TotalLessonsCount,
     int CompletedAssignmentsCount,
     int TotalAssignmentsCount,
-    DateTime? LastAccessedAtUtc);
+    DateTime? LastAccessedAtUtc,
+    List<CourseStudentExamProgressDto>? Exams = null);
