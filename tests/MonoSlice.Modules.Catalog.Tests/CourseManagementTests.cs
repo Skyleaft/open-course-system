@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MonoSlice.Modules.Catalog.Domain;
 using MonoSlice.Modules.Catalog.Features.AddLesson;
 using MonoSlice.Modules.Catalog.Features.AddSection;
@@ -12,6 +13,7 @@ using MonoSlice.Modules.Catalog.Persistence;
 using MonoSlice.Shared.Abstractions.Exceptions;
 using MonoSlice.Shared.Abstractions.Interfaces;
 using MonoSlice.Shared.Abstractions.Messaging;
+using MonoSlice.Shared.Abstractions.Storage;
 using NSubstitute;
 using Xunit;
 
@@ -23,6 +25,8 @@ public class CourseManagementTests
     private readonly ICurrentUser _currentUser;
     private readonly ICacheService _cacheService;
     private readonly IEventBus _eventBus;
+    private readonly IObjectStorageService _storageService;
+    private readonly ILogger<DeleteCourseCommandHandler> _logger;
 
     public CourseManagementTests()
     {
@@ -34,6 +38,8 @@ public class CourseManagementTests
         _currentUser = Substitute.For<ICurrentUser>();
         _cacheService = Substitute.For<ICacheService>();
         _eventBus = Substitute.For<IEventBus>();
+        _storageService = Substitute.For<IObjectStorageService>();
+        _logger = Substitute.For<ILogger<DeleteCourseCommandHandler>>();
     }
 
     [Fact]
@@ -44,18 +50,28 @@ public class CourseManagementTests
         _currentUser.UserId.Returns(instructorId);
         _currentUser.IsInRole("Admin").Returns(false);
 
-        var course = Course.Create(instructorId, "Course to delete", "Desc", CourseAccessType.OpenFree);
+        var course = Course.Create(
+            instructorId,
+            "Course to delete",
+            "Desc",
+            CourseAccessType.OpenFree,
+            thumbnailUrl: "http://localhost:9000/branding-assets/courses/thumbnails/thumb123.jpg");
         var section = course.AddSection("Intro");
         section.AddLesson("Lesson 1", LessonType.Video, "https://storage/vid1", 10);
         _dbContext.Courses.Add(course);
         await _dbContext.SaveChangesAsync();
 
-        var handler = new DeleteCourseCommandHandler(_dbContext, _cacheService, _currentUser, _eventBus);
+        var handler = new DeleteCourseCommandHandler(_dbContext, _cacheService, _currentUser, _eventBus, _storageService, _logger);
         var result = await handler.Handle(new DeleteCourseCommand(course.Id), CancellationToken.None);
 
         Assert.True(result.Success);
         var deleted = await _dbContext.Courses.FindAsync(course.Id);
         Assert.Null(deleted);
+
+        await _storageService.Received(1).DeleteObjectAsync(
+            "branding-assets",
+            "courses/thumbnails/thumb123.jpg",
+            Arg.Any<CancellationToken>());
 
         await _eventBus.Received(1).PublishAsync(
             Arg.Is<CourseDeletedIntegrationEvent>(e => e.CourseId == course.Id && e.InstructorId == instructorId),
@@ -75,7 +91,7 @@ public class CourseManagementTests
         _dbContext.Courses.Add(course);
         await _dbContext.SaveChangesAsync();
 
-        var handler = new DeleteCourseCommandHandler(_dbContext, _cacheService, _currentUser, _eventBus);
+        var handler = new DeleteCourseCommandHandler(_dbContext, _cacheService, _currentUser, _eventBus, _storageService, _logger);
 
         await Assert.ThrowsAsync<ForbiddenException>(() =>
             handler.Handle(new DeleteCourseCommand(course.Id), CancellationToken.None).AsTask());

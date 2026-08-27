@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using OpenTelemetry.Exporter;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -15,12 +16,11 @@ public static class OpenTelemetryExtensions
         IConfiguration configuration,
         string serviceName = "MonoSlice")
     {
-        var otelEndpoint = configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317";
-        var otelServiceName = configuration["OpenTelemetry:ServiceName"] ?? serviceName;
+        var (endpoint, resolvedServiceName, protocol, headers) = GetOtelSettings(configuration, serviceName);
 
         services.AddOpenTelemetry()
             .ConfigureResource(resource => resource
-                .AddService(serviceName: otelServiceName, serviceVersion: "1.0.0"))
+                .AddService(serviceName: resolvedServiceName, serviceVersion: "1.0.0"))
             .WithTracing(tracing =>
             {
                 tracing
@@ -31,11 +31,22 @@ public static class OpenTelemetryExtensions
                             !httpContext.Request.Path.StartsWithSegments("/scalar");
                     })
                     .AddHttpClientInstrumentation()
-                    .AddSource("MonoSlice.*");
+                    .AddSource("MonoSlice.*")
+                    .AddSource("MonoSlice.Mediator")
+                    .AddSource("MonoSlice.EventStream")
+                    .AddSource("MonoSlice.Assessments.Worker");
 
-                if (Uri.TryCreate(otelEndpoint, UriKind.Absolute, out var uri))
+                if (Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
                 {
-                    tracing.AddOtlpExporter(options => options.Endpoint = uri);
+                    tracing.AddOtlpExporter(options =>
+                    {
+                        options.Endpoint = uri;
+                        options.Protocol = protocol;
+                        if (!string.IsNullOrWhiteSpace(headers))
+                        {
+                            options.Headers = headers;
+                        }
+                    });
                 }
             })
             .WithMetrics(metrics =>
@@ -43,11 +54,23 @@ public static class OpenTelemetryExtensions
                 metrics
                     .AddAspNetCoreInstrumentation()
                     .AddHttpClientInstrumentation()
-                    .AddRuntimeInstrumentation();
+                    .AddRuntimeInstrumentation()
+                    .AddMeter("MonoSlice.*")
+                    .AddMeter("MonoSlice.Mediator")
+                    .AddMeter("MonoSlice.EventStream")
+                    .AddMeter("MonoSlice.Assessments.Worker");
 
-                if (Uri.TryCreate(otelEndpoint, UriKind.Absolute, out var uri))
+                if (Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
                 {
-                    metrics.AddOtlpExporter(options => options.Endpoint = uri);
+                    metrics.AddOtlpExporter(options =>
+                    {
+                        options.Endpoint = uri;
+                        options.Protocol = protocol;
+                        if (!string.IsNullOrWhiteSpace(headers))
+                        {
+                            options.Headers = headers;
+                        }
+                    });
                 }
             });
 
@@ -59,18 +82,71 @@ public static class OpenTelemetryExtensions
         IConfiguration configuration,
         string serviceName = "MonoSlice")
     {
-        var otelEndpoint = configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317";
-        var otelServiceName = configuration["OpenTelemetry:ServiceName"] ?? serviceName;
+        var (endpoint, resolvedServiceName, protocol, headers) = GetOtelSettings(configuration, serviceName);
 
-        if (Uri.TryCreate(otelEndpoint, UriKind.Absolute, out var uri))
+        if (Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
         {
             logging.AddOpenTelemetry(options =>
             {
-                options.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(otelServiceName));
-                options.AddOtlpExporter(exporterOptions => exporterOptions.Endpoint = uri);
+                options.IncludeFormattedMessage = true;
+                options.IncludeScopes = true;
+                options.SetResourceBuilder(ResourceBuilder.CreateDefault()
+                    .AddService(serviceName: resolvedServiceName, serviceVersion: "1.0.0"));
+                options.AddOtlpExporter(exporterOptions =>
+                {
+                    exporterOptions.Endpoint = uri;
+                    exporterOptions.Protocol = protocol;
+                    if (!string.IsNullOrWhiteSpace(headers))
+                    {
+                        exporterOptions.Headers = headers;
+                    }
+                });
             });
         }
 
         return logging;
+    }
+
+    private static (string Endpoint, string ServiceName, OtlpExportProtocol Protocol, string? Headers) GetOtelSettings(
+        IConfiguration configuration,
+        string defaultServiceName)
+    {
+        var endpoint = configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]
+            ?? configuration["OpenTelemetry:Endpoint"]
+            ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")
+            ?? "http://localhost:4317";
+
+        var serviceName = configuration["OTEL_SERVICE_NAME"]
+            ?? configuration["OpenTelemetry:ServiceName"]
+            ?? Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME")
+            ?? defaultServiceName;
+
+        var protocolStr = configuration["OTEL_EXPORTER_OTLP_PROTOCOL"]
+            ?? configuration["OpenTelemetry:Protocol"]
+            ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_PROTOCOL");
+
+        var headers = configuration["OTEL_EXPORTER_OTLP_HEADERS"]
+            ?? configuration["OpenTelemetry:Headers"]
+            ?? Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_HEADERS");
+
+        var protocol = ResolveProtocol(protocolStr);
+
+        return (endpoint, serviceName, protocol, headers);
+    }
+
+    private static OtlpExportProtocol ResolveProtocol(string? protocol)
+    {
+        if (string.IsNullOrWhiteSpace(protocol))
+        {
+            return OtlpExportProtocol.Grpc;
+        }
+
+        var normalized = protocol.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "http/protobuf" or "httpprotobuf" or "http" => OtlpExportProtocol.HttpProtobuf,
+            "grpc" => OtlpExportProtocol.Grpc,
+            _ => OtlpExportProtocol.Grpc
+        };
     }
 }

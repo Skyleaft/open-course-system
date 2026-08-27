@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using MonoSlice.Modules.Catalog.Domain;
 using MonoSlice.Modules.Catalog.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
@@ -6,6 +7,7 @@ using MonoSlice.Shared.Abstractions.CQRS;
 using MonoSlice.Shared.Abstractions.Exceptions;
 using MonoSlice.Shared.Abstractions.Interfaces;
 using MonoSlice.Shared.Abstractions.Messaging;
+using MonoSlice.Shared.Abstractions.Storage;
 
 namespace MonoSlice.Modules.Catalog.Features.DeleteCourse;
 
@@ -15,17 +17,23 @@ public sealed class DeleteCourseCommandHandler : ICommandHandler<DeleteCourseCom
     private readonly ICacheService _cacheService;
     private readonly ICurrentUser _currentUser;
     private readonly IEventBus _eventBus;
+    private readonly IObjectStorageService _storageService;
+    private readonly ILogger<DeleteCourseCommandHandler> _logger;
 
     public DeleteCourseCommandHandler(
         CoursesDbContext dbContext,
         ICacheService cacheService,
         ICurrentUser currentUser,
-        IEventBus eventBus)
+        IEventBus eventBus,
+        IObjectStorageService storageService,
+        ILogger<DeleteCourseCommandHandler> logger)
     {
         _dbContext = dbContext;
         _cacheService = cacheService;
         _currentUser = currentUser;
         _eventBus = eventBus;
+        _storageService = storageService;
+        _logger = logger;
     }
 
     public async ValueTask<ApiResponse> Handle(
@@ -45,6 +53,19 @@ public sealed class DeleteCourseCommandHandler : ICommandHandler<DeleteCourseCom
         if (!_currentUser.IsInRole("Admin") && _currentUser.UserId != course.InstructorId)
         {
             throw new ForbiddenException("You are not authorized to delete this course.");
+        }
+
+        // Clean up course thumbnail from MinIO object storage if present using global storage helper
+        if (!string.IsNullOrWhiteSpace(course.ThumbnailUrl))
+        {
+            try
+            {
+                await _storageService.DeleteObjectByUrlAsync(course.ThumbnailUrl, cancellationToken: cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete thumbnail object from MinIO for URL '{ThumbnailUrl}'", course.ThumbnailUrl);
+            }
         }
 
         // Remove any associated enrollments
