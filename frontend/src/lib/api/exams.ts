@@ -8,6 +8,7 @@ import type {
 	QuizSubmission,
 	StudentAnswer,
 	QuestionType,
+	GradingMethod,
 	QuestionBank,
 	BankQuestion,
 	StudentExamPaperDto,
@@ -196,11 +197,12 @@ export const examsApi = {
 			bankId?: string;
 			questionText: string;
 			type: QuestionType | string;
+			gradingMethod?: GradingMethod | string;
 			points: number;
 			explanation?: string;
 			category?: string;
 			tags?: string[];
-			options?: Array<{ id?: string; text: string; isCorrect: boolean }>;
+			options?: Array<{ id?: string; text: string; isCorrect: boolean; points?: number; penaltyPoints?: number }>;
 			sectionId?: string;
 		}
 	): Promise<QuizQuestion> {
@@ -216,9 +218,10 @@ export const examsApi = {
 		questions: Array<{
 			text: string;
 			type: string;
+			gradingMethod?: string;
 			points: number;
 			orderIndex: number;
-			options: Array<{ id?: string; text: string; isCorrect: boolean }>;
+			options: Array<{ id?: string; text: string; isCorrect: boolean; points?: number; penaltyPoints?: number }>;
 			explanation?: string;
 			category?: string;
 			tags?: string[];
@@ -229,6 +232,7 @@ export const examsApi = {
 			await this.addQuestion(quizId, {
 				questionText: q.text,
 				type: q.type,
+				gradingMethod: q.gradingMethod,
 				points: q.points,
 				explanation: q.explanation,
 				category: q.category,
@@ -247,11 +251,12 @@ export const examsApi = {
 	async updateQuestion(questionId: string, data: {
 		questionText: string;
 		type: QuestionType | string;
+		gradingMethod?: GradingMethod | string;
 		points: number;
 		explanation?: string;
 		category?: string;
 		tags?: string[];
-		options?: Array<{ id?: string; text: string; isCorrect: boolean }>;
+		options?: Array<{ id?: string; text: string; isCorrect: boolean; points?: number; penaltyPoints?: number }>;
 	}): Promise<QuizQuestion> {
 		return apiClient.put<QuizQuestion>(`/api/v1/exams/questions/${questionId}`, data);
 	},
@@ -353,5 +358,19 @@ export const examsApi = {
 		return apiClient.post<boolean>(`/api/v1/exams/${examId}/students/${studentId}/retake`, {
 			reason
 		});
+	},
+
+	async gradeEssaySubmission(
+		submissionId: string,
+		grades: Array<{
+			questionId: string;
+			score: number;
+			feedback?: string;
+		}>
+	): Promise<ExamResultDetailsDto> {
+		return apiClient.post<ExamResultDetailsDto>(
+			`/api/v1/exams/submissions/${submissionId}/grade`,
+			{ grades }
+		);
 	}
 };

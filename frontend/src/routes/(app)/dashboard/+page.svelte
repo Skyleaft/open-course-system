@@ -1,10 +1,9 @@
 <script lang="ts">
 	import { authStore } from '#lib/stores/auth.svelte.ts';
-	import { coursesApi } from '#lib/api/courses.ts';
-	import { examsApi } from '#lib/api/exams.ts';
-	import type { Course, QuizExam } from '#lib/api/types.ts';
+	import { dashboardApi, type StudentDashboardOverview } from '#lib/api/dashboard.ts';
 	import GlassCard from '#lib/components/ui/GlassCard.svelte';
 	import StatCard from '#lib/components/ui/StatCard.svelte';
+	import CompetencyRadarChart from '#lib/components/ui/CompetencyRadarChart.svelte';
 	import {
 		BookOpen,
 		GraduationCap,
@@ -13,30 +12,24 @@
 		ArrowRight,
 		PlayCircle,
 		Sparkles,
-		Layers,
-		ShieldAlert
+		AlertCircle,
+		CheckCircle2,
+		Calendar,
+		Flame
 	} from '@lucide/svelte';
 	import { onMount } from 'svelte';
 
-	let enrolledCourses = $state<Course[]>([]);
-	let activeExams = $state<QuizExam[]>([]);
+	let overview = $state<StudentDashboardOverview | null>(null);
 	let isLoading = $state(true);
 
 	onMount(async () => {
 		try {
-			const [coursesRes, examsRes] = await Promise.allSettled([
-				coursesApi.getCourses({ pageSize: 4 }),
-				examsApi.listExams({ isPublished: true, pageSize: 4 })
-			]);
-
-			if (coursesRes.status === 'fulfilled' && coursesRes.value?.items) {
-				enrolledCourses = coursesRes.value.items;
-			}
-			if (examsRes.status === 'fulfilled' && examsRes.value?.items) {
-				activeExams = examsRes.value.items;
+			const res = await dashboardApi.getStudentDashboardOverview();
+			if (res) {
+				overview = res;
 			}
 		} catch (err) {
-			console.error(err);
+			console.error('Failed to load student dashboard:', err);
 		} finally {
 			isLoading = false;
 		}
@@ -56,7 +49,7 @@
 					Hello, {authStore.user?.fullName || 'Student'}! 👋
 				</h1>
 				<p class="text-xs text-base-content/70 sm:text-sm">
-					Ready to continue your courses and prepare for upcoming examinations?
+					Track your modular learning progress, upcoming assignment deadlines, and exam milestones.
 				</p>
 			</div>
 
@@ -77,126 +70,202 @@
 	<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
 		<StatCard
 			title="Active Courses"
-			value={enrolledCourses.length > 0 ? String(enrolledCourses.length) : '4'}
+			value={overview ? String(overview.activeCoursesCount) : '0'}
 			description="Modular learning tracks"
 			icon={BookOpen}
 			color="primary"
 		/>
 		<StatCard
-			title="Curriculum Exams"
-			value={activeExams.length > 0 ? String(activeExams.length) : '6'}
-			description="Integrated Course Milestones"
-			icon={GraduationCap}
-			color="secondary"
+			title="Completed"
+			value={overview ? String(overview.completedCoursesCount) : '0'}
+			description="Fully mastered courses"
+			icon={CheckCircle2}
+			color="success"
 		/>
 		<StatCard
 			title="Certificates"
-			value="3"
+			value={overview ? String(overview.certificatesCount) : '0'}
 			description="Cryptographically signed"
 			icon={Award}
 			color="accent"
 		/>
 		<StatCard
-			title="Study Hours"
-			value="24.5"
-			description="Total time spent"
+			title="Urgent Deadlines"
+			value={overview ? String(overview.pendingAssignmentsCount) : '0'}
+			description="Tasks due within 7 days"
 			icon={Clock}
-			color="info"
+			color={overview && overview.pendingAssignmentsCount > 0 ? 'warning' : 'info'}
 		/>
 	</div>
 
-	<!-- Two-column Section: Enrolled Courses & Course Examinations -->
-	<div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-		<!-- Enrolled Courses -->
-		<GlassCard>
-			<div class="space-y-4">
-				<div class="flex items-center justify-between border-b border-white/10 pb-3">
-					<h3 class="text-base font-bold text-base-content">In-Progress Courses</h3>
-					<a href="/my-courses" class="text-xs font-medium text-primary hover:underline flex items-center gap-1">
-						My Courses <ArrowRight class="h-3 w-3" />
-					</a>
-				</div>
-
-				{#if isLoading}
-					<div class="space-y-3">
-						<div class="h-16 rounded-xl bg-base-200/50 animate-pulse"></div>
-						<div class="h-16 rounded-xl bg-base-200/50 animate-pulse"></div>
+	<!-- Two-column Section: In-Progress Courses & Urgent Deadlines / Radar -->
+	<div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+		<!-- In-Progress Courses (Span 2 cols on LG) -->
+		<div class="lg:col-span-2 space-y-6">
+			<GlassCard>
+				<div class="space-y-4">
+					<div class="flex items-center justify-between border-b border-white/10 pb-3">
+						<h3 class="text-base font-bold text-base-content flex items-center gap-2">
+							<BookOpen class="h-4 w-4 text-primary" />
+							In-Progress Courses
+						</h3>
+						<a href="/my-courses" class="text-xs font-medium text-primary hover:underline flex items-center gap-1">
+							View All <ArrowRight class="h-3 w-3" />
+						</a>
 					</div>
-				{:else if enrolledCourses.length > 0}
-					<div class="space-y-3">
-						{#each enrolledCourses.slice(0, 3) as course (course.id)}
-							<div class="flex items-center justify-between rounded-xl bg-base-100/40 border border-white/5 p-3.5 hover:border-primary/30 transition-colors">
-								<div class="flex items-center gap-3">
-									<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-										<BookOpen class="h-5 w-5" />
+
+					{#if isLoading}
+						<div class="space-y-3">
+							<div class="h-20 rounded-xl bg-base-200/50 animate-pulse"></div>
+							<div class="h-20 rounded-xl bg-base-200/50 animate-pulse"></div>
+						</div>
+					{:else if overview && overview.enrolledCourses.length > 0}
+						<div class="space-y-3">
+							{#each overview.enrolledCourses as course (course.courseId)}
+								<div class="rounded-2xl bg-base-100/40 border border-white/5 p-4 hover:border-primary/30 transition-all">
+									<div class="flex items-center justify-between gap-4 mb-2.5">
+										<div class="flex items-center gap-3 min-w-0">
+											<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+												<BookOpen class="h-5 w-5" />
+											</div>
+											<div class="space-y-0.5 overflow-hidden">
+												<h4 class="text-xs font-bold text-base-content truncate">{course.title}</h4>
+												<div class="text-[10px] text-base-content/60">
+													{course.completedLessons} / {course.totalLessons} Lessons Completed
+												</div>
+											</div>
+										</div>
+
+										{#if course.lastLessonId}
+											<a
+												href="/courses/{course.courseId}/learn?lessonId={course.lastLessonId}"
+												class="btn btn-primary gradient-accent btn-xs rounded-lg text-white border-0 shrink-0 font-semibold gap-1"
+											>
+												<PlayCircle class="h-3.5 w-3.5" />
+												Continue
+											</a>
+										{:else}
+											<a
+												href="/courses/{course.courseId}/learn"
+												class="btn btn-ghost glass-card btn-xs rounded-lg border border-white/10 shrink-0 text-primary"
+											>
+												Start
+											</a>
+										{/if}
 									</div>
-									<div class="space-y-0.5 text-left">
-										<h4 class="text-xs font-bold text-base-content line-clamp-1">{course.title}</h4>
+
+									<!-- Progress Bar -->
+									<div class="space-y-1">
+										<div class="flex justify-between text-[10px] text-base-content/60">
+											<span>Progress</span>
+											<span class="font-bold text-primary">{course.progressPercentage}%</span>
+										</div>
+										<progress
+											class="progress progress-primary w-full h-1.5 bg-base-300/60"
+											value={course.progressPercentage}
+											max="100"
+										></progress>
+									</div>
+								</div>
+							{/each}
+						</div>
+					{:else}
+						<div class="p-8 text-center text-xs text-base-content/50">
+							No active course enrollments yet. <a href="/courses" class="text-primary font-bold hover:underline">Explore Catalog</a>
+						</div>
+					{/if}
+				</div>
+			</GlassCard>
+
+			<!-- Urgent Deadlines -->
+			<GlassCard>
+				<div class="space-y-4">
+					<div class="flex items-center justify-between border-b border-white/10 pb-3">
+						<h3 class="text-base font-bold text-base-content flex items-center gap-2">
+							<Clock class="h-4 w-4 text-warning" />
+							Upcoming Deadlines & Milestones
+						</h3>
+						<span class="text-[10px] text-base-content/50 font-medium">Within 7 days</span>
+					</div>
+
+					{#if isLoading}
+						<div class="h-16 rounded-xl bg-base-200/50 animate-pulse"></div>
+					{:else if overview && overview.upcomingDeadlines.length > 0}
+						<div class="space-y-2.5">
+							{#each overview.upcomingDeadlines as item (item.id)}
+								<div class="flex items-center justify-between rounded-xl {item.isUrgent ? 'bg-error/10 border-error/20' : 'bg-base-100/40 border-white/5'} border p-3.5 transition-colors">
+									<div class="space-y-0.5 overflow-hidden pr-2">
+										<div class="flex items-center gap-2">
+											<span class="badge {item.isUrgent ? 'badge-error' : 'badge-ghost'} badge-xs font-bold text-[9px] uppercase">
+												{item.itemType}
+											</span>
+											<span class="text-xs font-bold text-base-content truncate">{item.title}</span>
+										</div>
 										<div class="text-[10px] text-base-content/60">
-											{course.sections?.length || 0} Sections • {course.accessType}
+											{item.courseTitle} • Due: {new Date(item.deadlineUtc).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+										</div>
+									</div>
+
+									<div class="text-right shrink-0">
+										<div class="text-[11px] font-extrabold {item.isUrgent ? 'text-error flex items-center gap-1' : 'text-base-content/70'}">
+											{#if item.isUrgent}<Flame class="h-3.5 w-3.5 animate-bounce" />{/if}
+											{item.remainingHours}h left
 										</div>
 									</div>
 								</div>
-								<a href="/courses/{course.id}/learn" class="btn btn-ghost btn-sm btn-circle text-primary hover:bg-primary/10 shrink-0">
-									<PlayCircle class="h-5 w-5" />
-								</a>
-							</div>
-						{/each}
-					</div>
-				{:else}
-					<div class="p-6 text-center text-xs text-base-content/50">
-						No active course enrollments yet. <a href="/courses" class="text-primary font-bold hover:underline">Explore Catalog</a>
-					</div>
-				{/if}
-			</div>
-		</GlassCard>
-
-		<!-- Course Exams -->
-		<GlassCard>
-			<div class="space-y-4">
-				<div class="flex items-center justify-between border-b border-white/10 pb-3">
-					<h3 class="text-base font-bold text-base-content">Course Examinations</h3>
-					<a href="/my-courses" class="text-xs font-medium text-primary hover:underline flex items-center gap-1">
-						View in Courses <ArrowRight class="h-3 w-3" />
-					</a>
+							{/each}
+						</div>
+					{:else}
+						<div class="p-6 text-center text-xs text-base-content/50">
+							🎉 All caught up! No urgent assignments or exams due soon.
+						</div>
+					{/if}
 				</div>
+			</GlassCard>
+		</div>
 
-				{#if isLoading}
-					<div class="space-y-3">
-						<div class="h-14 rounded-xl bg-base-200/50 animate-pulse"></div>
-						<div class="h-14 rounded-xl bg-base-200/50 animate-pulse"></div>
+		<!-- Right Column: Competency Radar & Certifications (1 col on LG) -->
+		<div class="space-y-6">
+			<GlassCard>
+				<div class="space-y-4">
+					<div class="border-b border-white/10 pb-3">
+						<h3 class="text-base font-bold text-base-content">Competency Radar</h3>
+						<p class="text-[10px] text-base-content/60">Domain mastery across courses</p>
 					</div>
-				{:else if activeExams.length > 0}
-					<div class="space-y-3">
-						{#each activeExams.slice(0, 3) as exam (exam.id)}
-							{@const isReal = exam.mode === 'RealExam'}
-							<div class="flex items-center justify-between rounded-xl {isReal ? 'bg-primary/10 border-primary/20' : 'bg-base-100/40 border-white/5'} border p-3.5">
-								<div class="space-y-0.5 text-left overflow-hidden mr-2">
-									<div class="flex items-center gap-2">
-										<span class="badge {isReal ? 'badge-primary' : 'badge-ghost'} badge-xs uppercase font-bold text-[9px]">
-											{isReal ? 'Proctored' : 'Simulation'}
-										</span>
-										<span class="text-xs font-bold text-base-content truncate">{exam.title}</span>
-									</div>
-									<div class="text-[10px] text-base-content/60">
-										{exam.durationMinutes} mins • Passing: {exam.passingScore}%
-									</div>
-								</div>
-								<a
-									href="/exams/{exam.id}/start"
-									class="btn {isReal ? 'btn-primary gradient-accent' : 'btn-ghost glass-card border border-white/10'} btn-xs rounded-lg text-white border-0 shrink-0 font-semibold"
-								>
-									{isReal ? 'Start Exam' : 'Practice'}
-								</a>
-							</div>
-						{/each}
+
+					{#if isLoading}
+						<div class="h-56 rounded-xl bg-base-200/50 animate-pulse"></div>
+					{:else if overview && overview.competencyRadar.length > 0}
+						<CompetencyRadarChart points={overview.competencyRadar} size={220} />
+					{:else}
+						<div class="p-6 text-center text-xs text-base-content/50">
+							No competency data yet.
+						</div>
+					{/if}
+				</div>
+			</GlassCard>
+
+			<GlassCard>
+				<div class="space-y-4">
+					<div class="flex items-center justify-between border-b border-white/10 pb-3">
+						<h3 class="text-base font-bold text-base-content flex items-center gap-2">
+							<Award class="h-4 w-4 text-accent" />
+							Certificates
+						</h3>
+						<a href="/certificates" class="text-xs font-medium text-accent hover:underline flex items-center gap-1">
+							View <ArrowRight class="h-3 w-3" />
+						</a>
 					</div>
-				{:else}
-					<div class="p-6 text-center text-xs text-base-content/50">
-						No examinations currently available.
+
+					<div class="p-4 rounded-xl bg-accent/10 border border-accent/20 text-center space-y-2">
+						<div class="text-2xl font-extrabold text-accent">{overview?.certificatesCount ?? 0}</div>
+						<p class="text-xs text-base-content/70">Verified Digital Certificates Earned</p>
+						<a href="/certificates" class="btn btn-accent btn-xs rounded-lg text-white border-0 shadow-sm font-semibold">
+							Browse Credentials
+						</a>
 					</div>
-				{/if}
-			</div>
-		</GlassCard>
+				</div>
+			</GlassCard>
+		</div>
 	</div>
 </div>

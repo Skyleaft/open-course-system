@@ -8,6 +8,7 @@ public sealed class BankQuestion : Entity<Guid>
     public Guid BankId { get; private set; }
     public string QuestionText { get; private set; } = string.Empty;
     public QuestionType Type { get; private set; } = QuestionType.SingleChoice;
+    public GradingMethod GradingMethod { get; private set; } = GradingMethod.PartialWithPenalty;
     public decimal Points { get; private set; } = 1m;
     public int OrderIndex { get; private set; }
     public string? Explanation { get; private set; }
@@ -22,7 +23,8 @@ public sealed class BankQuestion : Entity<Guid>
         decimal points,
         int orderIndex,
         string? explanation = null,
-        IEnumerable<QuestionOption>? options = null)
+        IEnumerable<QuestionOption>? options = null,
+        GradingMethod? gradingMethod = null)
     {
         if (bankId == Guid.Empty)
         {
@@ -39,12 +41,17 @@ public sealed class BankQuestion : Entity<Guid>
             throw new ValidationException("Question points must be greater than zero.");
         }
 
+        var defaultMethod = type == QuestionType.MultipleChoice
+            ? (gradingMethod ?? GradingMethod.PartialWithPenalty)
+            : (gradingMethod ?? GradingMethod.AllOrNothing);
+
         return new BankQuestion
         {
             Id = Guid.CreateVersion7(),
             BankId = bankId,
             QuestionText = questionText.Trim(),
             Type = type,
+            GradingMethod = defaultMethod,
             Points = points,
             OrderIndex = orderIndex,
             Explanation = explanation?.Trim(),
@@ -58,7 +65,8 @@ public sealed class BankQuestion : Entity<Guid>
         decimal points,
         string? explanation = null,
         IEnumerable<QuestionOption>? options = null,
-        int? orderIndex = null)
+        int? orderIndex = null,
+        GradingMethod? gradingMethod = null)
     {
         if (string.IsNullOrWhiteSpace(questionText))
         {
@@ -72,6 +80,11 @@ public sealed class BankQuestion : Entity<Guid>
 
         QuestionText = questionText.Trim();
         Type = type;
+        if (gradingMethod.HasValue)
+        {
+            GradingMethod = gradingMethod.Value;
+        }
+
         Points = points;
         Explanation = explanation?.Trim();
         Options = options?.ToList() ?? [];

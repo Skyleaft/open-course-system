@@ -26,7 +26,7 @@
 		AlignLeft
 	} from 'lucide-svelte';
 	import { examsApi } from '$lib/api/exams.ts';
-	import type { QuestionBank, BankQuestion, QuestionType, QuestionOption } from '$lib/api/types.ts';
+	import type { QuestionBank, BankQuestion, QuestionType, GradingMethod, QuestionOption } from '$lib/api/types.ts';
 	import { toast } from '$lib/stores/toast.svelte.ts';
 	import GlassCard from '$lib/components/ui/GlassCard.svelte';
 	import QuestionBankModal from '$lib/components/exam/QuestionBankModal.svelte';
@@ -170,9 +170,10 @@
 	async function handleSaveQuestion(data: {
 		questionText: string;
 		type: QuestionType;
+		gradingMethod?: GradingMethod;
 		points: number;
 		explanation?: string;
-		options: Array<{ id?: string; text: string; isCorrect: boolean }>;
+		options: Array<{ id?: string; text: string; isCorrect: boolean; points?: number; penaltyPoints?: number }>;
 	}) {
 		if (!bankId) return;
 
@@ -183,21 +184,30 @@
 					bankId,
 					questionText: data.questionText,
 					type: data.type,
+					gradingMethod: data.gradingMethod,
 					points: data.points,
 					explanation: data.explanation,
-					options: data.options.map((o) => ({ text: o.text, isCorrect: o.isCorrect }))
+					options: data.options.map((o) => ({
+						text: o.text,
+						isCorrect: o.isCorrect,
+						points: o.points,
+						penaltyPoints: o.penaltyPoints
+					}))
 				});
 				toast.success('Question added to Question Bank pool successfully!');
 			} else if (editingQuestion?.id) {
 				await examsApi.updateQuestion(editingQuestion.id, {
 					questionText: data.questionText,
 					type: data.type,
+					gradingMethod: data.gradingMethod,
 					points: data.points,
 					explanation: data.explanation,
 					options: data.options.map((o) => ({
 						id: o.id,
 						text: o.text,
-						isCorrect: o.isCorrect
+						isCorrect: o.isCorrect,
+						points: o.points,
+						penaltyPoints: o.penaltyPoints
 					}))
 				});
 				toast.success('Question updated successfully!');
@@ -605,6 +615,19 @@
 										<span class="badge badge-sm badge-outline badge-primary font-bold text-[10px]">
 											{q.type}
 										</span>
+										{#if q.type === 'MultipleChoice' || q.gradingMethod === 'OptionWeighted' || (q.gradingMethod && q.gradingMethod !== 'AllOrNothing')}
+											<span class="badge badge-sm badge-outline badge-secondary font-semibold text-[10px]">
+												{q.gradingMethod === 'PartialWithPenalty'
+													? 'Partial with Penalty'
+													: q.gradingMethod === 'AllOrNothing'
+														? 'All or Nothing'
+														: q.gradingMethod === 'PartialWithoutPenalty'
+															? 'Partial (No Penalty)'
+															: q.gradingMethod === 'OptionWeighted'
+																? 'Option Weighted'
+																: q.gradingMethod}
+											</span>
+										{/if}
 										<span class="badge badge-sm badge-neutral font-mono text-[10px] font-bold">
 											{q.points} pts
 										</span>
@@ -623,9 +646,14 @@
 													<span class="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold {opt.isCorrect ? 'bg-success text-success-content' : 'bg-base-300 text-base-content/60'}">
 														{String.fromCharCode(65 + optIdx)}
 													</span>
-													<span class="truncate">{opt.text}</span>
+													<span class="truncate flex-1">{opt.text}</span>
+													{#if (opt.points !== undefined && opt.points > 0) || (opt.penaltyPoints !== undefined && opt.penaltyPoints > 0)}
+														<span class="badge badge-xs font-mono text-[9px] font-bold {opt.points ? 'badge-success text-white' : 'badge-error text-white'}">
+															{opt.points ? `+${opt.points}` : `-${opt.penaltyPoints}`}
+														</span>
+													{/if}
 													{#if opt.isCorrect}
-														<Check class="w-3.5 h-3.5 ml-auto text-success" />
+														<Check class="w-3.5 h-3.5 ml-auto text-success shrink-0" />
 													{/if}
 												</div>
 											{/each}

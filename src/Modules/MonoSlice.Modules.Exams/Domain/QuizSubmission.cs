@@ -129,6 +129,16 @@ public sealed class QuizSubmission : AggregateRoot<Guid>
         IsPassed = Score >= passingScore;
     }
 
+    public void UpdateManualGrade(decimal calculatedScore, decimal passingScore)
+    {
+        Score = Math.Clamp(calculatedScore, 0m, 100m);
+        IsPassed = Score >= passingScore;
+        if (Status != SubmissionStatus.Disqualified)
+        {
+            Status = SubmissionStatus.Completed;
+        }
+    }
+
     public void Disqualify(string reason)
     {
         Status = SubmissionStatus.Disqualified;

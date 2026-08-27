@@ -5,7 +5,8 @@ namespace MonoSlice.Modules.Exams.Services;
 public sealed record ParsedOptionItem(
     string Text,
     bool IsCorrect,
-    decimal Points = 0);
+    decimal Points = 0m,
+    decimal PenaltyPoints = 0m);
 
 public sealed record ParsedQuestionItem(
     int Number,
@@ -13,7 +14,8 @@ public sealed record ParsedQuestionItem(
     QuestionType Type,
     decimal Points,
     string? Explanation,
-    List<ParsedOptionItem> Options);
+    List<ParsedOptionItem> Options,
+    GradingMethod GradingMethod = GradingMethod.PartialWithPenalty);
 
 public sealed record WordQuestionBankParseResult(
     string? DocumentTitle,

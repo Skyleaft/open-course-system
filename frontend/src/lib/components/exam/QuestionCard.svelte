@@ -1,8 +1,8 @@
 <script lang="ts">
-	import type { QuizQuestion } from '$lib/api/types.ts';
-	import RichRenderer from '$lib/components/editor/RichRenderer.svelte';
-	import RichEditor from '$lib/components/editor/RichEditor.svelte';
-	import { Flag, Check, Folder, Sparkles } from 'lucide-svelte';
+import type { QuizQuestion } from '#lib/api/types.ts';
+import RichRenderer from '#lib/components/editor/RichRenderer.svelte';
+import RichEditor from '#lib/components/editor/RichEditor.svelte';
+import { Flag, Check, Folder, Sparkles } from '@lucide/svelte';
 
 	interface Props {
 		question: QuizQuestion;

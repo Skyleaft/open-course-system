@@ -16,7 +16,8 @@ public sealed record CourseStudentExamProgressDto(
     decimal? Score,
     bool? IsPassed,
     DateTime? StartedAtUtc,
-    DateTime? FinishedAtUtc);
+    DateTime? FinishedAtUtc,
+    Guid? SubmissionId = null);
 
 public sealed record CourseStudentEnrollmentDto(
     Guid EnrollmentId,

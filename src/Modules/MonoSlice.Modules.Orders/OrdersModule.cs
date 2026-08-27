@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MonoSlice.Modules.Orders.Contracts;
 using MonoSlice.Modules.Orders.Features.CreateCheckout;
 using MonoSlice.Modules.Orders.Features.GetOrder;
+using MonoSlice.Modules.Orders.Features.GetRevenueAnalytics;
 using MonoSlice.Modules.Orders.Features.ProcessWebhook;
 using MonoSlice.Modules.Orders.Persistence;
 using MonoSlice.Shared.Abstractions.Contracts;
@@ -60,6 +61,10 @@ public static class OrdersModule
         paymentsV1Group.MapCreateCheckoutEndpoint();
         paymentsV1Group.MapProcessWebhookEndpoint();
         paymentsV1Group.MapGetOrderEndpoint();
+
+        var dashboardGroup = app.MapGroup("/api/v1")
+            .WithTags("Dashboard");
+        dashboardGroup.MapGetRevenueAnalyticsEndpoint();
 
         return app;
     }

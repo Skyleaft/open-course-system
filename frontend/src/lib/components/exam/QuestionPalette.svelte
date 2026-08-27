@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { QuizQuestion, StudentExamSectionDto } from '$lib/api/types.ts';
-	import { Flag, CheckCircle2, Layers, ChevronDown, ChevronRight, Folder } from 'lucide-svelte';
+import type { QuizQuestion, StudentExamSectionDto } from '#lib/api/types.ts';
+import { Flag, CheckCircle2, Layers, ChevronDown, ChevronRight, Folder } from '@lucide/svelte';
 
 	interface Props {
 		questions: QuizQuestion[];

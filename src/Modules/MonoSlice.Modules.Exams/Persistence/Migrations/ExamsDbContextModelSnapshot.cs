@@ -37,6 +37,13 @@ namespace MonoSlice.Modules.Exams.Persistence.Migrations
                     b.Property<string>("Explanation")
                         .HasColumnType("text");
 
+                    b.Property<string>("GradingMethod")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasDefaultValue("PartialWithPenalty");
+
                     b.Property<string>("Options")
                         .IsRequired()
                         .HasColumnType("text");

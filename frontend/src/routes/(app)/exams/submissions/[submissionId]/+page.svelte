@@ -1,15 +1,17 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { examsApi } from '$lib/api/exams.ts';
-	import type { QuizQuestion, QuestionType, StudentExamSectionDto, ExamRuleConfig } from '$lib/api/types.ts';
-	import { ExamHubClient } from '$lib/signalr/exam-hub.svelte.ts';
-	import { bindSecurityInterceptors } from '$lib/utils/security.ts';
-	import ExamTimer from '$lib/components/exam/ExamTimer.svelte';
-	import QuestionPalette from '$lib/components/exam/QuestionPalette.svelte';
-	import QuestionCard from '$lib/components/exam/QuestionCard.svelte';
-	import ViolationOverlay from '$lib/components/exam/ViolationOverlay.svelte';
-	import SnapshotEngine from '$lib/components/exam/SnapshotEngine.svelte';
-	import { toast } from '$lib/stores/toast.svelte.ts';
+	import { examsApi } from '#lib/api/exams.ts';
+	import type { QuizQuestion, QuestionType, StudentExamSectionDto, ExamRuleConfig } from '#lib/api/types.ts';
+	import { ExamHubClient } from '#lib/signalr/exam-hub.svelte.ts';
+	import { bindSecurityInterceptors } from '#lib/utils/security.ts';
+	import ExamTimer from '#lib/components/exam/ExamTimer.svelte';
+	import QuestionPalette from '#lib/components/exam/QuestionPalette.svelte';
+	import QuestionCard from '#lib/components/exam/QuestionCard.svelte';
+	import ViolationOverlay from '#lib/components/exam/ViolationOverlay.svelte';
+	import SnapshotEngine from '#lib/components/exam/SnapshotEngine.svelte';
+	import GlassCard from '#lib/components/ui/GlassCard.svelte';
+	import GlassModal from '#lib/components/ui/GlassModal.svelte';
+	import { toast } from '#lib/stores/toast.svelte.ts';
 	import { goto } from '$app/navigation';
 	import {
 		ChevronLeft,
@@ -24,8 +26,11 @@
 		Layers,
 		CheckSquare,
 		HelpCircle,
-		Send
-	} from 'lucide-svelte';
+		Send,
+		Megaphone,
+		Camera,
+		Radio
+	} from '@lucide/svelte';
 	import { onMount, onDestroy } from 'svelte';
 
 	const submissionId = (page.params.submissionId || '') as string;
@@ -48,6 +53,10 @@
 	let maxViolations = $state(3);
 	let isDisqualified = $state(false);
 	let terminationReason = $state<string | undefined>(undefined);
+
+	// Proctor Live Messages State
+	let proctorMessage = $state<string | null>(null);
+	let isProctorMessageOpen = $state(false);
 
 	// Autosave status
 	let isSaving = $state(false);
@@ -252,6 +261,11 @@
 					terminationReason = reason;
 					toast.error(`Exam session terminated: ${reason}`);
 				});
+
+				examHub.onProctorMessage((message) => {
+					proctorMessage = message;
+					isProctorMessageOpen = true;
+				});
 			}
 
 			// 5. Bind security interceptors with dynamic rules
@@ -386,7 +400,7 @@
 <div class="space-y-5 pb-12">
 	{#if isLoading}
 		<div class="space-y-6 max-w-7xl mx-auto py-8">
-			<div class="glass-panel h-16 rounded-2xl animate-pulse"></div>
+			<div class="glass-panel h-16 rounded-3xl animate-pulse"></div>
 			<div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
 				<div class="lg:col-span-3 h-96 rounded-3xl bg-base-200/50 animate-pulse"></div>
 				<div class="h-96 rounded-3xl bg-base-200/50 animate-pulse"></div>
@@ -418,11 +432,37 @@
 			{terminationReason}
 		/>
 
+		<!-- Proctor Live Instruction Pop-up Modal -->
+		{#if isProctorMessageOpen && proctorMessage}
+			<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md animate-in fade-in">
+				<div class="glass-modal max-w-md rounded-3xl border border-warning/40 p-6 text-center space-y-5 shadow-2xl bg-base-100">
+					<div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-warning/20 text-warning border border-warning/30 animate-pulse">
+						<Megaphone class="h-7 w-7" />
+					</div>
+					<div class="space-y-2">
+						<span class="badge badge-warning badge-sm font-bold uppercase tracking-wider text-warning-content">
+							Official Proctor Message
+						</span>
+						<h3 class="text-base font-bold text-base-content">Supervisor Instruction</h3>
+						<div class="p-3.5 rounded-2xl bg-base-200/60 border border-white/10 text-xs font-semibold text-base-content leading-relaxed">
+							{proctorMessage}
+						</div>
+					</div>
+					<button
+						class="btn btn-warning w-full rounded-xl font-bold text-warning-content shadow-md"
+						onclick={() => (isProctorMessageOpen = false)}
+					>
+						I Acknowledge & Understand
+					</button>
+				</div>
+			</div>
+		{/if}
+
 		<!-- Top Header Exam Bar -->
-		<div class="rounded-2xl bg-base-100/90 backdrop-blur-xl px-4 sm:px-6 py-3 border border-base-content/10 shadow-lg flex items-center justify-between gap-4">
+		<div class="rounded-3xl bg-base-100/80 backdrop-blur-2xl px-5 py-3.5 border border-white/10 shadow-xl flex items-center justify-between gap-4">
 			<!-- Left: Title & Mode & Autosave -->
 			<div class="flex items-center gap-3 min-w-0">
-				<span class="badge {isRealExam ? 'badge-primary' : 'badge-neutral'} font-bold uppercase text-[11px] flex-shrink-0">
+				<span class="badge {isRealExam ? 'badge-primary text-white' : 'badge-neutral'} font-bold uppercase text-[11px] flex-shrink-0 shadow-sm">
 					{mode}
 				</span>
 				<div class="min-w-0 hidden md:block">
@@ -436,7 +476,7 @@
 							<Save class="h-3.5 w-3.5" /> Saving...
 						</span>
 					{:else if lastSavedTime}
-						<span class="flex items-center gap-1 text-success text-[11px]">
+						<span class="flex items-center gap-1 text-success text-[11px] font-mono">
 							<CheckCircle2 class="h-3.5 w-3.5" /> Saved at {lastSavedTime}
 						</span>
 					{/if}
@@ -459,8 +499,8 @@
 
 		<!-- Section Navigation Ribbon (Split per Section) -->
 		{#if hasMultipleSections}
-			<div class="glass-card rounded-2xl p-3 sm:p-4 border border-base-content/10 shadow-md space-y-2.5">
-				<div class="flex items-center justify-between pb-2 border-b border-base-content/10">
+			<div class="glass-card rounded-3xl p-4 border border-white/10 shadow-xl space-y-3">
+				<div class="flex items-center justify-between pb-2 border-b border-white/10">
 					<div class="flex items-center gap-2">
 						<Layers class="w-4 h-4 text-primary" />
 						<span class="text-xs font-bold uppercase tracking-wider text-base-content/80">
@@ -472,7 +512,7 @@
 					</span>
 				</div>
 
-				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
 					{#each sectionSummaries as sec, secIdx (sec.id)}
 						{@const isSecActive = currentSection?.id === sec.id}
 						{@const isCompleted = sec.answeredCount === sec.totalQuestions}
@@ -480,9 +520,9 @@
 
 						<button
 							type="button"
-							class="text-left p-3 rounded-xl border transition-all duration-200 cursor-pointer flex flex-col justify-between gap-2 {isSecActive
-								? 'bg-primary/15 border-primary shadow-md shadow-primary/10 ring-2 ring-primary/40'
-								: 'bg-base-100/60 border-base-content/10 hover:bg-base-200/60 hover:border-base-content/25'}"
+							class="text-left p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer flex flex-col justify-between gap-2.5 {isSecActive
+								? 'bg-primary/15 border-primary shadow-lg shadow-primary/10 ring-2 ring-primary/40'
+								: 'bg-base-100/50 border-white/10 hover:bg-base-200/60 hover:border-white/20'}"
 							onclick={() => jumpToSection(sec)}
 						>
 							<div class="flex items-center justify-between gap-2">
@@ -543,7 +583,7 @@
 					<div class="flex items-center justify-between gap-3 pt-1">
 						<button
 							type="button"
-							class="btn btn-ghost glass-card btn-sm rounded-xl border border-base-content/10 gap-1.5"
+							class="btn btn-ghost glass-card btn-sm rounded-xl border border-white/10 gap-1.5"
 							disabled={currentIndex === 0}
 							onclick={() => (currentIndex -= 1)}
 						>
@@ -592,8 +632,8 @@
 		<!-- Final Submission Confirmation Modal with Section Breakdown -->
 		{#if isFinishModalOpen}
 			<div class="modal modal-open z-50">
-				<div class="modal-box bg-base-100/95 backdrop-blur-xl border border-base-content/10 shadow-2xl max-w-lg space-y-4">
-					<div class="flex items-center justify-between border-b border-base-content/10 pb-3">
+				<div class="modal-box bg-base-100/95 backdrop-blur-2xl border border-white/10 shadow-2xl max-w-lg space-y-4 rounded-3xl">
+					<div class="flex items-center justify-between border-b border-white/10 pb-3">
 						<h3 class="font-bold text-base text-base-content flex items-center gap-2">
 							<Send class="w-5 h-5 text-primary" />
 							Submit Examination
@@ -613,7 +653,7 @@
 					<div class="space-y-2 max-h-56 overflow-y-auto pr-1">
 						{#each sectionSummaries as sec, idx}
 							{@const isAllDone = sec.answeredCount === sec.totalQuestions}
-							<div class="p-3 rounded-xl bg-base-200/50 border border-base-content/10 flex items-center justify-between gap-3">
+							<div class="p-3 rounded-2xl bg-base-200/50 border border-white/10 flex items-center justify-between gap-3">
 								<div class="space-y-0.5 min-w-0">
 									<p class="text-xs font-bold text-base-content truncate">
 										{idx + 1}. {sec.title}
@@ -626,11 +666,11 @@
 									</p>
 								</div>
 								{#if isAllDone}
-									<span class="badge badge-success badge-sm font-bold gap-1">
+									<span class="badge badge-success badge-sm font-bold gap-1 text-white">
 										<CheckCircle2 class="w-3 h-3" /> Complete
 									</span>
 								{:else}
-									<span class="badge badge-warning badge-sm font-bold">
+									<span class="badge badge-warning badge-sm font-bold text-warning-content">
 										{sec.totalQuestions - sec.answeredCount} Unanswered
 									</span>
 								{/if}
@@ -640,7 +680,7 @@
 
 					<!-- Warning banner if incomplete -->
 					{#if totalAnswered < questions.length}
-						<div class="p-3 rounded-xl bg-warning/10 border border-warning/30 flex items-start gap-2.5 text-xs text-warning-content">
+						<div class="p-3 rounded-2xl bg-warning/10 border border-warning/30 flex items-start gap-2.5 text-xs text-warning-content">
 							<AlertCircle class="w-4 h-4 text-warning flex-shrink-0 mt-0.5" />
 							<div>
 								<span class="font-bold">Unanswered Questions:</span>
@@ -652,7 +692,7 @@
 					<div class="modal-action pt-2">
 						<button
 							type="button"
-							class="btn btn-sm btn-ghost"
+							class="btn btn-sm btn-ghost rounded-xl"
 							onclick={() => (isFinishModalOpen = false)}
 							disabled={isSubmittingFinal}
 						>
@@ -660,7 +700,7 @@
 						</button>
 						<button
 							type="button"
-							class="btn btn-sm btn-primary gap-1.5"
+							class="btn btn-sm btn-primary rounded-xl font-bold gap-1.5 shadow-lg shadow-primary/20"
 							onclick={handleFinishExam}
 							disabled={isSubmittingFinal}
 						>
@@ -673,7 +713,7 @@
 						</button>
 					</div>
 				</div>
-				<div class="modal-backdrop bg-black/40 backdrop-blur-sm" onclick={() => (isFinishModalOpen = false)}></div>
+				<div class="modal-backdrop bg-black/50 backdrop-blur-sm" onclick={() => (isFinishModalOpen = false)}></div>
 			</div>
 		{/if}
 	{/if}

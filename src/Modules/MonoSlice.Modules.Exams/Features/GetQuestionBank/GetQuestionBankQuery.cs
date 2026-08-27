@@ -37,5 +37,6 @@ public sealed record BankQuestionDto(
     decimal Points,
     int OrderIndex,
     string? Explanation,
-    List<QuestionOption> Options
+    List<QuestionOption> Options,
+    string GradingMethod = nameof(Domain.GradingMethod.PartialWithPenalty)
 );

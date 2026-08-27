@@ -16,6 +16,8 @@ public sealed partial class AddQuestionCommand : ICommand<ApiResponse<QuestionRe
 
     public QuestionType Type { get; init; } = QuestionType.SingleChoice;
 
+    public GradingMethod? GradingMethod { get; init; }
+
     public decimal Points { get; init; } = 1m;
 
     public string? Explanation { get; init; }
@@ -30,7 +32,9 @@ public sealed partial class AddQuestionCommand : ICommand<ApiResponse<QuestionRe
 public sealed record QuestionOptionDto(
     Guid? Id,
     string Text,
-    bool IsCorrect);
+    bool IsCorrect,
+    decimal Points = 0m,
+    decimal PenaltyPoints = 0m);
 
 public sealed record QuestionResultDto(
     Guid Id,
@@ -47,4 +51,5 @@ public sealed record QuestionResultDto(
     Guid CreatedBy,
     Guid? UpdatedBy,
     DateTime CreatedAtUtc,
-    Guid? BankId = null);
+    Guid? BankId = null,
+    string GradingMethod = nameof(Domain.GradingMethod.PartialWithPenalty));

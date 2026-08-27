@@ -4,7 +4,7 @@
 	import '#lib/components/edra/onedark.css';
 
 	interface Props {
-		content?: string;
+		content?: string | any;
 		class?: string;
 	}
 
@@ -16,11 +16,30 @@
 		if (editor) {
 			editor.setEditable(false);
 			if (content) {
-				try {
-					const parsed = JSON.parse(content);
-					editor.commands.setContent(parsed);
-				} catch {
-					editor.commands.setContent(content);
+				if (typeof content === 'object' && content !== null) {
+					try {
+						editor.commands.setContent(content);
+					} catch {
+						editor.commands.setContent(JSON.stringify(content));
+					}
+				} else if (typeof content === 'string') {
+					const trimmed = content.trim();
+					if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+						try {
+							const parsed = JSON.parse(trimmed);
+							editor.commands.setContent(parsed);
+						} catch {
+							editor.commands.setContent(content);
+						}
+					} else {
+						try {
+							editor.commands.setContent(content);
+						} catch {
+							editor.commands.setContent(`<p>${content}</p>`);
+						}
+					}
+				} else {
+					editor.commands.setContent(String(content));
 				}
 			} else {
 				editor.commands.setContent('');

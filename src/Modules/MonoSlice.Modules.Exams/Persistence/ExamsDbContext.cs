@@ -161,6 +161,12 @@ public sealed class ExamsDbContext : DbContext
                 .HasMaxLength(50)
                 .IsRequired();
 
+            builder.Property(bq => bq.GradingMethod)
+                .HasConversion<string>()
+                .HasMaxLength(50)
+                .HasDefaultValue(GradingMethod.PartialWithPenalty)
+                .IsRequired();
+
             builder.Property(bq => bq.Points).HasPrecision(5, 2).HasDefaultValue(1m);
             builder.Property(bq => bq.OrderIndex).HasDefaultValue(1).IsRequired();
             builder.Property(bq => bq.Explanation);

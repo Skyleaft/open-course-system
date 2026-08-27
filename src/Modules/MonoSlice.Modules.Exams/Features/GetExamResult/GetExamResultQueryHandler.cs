@@ -41,7 +41,8 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
             throw new NotFoundException(nameof(QuizSubmission), query.SubmissionId);
         }
 
-        if (submission.StudentId != _currentUser.UserId.Value)
+        var isInstructorOrAdmin = _currentUser.IsInRole("Instructor") || _currentUser.IsInRole("Admin");
+        if (submission.StudentId != _currentUser.UserId.Value && !isInstructorOrAdmin)
         {
             throw new UnauthorizedAccessException("You do not have access to this exam result.");
         }
@@ -58,7 +59,8 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
             throw new NotFoundException(nameof(QuizExam), submission.ExamId);
         }
 
-        var canViewExplanations = submission.AppliedRules.CanTabSwitch ||
+        var canViewExplanations = isInstructorOrAdmin ||
+                                  submission.AppliedRules.CanTabSwitch ||
                                   submission.Status == SubmissionStatus.Completed ||
                                   submission.Status == SubmissionStatus.TimedOut;
 

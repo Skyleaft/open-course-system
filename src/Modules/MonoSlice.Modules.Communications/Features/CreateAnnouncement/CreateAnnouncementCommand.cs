@@ -9,10 +9,11 @@ public sealed partial class CreateAnnouncementCommand : ICommand<ApiResponse<Ann
     public Guid? CourseId { get; init; }
 
     [Required]
-    [StringLength(255)]
+    [StringLength(255, MinimumLength = 1)]
     public string Title { get; init; } = string.Empty;
 
     [Required]
+    [StringLength(100000, MinimumLength = 1)]
     public string Content { get; init; } = string.Empty;
 
     public bool IsPinned { get; init; } = false;

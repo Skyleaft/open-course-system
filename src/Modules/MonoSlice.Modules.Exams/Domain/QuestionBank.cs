@@ -79,7 +79,8 @@ public sealed class QuestionBank : AggregateRoot<Guid>
         QuestionType type,
         decimal points = 1m,
         string? explanation = null,
-        IEnumerable<QuestionOption>? options = null)
+        IEnumerable<QuestionOption>? options = null,
+        GradingMethod? gradingMethod = null)
     {
         var orderIndex = _questions.Count + 1;
         var question = BankQuestion.Create(
@@ -89,7 +90,8 @@ public sealed class QuestionBank : AggregateRoot<Guid>
             points,
             orderIndex,
             explanation,
-            options);
+            options,
+            gradingMethod);
 
         _questions.Add(question);
         UpdatedAtUtc = DateTime.UtcNow;
@@ -112,7 +114,8 @@ public sealed class QuestionBank : AggregateRoot<Guid>
         QuestionType type,
         decimal points,
         string? explanation = null,
-        IEnumerable<QuestionOption>? options = null)
+        IEnumerable<QuestionOption>? options = null,
+        GradingMethod? gradingMethod = null)
     {
         var question = _questions.FirstOrDefault(q => q.Id == questionId);
         if (question is null)
@@ -120,7 +123,7 @@ public sealed class QuestionBank : AggregateRoot<Guid>
             throw new NotFoundException(nameof(BankQuestion), questionId);
         }
 
-        question.Update(questionText, type, points, explanation, options);
+        question.Update(questionText, type, points, explanation, options, gradingMethod: gradingMethod);
         UpdatedAtUtc = DateTime.UtcNow;
         return question;
     }

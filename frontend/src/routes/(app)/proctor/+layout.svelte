@@ -8,7 +8,7 @@
 
 {#if authStore.isLoading}
 	<div class="glass-panel h-96 rounded-3xl animate-pulse"></div>
-{:else if authStore.isProctor || authStore.isAdmin}
+{:else if authStore.isProctor || authStore.isAdmin || authStore.isInstructor}
 	{@render children()}
 {:else}
 	<div class="glass-card max-w-lg mx-auto p-12 text-center rounded-3xl border border-warning/30 space-y-4 my-8">

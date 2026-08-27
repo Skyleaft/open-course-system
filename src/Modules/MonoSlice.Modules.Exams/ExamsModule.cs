@@ -15,14 +15,20 @@ using MonoSlice.Modules.Exams.Features.GetExamResult;
 using MonoSlice.Modules.Exams.Features.GetQuestion;
 using MonoSlice.Modules.Exams.Features.ListExams;
 using MonoSlice.Modules.Exams.Features.PresignSnapshot;
+using MonoSlice.Modules.Exams.Features.Proctor.BroadcastExamMessage;
 using MonoSlice.Modules.Exams.Features.Proctor.ForceDisconnectCandidate;
+using MonoSlice.Modules.Exams.Features.Proctor.GetCandidateSnapshots;
 using MonoSlice.Modules.Exams.Features.Proctor.GetLiveCandidates;
+using MonoSlice.Modules.Exams.Features.Proctor.GetProctorRooms;
 using MonoSlice.Modules.Exams.Features.Proctor.WarnCandidate;
 using MonoSlice.Modules.Exams.Features.PublishExam;
 using MonoSlice.Modules.Exams.Features.SaveAnswer;
 using MonoSlice.Modules.Exams.Features.StartExam;
 using MonoSlice.Modules.Exams.Features.SubmitExam;
 using MonoSlice.Modules.Exams.Features.UpdateExam;
+using MonoSlice.Modules.Exams.Features.Analytics.GetExamAnalytics;
+using MonoSlice.Modules.Exams.Features.Analytics.GetSecurityViolationsSummary;
+using MonoSlice.Modules.Exams.Features.Proctor.GetProctorLiveSummary;
 using MonoSlice.Modules.Exams.Features.CreateQuestionBank;
 using MonoSlice.Modules.Exams.Features.DeleteQuestionBank;
 using MonoSlice.Modules.Exams.Features.GetQuestionBank;
@@ -32,6 +38,7 @@ using MonoSlice.Modules.Exams.Features.UpdateQuestionBank;
 using MonoSlice.Modules.Exams.Features.UpdateQuestion;
 using MonoSlice.Modules.Exams.Features.GetStudentExamOverview;
 using MonoSlice.Modules.Exams.Features.GetExamSubmissions;
+using MonoSlice.Modules.Exams.Features.GradeEssaySubmission;
 using MonoSlice.Modules.Exams.Features.GrantRetake;
 using MonoSlice.Modules.Exams.Features.ImportQuestionBank;
 using MonoSlice.Modules.Exams.Features.ExamRules.CreateExamRule;
@@ -132,13 +139,23 @@ public static class ExamsModule
         examsV1Group.MapPresignSnapshotEndpoint();
         examsV1Group.MapSubmitExamEndpoint();
         examsV1Group.MapGetExamResultEndpoint();
+        examsV1Group.MapGradeEssaySubmissionEndpoint();
 
         var proctorV1Group = app.MapGroup("/api/v1/proctor")
             .WithTags("Proctor");
 
+        proctorV1Group.MapGetProctorRoomsEndpoint();
         proctorV1Group.MapGetLiveCandidatesEndpoint();
+        proctorV1Group.MapGetCandidateSnapshotsEndpoint();
         proctorV1Group.MapWarnCandidateEndpoint();
+        proctorV1Group.MapBroadcastExamMessageEndpoint();
         proctorV1Group.MapForceDisconnectCandidateEndpoint();
+
+        var dashboardGroup = app.MapGroup("/api/v1")
+            .WithTags("Dashboard");
+        dashboardGroup.MapGetExamAnalyticsEndpoint();
+        dashboardGroup.MapGetSecurityViolationsSummaryEndpoint();
+        dashboardGroup.MapGetProctorLiveSummaryEndpoint();
 
         return app;
     }

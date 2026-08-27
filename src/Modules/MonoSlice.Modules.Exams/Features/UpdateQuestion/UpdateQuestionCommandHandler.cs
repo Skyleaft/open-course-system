@@ -56,7 +56,9 @@ public sealed class UpdateQuestionCommandHandler : ICommandHandler<UpdateQuestio
         var domainOptions = (command.Options ?? []).Select(o => new QuestionOption(
             o.Id.HasValue && o.Id.Value != Guid.Empty ? o.Id.Value : Guid.CreateVersion7(),
             o.Text ?? string.Empty,
-            o.IsCorrect
+            o.IsCorrect,
+            o.Points,
+            o.PenaltyPoints
         )).ToList();
 
         question.Update(
@@ -64,7 +66,8 @@ public sealed class UpdateQuestionCommandHandler : ICommandHandler<UpdateQuestio
             command.Type,
             command.Points > 0 ? command.Points : 1m,
             command.Explanation,
-            domainOptions);
+            domainOptions,
+            gradingMethod: command.GradingMethod);
 
         if (!string.IsNullOrWhiteSpace(command.Category) || (command.Tags != null && command.Tags.Count > 0))
         {
@@ -89,11 +92,12 @@ public sealed class UpdateQuestionCommandHandler : ICommandHandler<UpdateQuestio
             question.Explanation,
             bank.Category,
             bank.Tags,
-            question.Options.Select(o => new QuestionOptionDto(o.Id, o.Text, o.IsCorrect)).ToList(),
+            question.Options.Select(o => new QuestionOptionDto(o.Id, o.Text, o.IsCorrect, o.Points, o.PenaltyPoints)).ToList(),
             bank.CreatedBy,
             bank.UpdatedBy,
             bank.CreatedAtUtc,
-            bank.Id
+            bank.Id,
+            question.GradingMethod.ToString()
         );
 
         return ApiResponse.Ok(result, "Question updated successfully.");

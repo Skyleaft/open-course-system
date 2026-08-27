@@ -16,9 +16,14 @@
 		Award,
 		Lightbulb,
 		ListOrdered,
-		Layers
+		Layers,
+		Scale,
+		ShieldCheck,
+		Sliders,
+		Percent,
+		Radio
 	} from 'lucide-svelte';
-	import type { QuestionType, QuestionOption, BankQuestion } from '$lib/api/types.ts';
+	import type { QuestionType, GradingMethod, QuestionOption, BankQuestion } from '$lib/api/types.ts';
 	import RichEditor from '$lib/components/editor/RichEditor.svelte';
 	import { toast } from '$lib/stores/toast.svelte.ts';
 
@@ -32,9 +37,10 @@
 		onSave: (data: {
 			questionText: string;
 			type: QuestionType;
+			gradingMethod?: GradingMethod;
 			points: number;
 			explanation?: string;
-			options: Array<{ id?: string; text: string; isCorrect: boolean }>;
+			options: Array<{ id?: string; text: string; isCorrect: boolean; points?: number; penaltyPoints?: number }>;
 		}) => void | Promise<void>;
 	}
 
@@ -50,9 +56,10 @@
 
 	let questionText = $state('');
 	let questionType = $state<QuestionType>('SingleChoice');
+	let questionGradingMethod = $state<GradingMethod>('AllOrNothing');
 	let questionPoints = $state<number>(5);
 	let questionExplanation = $state('');
-	let options = $state<Array<{ id?: string; text: string; isCorrect: boolean }>>([]);
+	let options = $state<Array<{ id?: string; text: string; isCorrect: boolean; points?: number; penaltyPoints?: number }>>([]);
 
 	const questionTypes: Array<{
 		id: QuestionType;
@@ -63,7 +70,7 @@
 		{
 			id: 'SingleChoice',
 			label: 'Single Choice',
-			description: 'One correct answer choice',
+			description: 'One option selected by candidate',
 			icon: CheckCircle2
 		},
 		{
@@ -86,6 +93,75 @@
 		}
 	];
 
+	const multipleChoiceStrategies: Array<{
+		id: GradingMethod;
+		label: string;
+		tag: string;
+		description: string;
+		icon: typeof Scale;
+	}> = [
+		{
+			id: 'PartialWithPenalty',
+			label: 'Partial with Penalty',
+			tag: 'Recommended',
+			description: 'Proportional +points for correct, -points for wrong choices (prevents select-all exploit)',
+			icon: ShieldCheck
+		},
+		{
+			id: 'AllOrNothing',
+			label: 'All or Nothing',
+			tag: 'Strict',
+			description: 'Requires selecting all correct choices with zero errors to get points',
+			icon: CheckSquare
+		},
+		{
+			id: 'PartialWithoutPenalty',
+			label: 'Partial (No Penalty)',
+			tag: 'Lenient',
+			description: 'Proportional credit for correct choices only if no wrong choices chosen',
+			icon: Percent
+		},
+		{
+			id: 'OptionWeighted',
+			label: 'Custom Option Points',
+			tag: 'Weighted',
+			description: 'Custom points and penalties configured individually on each option choice',
+			icon: Sliders
+		}
+	];
+
+	const singleChoiceStrategies: Array<{
+		id: GradingMethod;
+		label: string;
+		tag: string;
+		description: string;
+		icon: typeof Scale;
+	}> = [
+		{
+			id: 'AllOrNothing',
+			label: 'Standard Scoring',
+			tag: 'Default',
+			description: 'Candidate receives total question points if they pick the marked correct answer choice',
+			icon: CheckCircle2
+		},
+		{
+			id: 'OptionWeighted',
+			label: 'Option-Weighted Points',
+			tag: 'Likert / Tiered',
+			description: 'Each choice awards custom points (ideal for Likert scales, surveys, or tiered answers)',
+			icon: Sliders
+		}
+	];
+
+	// Derived list of strategies based on current questionType
+	const currentStrategies = $derived(
+		questionType === 'MultipleChoice'
+			? multipleChoiceStrategies
+			: questionType === 'SingleChoice'
+				? singleChoiceStrategies
+				: []
+	);
+
 	// Track previous state to avoid unnecessary re-initialization
 	let prevOpen = $state(false);
 	let prevQuestionId = $state<string | undefined>(undefined);
@@ -104,12 +180,24 @@
 				if (currentMode === 'edit' && currentQuestion) {
 					questionText = currentQuestion.questionText || currentQuestion.text || '';
 					questionType = currentQuestion.type || 'SingleChoice';
+					
+					const rawMethod = currentQuestion.gradingMethod as any;
+					if (rawMethod && rawMethod !== 'null' && rawMethod !== 'undefined' && ['AllOrNothing', 'PartialWithPenalty', 'PartialWithoutPenalty', 'OptionWeighted'].includes(rawMethod)) {
+						questionGradingMethod = rawMethod as GradingMethod;
+					} else if (questionType === 'MultipleChoice') {
+						questionGradingMethod = 'PartialWithPenalty';
+					} else {
+						questionGradingMethod = 'AllOrNothing';
+					}
+
 					questionPoints = currentQuestion.points || 5;
 					questionExplanation = currentQuestion.explanation || '';
 					const loadedOpts = (currentQuestion.options || []).map((o) => ({
 						id: o.id,
 						text: o.text || '',
-						isCorrect: Boolean(o.isCorrect)
+						isCorrect: Boolean(o.isCorrect),
+						points: o.points ?? 0,
+						penaltyPoints: o.penaltyPoints ?? 0
 					}));
 					if (loadedOpts.length === 0 && questionType !== 'Essay') {
 						initDefaultOptions(questionType);
@@ -119,6 +207,7 @@
 				} else {
 					questionText = '';
 					questionType = 'SingleChoice';
+					questionGradingMethod = 'AllOrNothing';
 					questionPoints = 5;
 					questionExplanation = '';
 					initDefaultOptions('SingleChoice');
@@ -133,41 +222,54 @@
 	function initDefaultOptions(type: QuestionType) {
 		if (type === 'TrueFalse') {
 			options = [
-				{ text: 'True', isCorrect: true },
-				{ text: 'False', isCorrect: false }
+				{ text: 'True', isCorrect: true, points: 0, penaltyPoints: 0 },
+				{ text: 'False', isCorrect: false, points: 0, penaltyPoints: 0 }
 			];
 		} else if (type === 'Essay') {
 			options = [];
 		} else {
 			options = [
-				{ text: 'Option A', isCorrect: true },
-				{ text: 'Option B', isCorrect: false },
-				{ text: 'Option C', isCorrect: false },
-				{ text: 'Option D', isCorrect: false }
+				{ text: 'Option A', isCorrect: true, points: 0, penaltyPoints: 0 },
+				{ text: 'Option B', isCorrect: false, points: 0, penaltyPoints: 0 },
+				{ text: 'Option C', isCorrect: false, points: 0, penaltyPoints: 0 },
+				{ text: 'Option D', isCorrect: false, points: 0, penaltyPoints: 0 }
 			];
 		}
 	}
 
 	function handleTypeChange(newType: QuestionType) {
 		if (questionType === newType) return;
+		const oldType = questionType;
 		questionType = newType;
+
+		if (newType === 'MultipleChoice') {
+			if (questionGradingMethod !== 'OptionWeighted') {
+				questionGradingMethod = 'PartialWithPenalty';
+			}
+		} else if (newType === 'SingleChoice') {
+			if (questionGradingMethod !== 'OptionWeighted') {
+				questionGradingMethod = 'AllOrNothing';
+			}
+		} else {
+			questionGradingMethod = 'AllOrNothing';
+		}
 
 		if (newType === 'TrueFalse') {
 			options = [
-				{ text: 'True', isCorrect: true },
-				{ text: 'False', isCorrect: false }
+				{ text: 'True', isCorrect: true, points: 0, penaltyPoints: 0 },
+				{ text: 'False', isCorrect: false, points: 0, penaltyPoints: 0 }
 			];
 		} else if (newType === 'Essay') {
 			options = [];
-		} else if (options.length === 0 || questionType === 'TrueFalse') {
+		} else if (options.length === 0 || oldType === 'TrueFalse') {
 			options = [
-				{ text: 'Option A', isCorrect: true },
-				{ text: 'Option B', isCorrect: false },
-				{ text: 'Option C', isCorrect: false },
-				{ text: 'Option D', isCorrect: false }
+				{ text: 'Option A', isCorrect: true, points: 0, penaltyPoints: 0 },
+				{ text: 'Option B', isCorrect: false, points: 0, penaltyPoints: 0 },
+				{ text: 'Option C', isCorrect: false, points: 0, penaltyPoints: 0 },
+				{ text: 'Option D', isCorrect: false, points: 0, penaltyPoints: 0 }
 			];
 		} else if (newType === 'SingleChoice') {
-			// Ensure only one is correct
+			// Ensure only one is correct if standard scoring
 			let foundFirst = false;
 			options = options.map((opt) => {
 				if (opt.isCorrect && !foundFirst) {
@@ -189,7 +291,7 @@
 			return;
 		}
 		const letter = String.fromCharCode(65 + options.length);
-		options = [...options, { text: `Option ${letter}`, isCorrect: false }];
+		options = [...options, { text: `Option ${letter}`, isCorrect: false, points: 0, penaltyPoints: 0 }];
 	}
 
 	function removeOption(index: number) {
@@ -199,7 +301,7 @@
 		}
 		const wasCorrect = options[index].isCorrect;
 		options = options.filter((_, i) => i !== index);
-		if (wasCorrect && !options.some((o) => o.isCorrect) && options.length > 0) {
+		if (wasCorrect && !options.some((o) => o.isCorrect) && options.length > 0 && questionGradingMethod !== 'OptionWeighted') {
 			options[0].isCorrect = true;
 		}
 	}
@@ -229,7 +331,7 @@
 				return;
 			}
 			const hasCorrect = options.some((o) => o.isCorrect);
-			if (!hasCorrect) {
+			if (!hasCorrect && questionGradingMethod !== 'OptionWeighted') {
 				toast.warning('Please mark at least one option as the correct answer.');
 				return;
 			}
@@ -240,9 +342,17 @@
 			}
 		}
 
+		const safeGradingMethod: GradingMethod =
+			questionGradingMethod === 'OptionWeighted'
+				? 'OptionWeighted'
+				: questionType === 'MultipleChoice'
+					? (questionGradingMethod || 'PartialWithPenalty')
+					: 'AllOrNothing';
+
 		onSave({
 			questionText: questionText.trim(),
 			type: questionType,
+			gradingMethod: safeGradingMethod,
 			points: Number(questionPoints) || 5,
 			explanation: questionExplanation.trim() || undefined,
 			options:
@@ -251,7 +361,9 @@
 					: options.map((o) => ({
 							id: o.id,
 							text: o.text.trim(),
-							isCorrect: o.isCorrect
+							isCorrect: o.isCorrect,
+							points: Number(o.points) || 0,
+							penaltyPoints: Number(o.penaltyPoints) || 0
 						}))
 		});
 	}
@@ -369,6 +481,54 @@
 					</div>
 				</div>
 
+				<!-- Grading Strategy Selector (For Multiple Choice or Single Choice) -->
+				{#if currentStrategies.length > 0}
+					<div class="space-y-2 p-3.5 rounded-2xl bg-primary/5 border border-primary/15">
+						<div class="flex items-center justify-between">
+							<label class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary">
+								<Scale class="w-3.5 h-3.5" />
+								<span>{questionType === 'MultipleChoice' ? 'Multiple Choice Grading Strategy' : 'Single Choice Scoring Mode'}</span>
+							</label>
+							<span class="badge badge-xs badge-primary badge-outline font-mono text-[9px]">
+								{questionType === 'MultipleChoice' ? 'Multi-Select Engine' : 'Single-Select Engine'}
+							</span>
+						</div>
+
+						<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+							{#each currentStrategies as gs}
+								{@const isSelected = questionGradingMethod === gs.id}
+								{@const Icon = gs.icon}
+								<button
+									type="button"
+									class="p-2.5 rounded-xl border text-left transition-all flex items-start gap-2.5 {isSelected
+										? 'border-primary bg-primary/15 text-primary shadow-xs ring-1 ring-primary/30'
+										: 'border-base-content/10 bg-base-100/70 text-base-content/70 hover:bg-base-200/80 hover:text-base-content'}"
+									onclick={() => (questionGradingMethod = gs.id)}
+								>
+									<div
+										class="w-6 h-6 rounded-lg flex items-center justify-center shrink-0 mt-0.5 {isSelected
+											? 'bg-primary text-white font-bold'
+											: 'bg-base-200 text-base-content/60'}"
+									>
+										<Icon class="w-3.5 h-3.5" />
+									</div>
+									<div class="min-w-0 flex-1">
+										<div class="flex items-center justify-between gap-1">
+											<p class="font-bold text-xs leading-tight truncate {isSelected ? 'text-primary' : 'text-base-content'}">
+												{gs.label}
+											</p>
+											<span class="badge badge-xs {isSelected ? 'badge-primary' : 'badge-ghost'} text-[9px] font-semibold">{gs.tag}</span>
+										</div>
+										<p class="text-[10px] text-base-content/60 mt-0.5 line-clamp-2 leading-relaxed">
+											{gs.description}
+										</p>
+									</div>
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
+
 				<!-- Question Prompt Editor -->
 				<div class="space-y-1.5">
 					<label
@@ -398,7 +558,7 @@
 							class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-base-content/80"
 						>
 							<Award class="w-3.5 h-3.5 text-warning" />
-							<span>Points / Score</span>
+							<span>{questionGradingMethod === 'OptionWeighted' ? 'Max Total Points' : 'Total Points'}</span>
 							<span class="text-error">*</span>
 						</label>
 						<input
@@ -444,7 +604,11 @@
 									<span>Answer Choices</span>
 								</span>
 								<p class="text-[11px] text-base-content/50 mt-0.5">
-									Click the badge pill to mark as {questionType === 'MultipleChoice' ? 'a correct answer' : 'the correct answer'}.
+									{#if questionGradingMethod === 'OptionWeighted'}
+										Specify exact reward point (+Pts) for each choice. Candidate will be awarded the points of the option they select.
+									{:else}
+										Click the badge pill to mark as {questionType === 'MultipleChoice' ? 'a correct answer' : 'the correct answer'}.
+									{/if}
 								</p>
 							</div>
 
@@ -464,7 +628,7 @@
 							{#each options as opt, idx (opt.id || idx)}
 								{@const letter = String.fromCharCode(65 + idx)}
 								<div
-									class="flex items-center gap-3 p-2.5 sm:p-3 rounded-2xl border transition-all {opt.isCorrect
+									class="flex items-center gap-2.5 p-2.5 sm:p-3 rounded-2xl border transition-all {opt.isCorrect
 										? 'border-success/40 bg-success/5 shadow-xs'
 										: 'border-base-content/10 bg-base-200/40 hover:bg-base-200/70'}"
 								>
@@ -493,6 +657,34 @@
 										class="input input-sm flex-1 bg-base-100/80 rounded-xl text-xs font-medium focus:bg-base-100 border-base-content/15"
 										required
 									/>
+
+									<!-- Custom Option Points (when OptionWeighted) -->
+									{#if questionGradingMethod === 'OptionWeighted'}
+										<div class="flex items-center gap-1.5 shrink-0">
+											<div class="flex items-center gap-1" title="Awarded points for choosing this option">
+												<span class="text-[10px] font-bold text-success">+</span>
+												<input
+													type="number"
+													step="0.5"
+													bind:value={opt.points}
+													placeholder="Pts"
+													class="input input-xs w-16 bg-base-100 rounded-lg text-center font-mono text-xs border-base-content/20 text-success font-bold"
+												/>
+											</div>
+											{#if questionType === 'MultipleChoice'}
+												<div class="flex items-center gap-1" title="Penalty deducted for choosing this option">
+													<span class="text-[10px] font-bold text-error">-</span>
+													<input
+														type="number"
+														step="0.5"
+														bind:value={opt.penaltyPoints}
+														placeholder="Pen"
+														class="input input-xs w-16 bg-base-100 rounded-lg text-center font-mono text-xs border-base-content/20 text-error font-bold"
+													/>
+												</div>
+											{/if}
+										</div>
+									{/if}
 
 									<!-- Remove Option Button -->
 									{#if questionType !== 'TrueFalse' && options.length > 2}

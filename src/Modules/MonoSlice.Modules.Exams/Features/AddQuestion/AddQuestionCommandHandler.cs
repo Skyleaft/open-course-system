@@ -67,7 +67,9 @@ public sealed class AddQuestionCommandHandler : ICommandHandler<AddQuestionComma
         var options = command.Options.Select(o => new QuestionOption(
             o.Id ?? Guid.CreateVersion7(),
             o.Text,
-            o.IsCorrect
+            o.IsCorrect,
+            o.Points,
+            o.PenaltyPoints
         )).ToList();
 
         var bankQuestion = bank.AddQuestion(
@@ -75,7 +77,8 @@ public sealed class AddQuestionCommandHandler : ICommandHandler<AddQuestionComma
             command.Type,
             command.Points,
             command.Explanation,
-            options);
+            options,
+            command.GradingMethod);
 
         // 2. If ExamId or SectionId provided, ensure QuizSection links to this QuestionBank
         Guid? sectionId = command.SectionId;
@@ -129,11 +132,12 @@ public sealed class AddQuestionCommandHandler : ICommandHandler<AddQuestionComma
             bankQuestion.Explanation,
             bank.Category,
             bank.Tags,
-            bankQuestion.Options.Select(o => new QuestionOptionDto(o.Id, o.Text, o.IsCorrect)).ToList(),
+            bankQuestion.Options.Select(o => new QuestionOptionDto(o.Id, o.Text, o.IsCorrect, o.Points, o.PenaltyPoints)).ToList(),
             bank.CreatedBy,
             bank.UpdatedBy,
             bank.CreatedAtUtc,
-            bank.Id);
+            bank.Id,
+            bankQuestion.GradingMethod.ToString());
 
         return ApiResponse.Ok(result, "Question added to bank successfully.");
     }

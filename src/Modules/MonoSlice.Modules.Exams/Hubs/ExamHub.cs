@@ -58,8 +58,10 @@ public sealed class ExamHub : Hub
 
         var examGroup = $"exam_{submissionId}";
         var proctorGroup = $"proctor_exam_{exam.Id}";
+        var roomGroup = $"exam_room_{exam.Id}";
 
         await Groups.AddToGroupAsync(Context.ConnectionId, examGroup);
+        await Groups.AddToGroupAsync(Context.ConnectionId, roomGroup);
 
         // Update student liveness in Redis
         await _cacheService.SetAsync($"exam_liveness:{submissionId}", true, TimeSpan.FromSeconds(30));
@@ -86,6 +88,21 @@ public sealed class ExamHub : Hub
 
         var proctorGroup = $"proctor_exam_{examId}";
         await Groups.AddToGroupAsync(Context.ConnectionId, proctorGroup);
+    }
+
+    public async Task BroadcastExamMessage(Guid examId, string message)
+    {
+        var isAuthorized = Context.User?.IsInRole("Admin") == true ||
+                           Context.User?.IsInRole("Instructor") == true ||
+                           Context.User?.IsInRole("Proctor") == true;
+
+        if (!isAuthorized)
+        {
+            throw new HubException("Unauthorized to broadcast to exam room.");
+        }
+
+        await Clients.Group($"exam_room_{examId}").SendAsync("ProctorMessage", message);
+        await Clients.Group($"proctor_exam_{examId}").SendAsync("RoomBroadcastSent", message, DateTime.UtcNow);
     }
 
     public async Task Heartbeat(Guid submissionId, string sessionToken)

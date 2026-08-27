@@ -2,13 +2,17 @@ using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Exams.Domain;
 using MonoSlice.Modules.Exams.Domain.Services;
+using MonoSlice.Modules.Exams.Features.Proctor.BroadcastExamMessage;
 using MonoSlice.Modules.Exams.Features.Proctor.ForceDisconnectCandidate;
+using MonoSlice.Modules.Exams.Features.Proctor.GetCandidateSnapshots;
 using MonoSlice.Modules.Exams.Features.Proctor.GetLiveCandidates;
 using MonoSlice.Modules.Exams.Features.Proctor.WarnCandidate;
 using MonoSlice.Modules.Exams.Hubs;
 using MonoSlice.Modules.Exams.Persistence;
+using MonoSlice.Shared.Abstractions.Contracts;
 using MonoSlice.Shared.Abstractions.Interfaces;
 using MonoSlice.Shared.Abstractions.Messaging;
+using MonoSlice.Shared.Abstractions.Storage;
 using NSubstitute;
 using Xunit;
 
@@ -22,6 +26,8 @@ public class ProctorControlCommandHandlerTests
     private readonly ICurrentUser _currentUser;
     private readonly IEventStreamPublisher _eventPublisher;
     private readonly IExamFinalizerService _finalizerService;
+    private readonly IIdentityModuleApi _identityModuleApi;
+    private readonly IObjectStorageService _storageService;
 
     public ProctorControlCommandHandlerTests()
     {
@@ -35,6 +41,8 @@ public class ProctorControlCommandHandlerTests
         _currentUser = Substitute.For<ICurrentUser>();
         _eventPublisher = Substitute.For<IEventStreamPublisher>();
         _finalizerService = new ExamFinalizerService(_dbContext, _cacheService, _eventPublisher);
+        _identityModuleApi = Substitute.For<IIdentityModuleApi>();
+        _storageService = Substitute.For<IObjectStorageService>();
 
         var clients = Substitute.For<IHubClients>();
         var clientProxy = Substitute.For<IClientProxy>();
@@ -89,6 +97,49 @@ public class ProctorControlCommandHandlerTests
     }
 
     [Fact]
+    public async Task BroadcastExamMessage_ShouldDispatchToRoom()
+    {
+        var exam = QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", 60, 70m);
+        await _dbContext.Exams.AddAsync(exam);
+        await _dbContext.SaveChangesAsync();
+
+        var handler = new BroadcastExamMessageCommandHandler(_dbContext, _hubContext);
+        var result = await handler.Handle(new BroadcastExamMessageCommand(exam.Id, "10 minutes remaining!"), CancellationToken.None);
+
+        Assert.True(result.Success);
+        _hubContext.Clients.Received(1).Group($"exam_room_{exam.Id}");
+        _hubContext.Clients.Received(1).Group($"proctor_exam_{exam.Id}");
+    }
+
+    [Fact]
+    public async Task GetCandidateSnapshots_ShouldReturnTimelineWithPresignedUrls()
+    {
+        var exam = QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", 60, 70m);
+        var studentId = Guid.CreateVersion7();
+        var submission = QuizSubmission.Create(exam.Id, studentId, 60, 12345, "token123");
+        submission.LogSnapshot("snapshots/exam1/student1/snap1.jpg");
+        submission.LogSnapshot("snapshots/exam1/student1/snap2.jpg");
+
+        await _dbContext.Exams.AddAsync(exam);
+        await _dbContext.Submissions.AddAsync(submission);
+        await _dbContext.SaveChangesAsync();
+
+        _storageService.GeneratePresignedDownloadUrlAsync(
+            "exam-snapshots",
+            Arg.Any<string>(),
+            Arg.Any<TimeSpan>())
+            .Returns("https://s3.local/presigned-url");
+
+        var handler = new GetCandidateSnapshotsQueryHandler(_dbContext, _storageService);
+        var result = await handler.Handle(new GetCandidateSnapshotsQuery(submission.Id), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data);
+        Assert.Equal(2, result.Data.Count);
+        Assert.Equal("https://s3.local/presigned-url", result.Data[0].PresignedUrl);
+    }
+
+    [Fact]
     public async Task GetLiveCandidates_ShouldReturnCandidateMetrics()
     {
         var exam = QuizExam.Create(Guid.CreateVersion7(), "Exam 1", "Desc", 60, 70m);
@@ -103,14 +154,28 @@ public class ProctorControlCommandHandlerTests
         _cacheService.GetAsync<bool?>($"exam_liveness:{submission.Id}", Arg.Any<CancellationToken>())
             .Returns(true);
 
-        var handler = new GetLiveCandidatesQueryHandler(_dbContext, _cacheService, _currentUser);
+        _identityModuleApi.GetUsersByIdsAsync(Arg.Any<IReadOnlyList<Guid>>(), Arg.Any<CancellationToken>())
+            .Returns(new List<UserContractDto>
+            {
+                new UserContractDto(studentId, "alex@example.com", "Alex Mercer", new[] { "Student" }, true, "alex", null)
+            });
+
+        var handler = new GetLiveCandidatesQueryHandler(
+            _dbContext,
+            _cacheService,
+            _currentUser,
+            _identityModuleApi,
+            _storageService);
+
         var result = await handler.Handle(new GetLiveCandidatesQuery(exam.Id), CancellationToken.None);
 
         Assert.True(result.Success);
         Assert.NotNull(result.Data);
         Assert.Single(result.Data);
         Assert.Equal(studentId, result.Data[0].StudentId);
+        Assert.Equal("Alex Mercer", result.Data[0].StudentName);
         Assert.Equal(1, result.Data[0].ViolationCount);
         Assert.True(result.Data[0].IsOnline);
     }
 }
+
