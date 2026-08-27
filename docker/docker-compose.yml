@@ -141,9 +141,9 @@ services:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_HTTP_PORTS=8080
       - ConnectionStrings__Database=${ConnectionStrings__Database:-Host=postgres;Port=5432;Database=${POSTGRES_DB:-lms_db};Username=${POSTGRES_USER:-lms_user};Password=${POSTGRES_PASSWORD:-lms_secret_password};}
-      - ConnectionStrings__Redis=${ConnectionStrings__Redis:-redis:6379,password=${REDIS_PASSWORD:-redis_secret_password}}
+      - ConnectionStrings__Redis=${ConnectionStrings__Redis:-redis:6379,password=${REDIS_PASSWORD:-redis_secret_password},abortConnect=false}
       - Cache__Provider=${Cache__Provider:-Redis}
-      - Cache__Redis__ConnectionString=${Cache__Redis__ConnectionString:-redis:6379,password=${REDIS_PASSWORD:-redis_secret_password}}
+      - Cache__Redis__ConnectionString=${Cache__Redis__ConnectionString:-redis:6379,password=${REDIS_PASSWORD:-redis_secret_password},abortConnect=false}
       - Minio__Endpoint=${Minio__Endpoint:-minio:9000}
       - Minio__PublicEndpoint=${Minio__PublicEndpoint:-http://localhost:9000}
       - Minio__AccessKey=${Minio__AccessKey:-${MINIO_ROOT_USER:-minioadmin}}
