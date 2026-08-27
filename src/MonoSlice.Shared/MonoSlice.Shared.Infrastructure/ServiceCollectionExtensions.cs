@@ -49,7 +49,15 @@ public static class ServiceCollectionExtensions
         {
             try
             {
-                signalR.AddStackExchangeRedis(redisConnStr);
+                var redisConfig = ConfigurationOptions.Parse(redisConnStr);
+                redisConfig.AbortOnConnectFail = false;
+                redisConfig.ConnectRetry = 5;
+                redisConfig.ConnectTimeout = 5000;
+
+                signalR.AddStackExchangeRedis(options =>
+                {
+                    options.Configuration = redisConfig;
+                });
             }
             catch
             {
@@ -82,15 +90,20 @@ public static class ServiceCollectionExtensions
 
         if (string.Equals(cacheSettings.Provider, "Redis", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(redisConnStr))
         {
+            var redisConfig = ConfigurationOptions.Parse(redisConnStr);
+            redisConfig.AbortOnConnectFail = false;
+            redisConfig.ConnectRetry = 5;
+            redisConfig.ConnectTimeout = 5000;
+
             services.AddStackExchangeRedisCache(options =>
             {
-                options.Configuration = redisConnStr;
+                options.ConfigurationOptions = redisConfig;
             });
             services.AddSingleton<ICacheService, RedisCacheService>();
 
             try
             {
-                var multiplexer = ConnectionMultiplexer.Connect(redisConnStr);
+                var multiplexer = ConnectionMultiplexer.Connect(redisConfig);
                 services.AddSingleton<IConnectionMultiplexer>(multiplexer);
                 services.AddSingleton<IDistributedLock, RedisDistributedLock>();
                 services.AddSingleton<IEventStreamPublisher, RedisEventStreamPublisher>();
