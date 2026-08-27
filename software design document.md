@@ -21,11 +21,10 @@ Sebagai **Open Course System**, platform ini dirancang dengan kapabilitas kustom
 +---------------------------------------------------------------------------------------------------------+
 |                                    CLIENT LAYER (SvelteKit V3 RC SPA/SSR)                               |
 |                                                                                                         |
-|  [ Student Portal ]                 [ Instructor & Admin Studio ]        [ Proctor / Live Monitor ]     |
-|  - Course Catalog & Checkout        - Curriculum & Section Builder       - Realtime Violation Feed      |
-|  - Video / PDF / Lesson Player      - Question Bank & Rubrics            - Force Disconnect / Warning   |
-|  - Realtime Exam Runner             - Dynamic Theme & Brand Customizer   - Candidate Snapshot Timeline  |
-|  - Certificate Verification         - Landing Section & Feature Switch   - Live Liveness Status         |
+|  [ Student Hub & Dashboard ]        [ Instructor & Admin Studio ]        [ Proctor / Live Monitor ]     |
+|  - Course Progress & Deadlines      - Financial GMV & DLQ Observability  - Realtime Violation Feed      |
+|  - Exam Runner & Competency Radar   - Question Psychometrics (p & D)     - Risk-Scored Examinee Grid    |
+|  - Cryptographic Certificates       - Curriculum & Theme Customizer      - Force Disconnect / Warning   |
 |                                                                                                         |
 |  Client Interceptors: Fullscreen Lock | Tab Visibility Detector | Audio/Video Analyser | Snapshot Engine|
 +------------------------------------+--------------------------------+-----------------------------------+
@@ -107,6 +106,14 @@ Sebagai **Open Course System**, platform ini dirancang dengan kapabilitas kustom
    - Modular Feature Switchboard (Public catalog, registration mode, payment gateway activation, certificate issuance, proctoring defaults, maintenance mode).
    - Landing Page Section Builder (Hero, Stats, Featured Courses, Feature Matrix, Testimonials, FAQ, CTA).
    - High-speed Redis caching (`customization:public`) dengan instant invalidation dan SSR hydration di SvelteKit.
+
+9. **Dashboard & Data Monitoring (Analytics & Observability Engine)**:
+   - Aggregated Read Model engine lintas bounded context untuk visualisasi data analitik dan monitoring real-time.
+   - **Executive Admin & System Observability**: Financial GMV & conversion metrics, pertumbuhan user & aktivitas role, Redis Stream grading queue lag, dead-letter queue (`stream:grading-dlq`), utilisasi storage MinIO S3, dan health metric cluster.
+   - **Instructor Analytics Studio**: Course funnel & completion rate, assignment grading backlog SLA, performa ujian & statistik seksi, serta psikometrik butir soal (Item Difficulty Index $p$ dan Discrimination Index $D$).
+   - **Proctor Realtime Operations Room**: Monitor kandidat aktif serentak, stream pelanggaran real-time dengan skoring resiko otomatis, serta visualisasi timeline snapshot anti-cheat.
+   - **Student Learning & Exam Hub**: Tracking progres belajar, timeline deadline tugas, jadwal ujian mandiri/kursus, riwayat nilai, dan sertifikat ber-hash kriptografis terbitan.
+   - Caching bertingkat pada Redis dengan sliding expiration dan invalidation berbasis domain event untuk menjaga latency query sub-50ms.
 
 ---
 
@@ -228,6 +235,18 @@ Sebagai **Open Course System**, platform ini dirancang dengan kapabilitas kustom
   - `SectionType` didukung: `Hero`, `StatsCounter`, `FeaturedCourses`, `FeaturesGrid`, `Testimonials`, `FaqAccordion`, `CtaBanner`.
   - `OrderIndex` menentukan posisi rendering pada landing page publik.
   - Bagian non-aktif (`IsActive = false`) difilter secara otomatis dari endpoint publik.
+
+### 3.8 Dashboard Aggregated Read Models & Telemetry Invariants
+- **Read Model Paradigm**: Seluruh data dashboard dioptimalkan sebagai Read-Only CQRS Projections & DTOs tanpa melakukan dirty tracking EF Core (`AsNoTracking()`).
+- **Granular Role Scoping & Multi-Tenancy Invariants**:
+  - **Admin Scope**: Akses tanpa batas ke seluruh matriks performa sistem, finansial, user audit, dan infrastructure health metrics (`stream:grading-dlq`, MinIO storage, Redis buffers).
+  - **Instructor Scope**: Dibatasi secara mutlak (`WHERE InstructorId == CurrentUser.Id` atau `CreatedBy == CurrentUser.Id`) pada kursus, ujian, penugasan, dan bank soal miliknya.
+  - **Proctor Scope**: Hanya dapat melihat sesi ujian aktif, antrian pelanggaran (`Violations`), dan snapshot peserta pada ujian yang ditugaskan.
+  - **Student Scope**: Dibatasi secara mutlak (`WHERE StudentId == CurrentUser.Id` atau `UserId == CurrentUser.Id`) untuk melihat progres belajar pribadi, riwayat nilai, sertifikat, dan submission miliknya.
+- **Item Difficulty ($p$) & Discrimination Index ($D$) Invariant**:
+  - Dihitung dari populasi submission yang telah berstatus `Completed`.
+  - $p = \frac{\text{Jumlah Peserta Menjawab Benar}}{\text{Total Peserta}}$. $p < 0.3$ diklasifikasikan sebagai *Hard*, $0.3 \le p \le 0.7$ sebagai *Medium*, $p > 0.7$ sebagai *Easy*.
+  - $D = \frac{U - L}{N/2}$, di mana $U$ adalah skor kelompok atas 27% dan $L$ adalah kelompok bawah 27%. $D \ge 0.3$ menandakan daya pembeda soal yang baik.
 
 ---
 
@@ -592,9 +611,162 @@ CREATE INDEX idx_settings_audit_key ON customization.settings_audit_logs(setting
 
 ---
 
-## 5. High-Concurrency Exam Buffering & Anti-Cheat Protocol
+## 6. Dashboard & Data Monitoring Engine (Real-time Analytics & Observability)
 
-### 5.1 Autosave with Redis Buffering & Disaster Recovery
+Dashboard Engine dirancang sebagai pusat kendali dan pemantauan data komprehensif yang mengonsolidasikan metrik dari seluruh bounded context (`identity`, `payments`, `courses`, `exams`, `assessments`, `communications`, dan `customization`). Arsitektur ini mengadopsi prinsip **Read-Model Projection** berkinerja tinggi, caching bertingkat berbasis Redis, dan visualisasi interaktif pada SvelteKit client.
+
+```
++----------------------------------------------------------------------------------------------------------------+
+|                                    DASHBOARD & MONITORING ARCHITECTURE TOPOLOGY                                |
++----------------------------------------------------------------------------------------------------------------+
+|                                                                                                                |
+|  [ SvelteKit Client Dashboards ]                                                                               |
+|  ├── Admin: Financial KPIs, User Growth, Infrastructure Health (DLQ, Redis Lag, S3), Global Security           |
+|  ├── Instructor: Course Funnel, Assignment SLA, Exam Score Distributions, Item Psychometrics (p & D Index)     |
+|  ├── Proctor: Real-time Examinee Stream, High-Risk Candidate Ranking, Live Violation Telemetry                |
+|  └── Student: Course Progression, Upcoming Deadlines, Exam Countdown, Competency Radar, Verifiable Certs       |
+|                                                                                                                |
++------------------------------------+---------------------------------------------------------------------------+
+                                     │ HTTPS REST Queries / SignalR Push
+                                     ▼
++------------------------------------+---------------------------------------------------------------------------+
+|                                   ASP.NET Core (.NET 10) Host Layer                                           |
+|                                                                                                                |
+|  [ Dashboard Feature Slices (CQRS Read Models) ]                                                               |
+|  - In-Memory Module APIs (`IIdentityModuleApi`, `IPaymentsModuleApi`, `ICoursesModuleApi`, etc.)                |
+|  - Asynchronous Aggregators with Zero DB locks (`AsNoTracking()`, CTEs & PostgreSQL Analytical Functions)      |
+|  - Realtime Alerting Worker for Dead-Letter Queue & Stream Health Monitoring                                  |
++-------------------+----------------+-----------------------------------+---------------------------------------+
+                    │                │                                   │
+                    │ 5s-15m Caching │ Stream Lag & Live Counts          │ MinIO Bucket Inspection
+                    ▼                ▼                                   ▼
++-------------------+----------------+-----------+   +-------------------+---------------------------------------+
+|                REDIS METRICS STORE             |   |             MINIO S3 OBSERVABILITY                    |
+|  - `cache:dashboard:admin:summary` (TTL 60s)   |   |  - Bucket `exam-snapshots`: Size, Count, Cleanup SLA  |
+|  - `cache:dashboard:instructor:{id}` (TTL 5m)  |   |  - Bucket `course-materials`: Video/PDF Storage Load  |
+|  - `cache:dashboard:student:{id}` (TTL 2m)     |   |  - Bucket `assignment-submissions`: File Utilization  |
+|  - `stream:grading-queue` Consumer Lag Metric  |   |                                                       |
+|  - `stream:grading-dlq` Poison Message Counter |   +-------------------------------------------------------+
++------------------------------------------------+
+                    │
+                    ▼
++----------------------------------------------------------------------------------------------------------------+
+|                                      POSTGRESQL MULTI-SCHEMA PERSISTENCE                                       |
+|  Identity │ Payments (Orders/GMV) │ Courses (Enrollments) │ Exams (Submissions/Items) │ Assessments (Certificates)|
++----------------------------------------------------------------------------------------------------------------+
+```
+
+### 6.1 Multi-Persona Dashboard Specifications
+
+#### A. Executive Admin & System Observability Studio
+1. **Financial & Commercial KPIs**:
+   - **Gross Merchandise Value (GMV)**: Total pendapatan kotor platform dan kurva tren harian/bulanan.
+   - **Order Conversion Rate**: Rasio konversi order (`Pending` $\rightarrow$ `Paid` vs `Failed`/`Expired`).
+   - **Top Performing Courses**: Peringkat kursus dengan volume penjualan dan pendapatan tertinggi.
+   - **Average Order Value (AOV)**: Rata-rata nilai transaksi per pesanan berhasil.
+2. **User & Identity Demographics**:
+   - Total pengguna terdaftar dikelompokkan berdasarkan Role (`Student`, `Instructor`, `Admin`, `Proctor`).
+   - Pertumbuhan pengguna baru harian (Signups vs OAuth Google Registrations).
+   - Metrik Daily Active Users (DAU) & Monthly Active Users (MAU).
+3. **Asynchronous Processing & Worker Health (Observability)**:
+   - **Redis Grading Stream Lag**: Selisih pesan pending pada `stream:grading-queue`.
+   - **Dead-Letter Queue (DLQ) Counter**: Jumlah pesan gagal/beracun yang belum terselesaikan di `stream:grading-dlq` beserta ringkasan error stack trace terakhir.
+   - **Worker Heartbeat Status**: Kondisi kesehatan consumer group background grading worker.
+4. **Storage & Cloud Asset Footprint**:
+   - Utilisasi kapasitas penyimpanan MinIO S3 per bucket (`exam-snapshots`, `course-materials`, `assignment-submissions`, `branding-assets`).
+   - Laju pertumbuhan file snapshot ujian dan efektivitas auto-cleanup lifecycle (30 hari).
+5. **Platform Security & Global Proctoring Telemetry**:
+   - Total sesi ujian aktif serentak (Real-time Concurrent Examinees).
+   - Tingkat diskualifikasi global (% peserta yang terdiskualifikasi otomatis).
+   - Distribusi tipe pelanggaran (Tab Switch, Fullscreen Exit, DevTools, Multiple Faces / Face Lost, Audio Spike).
+
+#### B. Instructor Course & Exam Analytics Studio
+1. **Course Funnel & Student Retention**:
+   - Total pendaftar aktif per kursus vs pendaftar selesai (Completion Rate).
+   - Drop-off rate: Analisis seksi/materi pelajaran dengan tingkat penghentian belajar tertinggi.
+   - Rata-rata durasi penyelesaian kursus oleh siswa.
+2. **Assignment SLA & Grading Backlog**:
+   - Jumlah submission tugas yang menunggu penilaian (`Score IS NULL`).
+   - Service Level Agreement (SLA) instruktur dalam memberikan umpan balik (rata-rata jam dari submit hingga graded).
+3. **Exam Performance & Score Distribution**:
+   - Distribusi skor peserta dalam bentuk Histogram / Kurva Normal (Rata-rata, Median, Modus, Nilai Minimum, Nilai Maksimum, Standar Deviasi).
+   - Rasio Kelulusan (Pass/Fail Rate) berdasarkan `PassingScore` ujian.
+   - Perbandingan rata-rata skor antar-seksi ujian (`QuizSection`).
+4. **Psychometric Item Analysis (Kesehatan Bank Soal)**:
+   - **Item Difficulty Index ($p$)**:
+     $$p = \frac{\text{Jumlah Peserta Menjawab Benar}}{\text{Total Peserta}}$$
+     - Klasifikasi: $p < 0.30$ (Sukar), $0.30 \le p \le 0.70$ (Sedang), $p > 0.70$ (Mudah).
+   - **Item Discrimination Index ($D$)**:
+     $$D = \frac{U - L}{N_{\text{group}}}$$
+     - Membandingkan performa 27% kelompok atas ($U$) vs 27% kelompok bawah ($L$). Soal dengan $D < 0.20$ ditandai untuk revisi instruktur.
+   - **Distractor Efficiency**: Analisis efektivitas pilihan pengecoh pada soal pilihan ganda.
+5. **Discussion Engagement**:
+   - Jumlah thread diskusi yang belum mendapatkan balasan dari pengajar (`Unanswered Threads`).
+   - Materi pelajaran dengan pertanyaan terbanyak untuk identifikasi materi yang butuh klarifikasi.
+
+#### C. Proctor Realtime Operations Room
+1. **Real-time Live Examinee Grid**:
+   - Grid monitoring interaktif yang menampilkan peserta ujian aktif, durasi tersisa, dan status koneksi SignalR.
+2. **Dynamic Risk-Scoring Engine**:
+   - Peringkat peserta berdasarkan kalkulasi skor risiko pelanggaran (`RiskScore = (TabSwitches \times 2) + (DevTools \times 5) + (AudioSpikes \times 1.5) + (FaceMissing \times 3)`).
+   - Indikator visual High-Risk (Merah), Medium-Risk (Kuning), Normal (Hijau).
+3. **Live Violation Stream & Audit Timeline**:
+   - Log pelanggaran real-time berurutan (timestamped) dengan link langsung ke snapshot MinIO S3 saat kejadian.
+4. **Direct Proctor Interventions**:
+   - Kirim peringatan langsung ke layar peserta (Direct Flash Message).
+   - Minta verifikasi snapshot manual (Request Snapshot).
+   - Diskualifikasi paksa seketika (Force Terminate / Disqualify) dengan alasan tercatat di audit log.
+
+#### D. Student Personal Learning & Examination Hub
+1. **Academic Progression & Learning Continuum**:
+   - Visual progress bar kursus yang sedang aktif dan tombol satu-klik "Continue Learning" ke lesson terakhir.
+2. **Upcoming Milestones & Urgency Matrix**:
+   - Daftar tenggat waktu penugasan yang akan datang (mendukung filter $\le 24$ jam, $\le 7$ hari).
+   - Jadwal ujian terjadwal dengan countdown timer otomatis.
+3. **Performance Scorecard & Competency Radar**:
+   - Radar chart kompetensi siswa berdasarkan tag/kategori dari soal yang dijawab benar.
+   - Riwayat nilai ujian dan penugasan dengan feedback instruktur.
+4. **Verifiable Digital Credentials**:
+   - Galeri sertifikat yang berhasil diperoleh, dilengkapi hash SHA-256 dan tombol salin link verifikasi publik.
+
+---
+
+### 6.2 Caching Strategy & Real-time Update Lifecycle
+
+Untuk menjamin efisiensi server dan responsivitas UI sub-50ms:
+1. **Tiered Redis Caching**:
+   - **Realtime Operational KPIs** (Examinees aktif, status server, queue DLQ): TTL 5–10 detik.
+   - **User/Instructor Aggregates** (Course progress, pending assignments): TTL 2–5 menit dengan sliding expiration.
+   - **Historical Financial & Analytics** (GMV 30-hari, Item psychometrics): TTL 15–60 menit.
+2. **Event-Driven Cache Invalidation**:
+   - `OrderPaidIntegrationEvent` $\rightarrow$ Invalidate `cache:dashboard:admin:*`.
+   - `ExamSubmittedIntegrationEvent` $\rightarrow$ Invalidate `cache:dashboard:instructor:exams:{examId}` dan `cache:dashboard:student:{studentId}`.
+   - `AssignmentGradedIntegrationEvent` $\rightarrow$ Invalidate `cache:dashboard:student:{studentId}`.
+3. **SignalR Push Updates**:
+   - `ExamHub` menyiarkan event pelanggaran secara instan ke room proctor (`ProctorMonitorGroup`).
+   - `NotificationHub` menyiarkan update status antrian DLQ ke `AdminAlertGroup` jika pesan gagal bertambah.
+
+---
+
+### 6.3 Dashboard REST API Endpoints & Request/Response Contracts
+
+| Endpoint | Method | Role | Description |
+| :--- | :--- | :--- | :--- |
+| `/api/v1/dashboard/admin/summary` | `GET` | `Admin` | Ringkasan KPI eksekutif (User count, Revenue GMV, Active exams, DLQ alerts). |
+| `/api/v1/dashboard/admin/revenue-analytics` | `GET` | `Admin` | Data time-series pendapatan, konversi pesanan, dan kursus terlaris. |
+| `/api/v1/dashboard/admin/system-health` | `GET` | `Admin` | Metrik Redis Stream lag, DLQ unresolved list, dan utilisasi storage MinIO. |
+| `/api/v1/dashboard/admin/security-violations` | `GET` | `Admin` | Statistik pelanggaran global dan tren diskualifikasi platform. |
+| `/api/v1/dashboard/instructor/overview` | `GET` | `Instructor`, `Admin` | Ringkasan instruktur (Total siswa, kursus aktif, tugas pending review). |
+| `/api/v1/dashboard/instructor/courses/{courseId}/analytics` | `GET` | `Instructor`, `Admin` | Analisis mendalam funnel kursus, completion rate, dan drop-off seksi. |
+| `/api/v1/dashboard/instructor/exams/{examId}/analytics` | `GET` | `Instructor`, `Admin` | Distribusi skor ujian, pass rate, dan psikometrik soal ($p$-value & $D$-index). |
+| `/api/v1/dashboard/proctor/live-summary` | `GET` | `Proctor`, `Instructor`, `Admin` | Status ujian aktif, daftar peserta berisiko tinggi, dan feed pelanggaran terbaru. |
+| `/api/v1/dashboard/student/overview` | `GET` | `Student`, `Instructor`, `Admin` | Progres kursus siswa, jadwal ujian, deadline tugas, dan sertifikat terbit. |
+
+---
+
+## 7. High-Concurrency Exam Buffering & Anti-Cheat Protocol
+
+### 7.1 Autosave with Redis Buffering & Disaster Recovery
 1. **Zero-DB Autosave (`POST /api/v1/exams/submissions/{submissionId}/answers`)**:
    - Seluruh jawaban yang diisi peserta dikirim ke endpoint autosave dan disimpan langsung ke Redis key `exam_answers:{submissionId}` (Hash / JSON) dengan TTL 4 jam.
    - Tidak ada operasi I/O database PostgreSQL selama pengerjaan ujian.
@@ -606,11 +778,11 @@ CREATE INDEX idx_settings_audit_key ON customization.settings_audit_logs(setting
 4. **Auto-Flush on Timeout / Abandonment**:
    - Jika waktu habis (`DateTime.UtcNow > MaxAllowedEndTimeUtc`), SignalR heartbeat atau background timeout checker mengeksekusi batch flush dan auto-grading.
 
-### 5.2 Deterministic Fisher-Yates Question & Option Shuffle
+### 7.2 Deterministic Fisher-Yates Question & Option Shuffle
 - Saat memulai attempt (`StartExam`), dihasilkan `randomSeed = Random.Shared.Next()`.
 - Algoritma PRNG Fisher-Yates mengacak urutan section, daftar soal dari Question Bank, dan opsi pilihan ganda secara deterministik menggunakan seed tersebut sehingga urutan konsisten pada setiap query ulang sesi siswa.
 
-### 5.3 Granular Anti-Cheat Interceptors & Ruleset Protocol
+### 7.3 Granular Anti-Cheat Interceptors & Ruleset Protocol
 SvelteKit Client mengaktifkan modul pencegahan kecurangan secara reaktif berdasarkan payload `appliedRules` yang diterima saat `StartExam`:
 1. **Tab & Window Visibility (`CanTabSwitch: false`)**:
    - Memonitor event `document.visibilitychange` dan `window.onblur`.
@@ -633,7 +805,7 @@ SvelteKit Client mengaktifkan modul pencegahan kecurangan secara reaktif berdasa
 
 ---
 
-## 6. SvelteKit V3 RC Frontend Architecture
+## 8. SvelteKit V3 RC Frontend Architecture
 
 - **Path Aliasing**: Menggunakan `#lib` untuk seluruh shared services, API wrappers, dan UI components.
 - **Design System & Dynamic Theming**: Glassmorphism (`backdrop-blur-xl`, translucent surface, vibrant glow borders) didukung oleh daisyUI 5 & Tailwind CSS 4. Token OKLCH dan variabel warna diinjeksikan secara reaktif dari payload `customization:public`.
@@ -641,4 +813,9 @@ SvelteKit Client mengaktifkan modul pencegahan kecurangan secara reaktif berdasa
 - **Rich Text Engine**: Edra (Tiptap + Svelte 5 Runes) untuk editing soal, LaTeX KaTeX formulas, code syntax highlighting, dan callouts.
 - **Dynamic Rule-Driven Exam Runner**: Client component yang secara reaktif mengaktifkan proctoring hooks (Fullscreen lock, Tab visibility detector, Keyboard interceptors, Web Worker Snapshot uploader, dan Audio Analyzer) sesuai spesifikasi `appliedRules`.
 - **Modular Admin Customization Studio**: Antarmuka visual untuk mengubah palet warna, konfigurasi landing page builder, toggle modul/fitur, manajemen ruleset ujian preset, dan upload aset brand ke MinIO.
+- **Interactive Dashboard & Telemetry Visualizers**:
+  - Komponen Card statistik Glassmorphism (`StatCard.svelte`, `GlassCard.svelte`) dengan indikator delta/tren positif-negatif.
+  - Charting engine interaktif (SVG / Canvas lightweight chart components) untuk kurva pendapatan GMV, histogram distribusi nilai, kurva retensi kursus, dan radar kompetensi siswa.
+  - Real-time Proctoring Grid & Live Violation Ticker dengan filter tingkat keparahan risiko.
+
 
