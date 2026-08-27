@@ -40,13 +40,52 @@ public class RegisterCommandHandlerTests
     }
 
     [Fact]
-    public async Task Handle_ShouldReturnSuccess_WhenRegistrationIsValid()
+    public async Task Handle_ShouldAssignAdminRole_WhenFirstUserRegisters()
     {
         // Arrange
         var command = new RegisterCommand
         {
-            Email = "newuser@example.com",
-            UserName = "newuser",
+            Email = "admin@example.com",
+            UserName = "adminuser",
+            Password = "Password123!",
+            FirstName = "Super",
+            LastName = "Admin",
+            FullName = "Super Admin"
+        };
+
+        _userManager.FindByEmailAsync(command.Email)
+            .Returns((ApplicationUser?)null);
+
+        _userManager.Users
+            .Returns(new List<ApplicationUser>().AsQueryable());
+
+        _userManager.CreateAsync(Arg.Any<ApplicationUser>(), command.Password)
+            .Returns(IdentityResult.Success);
+
+        _userManager.AddToRoleAsync(Arg.Any<ApplicationUser>(), "Admin")
+            .Returns(IdentityResult.Success);
+
+        // Act
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        // Assert
+        Assert.True(result.Success);
+        Assert.NotNull(result.Data);
+        Assert.Equal(command.Email, result.Data.Email);
+        Assert.Equal(command.UserName, result.Data.UserName);
+        Assert.Equal("Super Admin", result.Data.FullName);
+        Assert.Contains("Admin", result.Data.Roles);
+    }
+
+    [Fact]
+    public async Task Handle_ShouldAssignStudentRole_WhenNotFirstUser()
+    {
+        // Arrange
+        var existingUser = new ApplicationUser("existingadmin", "admin@example.com");
+        var command = new RegisterCommand
+        {
+            Email = "student@example.com",
+            UserName = "studentuser",
             Password = "Password123!",
             FirstName = "John",
             LastName = "Doe",
@@ -55,6 +94,9 @@ public class RegisterCommandHandlerTests
 
         _userManager.FindByEmailAsync(command.Email)
             .Returns((ApplicationUser?)null);
+
+        _userManager.Users
+            .Returns(new List<ApplicationUser> { existingUser }.AsQueryable());
 
         _userManager.CreateAsync(Arg.Any<ApplicationUser>(), command.Password)
             .Returns(IdentityResult.Success);
