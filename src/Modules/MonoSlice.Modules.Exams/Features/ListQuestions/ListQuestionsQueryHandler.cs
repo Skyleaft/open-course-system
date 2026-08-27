@@ -65,7 +65,8 @@ public sealed class ListQuestionsQueryHandler : IQueryHandler<ListQuestionsQuery
                 x.Question.OrderIndex,
                 x.Question.Explanation,
                 x.Question.Options,
-                x.Bank.CreatedAtUtc
+                x.Bank.CreatedAtUtc,
+                x.Question.GradingMethod.ToString()
             ))
             .ToListAsync(cancellationToken);
 

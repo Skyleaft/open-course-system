@@ -42,11 +42,12 @@ public sealed class GetQuestionQueryHandler : IQueryHandler<GetQuestionQuery, Ap
             question.Explanation,
             bank?.Category,
             bank?.Tags ?? [],
-            question.Options.Select(o => new QuestionOptionDto(o.Id, o.Text, o.IsCorrect)).ToList(),
+            question.Options.Select(o => new QuestionOptionDto(o.Id, o.Text, o.IsCorrect, o.Points, o.PenaltyPoints)).ToList(),
             bank?.CreatedBy ?? Guid.Empty,
             bank?.UpdatedBy,
             bank?.CreatedAtUtc ?? DateTime.UtcNow,
-            question.BankId
+            question.BankId,
+            question.GradingMethod.ToString()
         );
 
         return ApiResponse.Ok(result);

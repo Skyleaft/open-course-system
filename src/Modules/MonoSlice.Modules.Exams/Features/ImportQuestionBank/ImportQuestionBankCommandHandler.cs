@@ -96,7 +96,9 @@ public sealed class ImportQuestionBankCommandHandler : ICommandHandler<ImportQue
             var options = q.Options.Select(o => new QuestionOption(
                 Guid.CreateVersion7(),
                 o.Text,
-                o.IsCorrect
+                o.IsCorrect,
+                o.Points,
+                o.PenaltyPoints
             ));
 
             bank.AddQuestion(
@@ -104,7 +106,8 @@ public sealed class ImportQuestionBankCommandHandler : ICommandHandler<ImportQue
                 q.Type,
                 q.Points > 0 ? q.Points : 1m,
                 q.Explanation,
-                options);
+                options,
+                q.GradingMethod);
         }
 
         await _dbContext.SaveChangesAsync(cancellationToken);

@@ -265,6 +265,7 @@ export interface AdminEnrollStudentResultDto {
 // Exam Types
 export type QuizMode = 'Simulation' | 'RealExam';
 export type QuestionType = 'SingleChoice' | 'MultipleChoice' | 'Essay' | 'TrueFalse';
+export type GradingMethod = 'AllOrNothing' | 'PartialWithPenalty' | 'PartialWithoutPenalty' | 'OptionWeighted';
 export type SubmissionStatus = 'InProgress' | 'Completed' | 'Disqualified' | 'TimedOut';
 
 export interface ExamRuleConfig {
@@ -324,6 +325,8 @@ export interface QuestionOption {
 	id: string;
 	text: string;
 	isCorrect?: boolean;
+	points?: number;
+	penaltyPoints?: number;
 }
 
 export interface QuestionBank {
@@ -352,6 +355,7 @@ export interface BankQuestion {
 	questionText?: string;
 	text?: string;
 	type: QuestionType;
+	gradingMethod?: GradingMethod;
 	points: number;
 	orderIndex?: number;
 	explanation?: string;

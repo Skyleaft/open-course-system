@@ -25,5 +25,6 @@ public sealed record QuestionItemDto(
     int OrderIndex,
     string? Explanation,
     List<QuestionOption> Options,
-    DateTime CreatedAtUtc
+    DateTime CreatedAtUtc,
+    string GradingMethod = nameof(Domain.GradingMethod.PartialWithPenalty)
 );

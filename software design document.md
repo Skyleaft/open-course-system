@@ -140,7 +140,7 @@ Sebagai **Open Course System**, platform ini dirancang dengan kapabilitas kustom
 |  QuestionBank (Aggregate Root - Question Package)                                                 |
 |  - Id, Title, Description, Category, Tags, CreatedBy, UpdatedBy, CreatedAtUtc, UpdatedAtUtc      |
 |  └── BankQuestion (Entity) [0..*]                                                                |
-|      - Id, BankId, QuestionText, Type, Points, OrderIndex, Explanation, Options (JSONB)           |
+|      - Id, BankId, QuestionText, Type, GradingMethod, Points, OrderIndex, Explanation, Options (JSONB) |
 |                                                                                                   |
 |  ExamRule (Aggregate Root - Ruleset Presets & Policies)                                           |
 |  - Id, Name, Description, IsSystemPreset, CanTabSwitch, MaxTabSwitchesAllowed                     |
@@ -191,8 +191,13 @@ Sebagai **Open Course System**, platform ini dirancang dengan kapabilitas kustom
 - **Invariants**:
   - Merepresentasikan wadah/paket kumpulan soal yang mandiri dan decoupled dari ujian atau kursus tertentu.
   - Memiliki audit tracking (`CreatedBy`, `UpdatedBy`, `CreatedAtUtc`, `UpdatedAtUtc`).
-  - Mengelola daftar `BankQuestion`. Setiap pertanyaan menyimpan default points, options JSONB, explanation, serta orderIndex.
+  - Mengelola daftar `BankQuestion`. Setiap pertanyaan menyimpan default points, grading method (`GradingMethod`), options JSONB, explanation, serta orderIndex.
   - Opsi jawaban minimal 2 untuk pilihan ganda, dan tepat 1 kunci benar untuk `SingleChoice` & `TrueFalse`.
+  - **Grading Strategy Support**:
+    - `AllOrNothing`: Peserta wajib memilih seluruh opsi benar tanpa memilih opsi salah satupun.
+    - `PartialWithPenalty`: Penilaian proporsional berdasarkan jumlah opsi benar yang dipilih dikurangi penalti opsi salah ($Score = \max(0, (\text{CorrectSelected} \times \text{PointPerCorrect}) - (\text{IncorrectSelected} \times \text{PenaltyPerIncorrect}))$) untuk mencegah *Select-All Exploit*.
+    - `PartialWithoutPenalty`: Penilaian proporsional untuk setiap opsi benar yang dipilih tanpa penalti jika tidak ada opsi salah.
+    - `OptionWeighted`: Menjumlahkan bobot individual (`Points` - `PenaltyPoints`) dari setiap opsi yang dipilih (mendukung survei, skala Likert, dan psikometrik).
 
 ### 3.3 ExamRule Aggregate
 - **Root**: `ExamRule`
@@ -388,10 +393,11 @@ CREATE TABLE exams.bank_questions (
     bank_id UUID NOT NULL REFERENCES exams.question_banks(id) ON DELETE CASCADE,
     question_text TEXT NOT NULL,
     type VARCHAR(50) NOT NULL, -- SingleChoice, MultipleChoice, Essay, TrueFalse
+    grading_method VARCHAR(50) NOT NULL DEFAULT 'PartialWithPenalty', -- AllOrNothing, PartialWithPenalty, PartialWithoutPenalty, OptionWeighted
     points NUMERIC(5, 2) NOT NULL DEFAULT 1.00,
     order_index INT NOT NULL DEFAULT 1,
     explanation TEXT,
-    options JSONB NOT NULL DEFAULT '[]' -- Array of { id: UUID, text: string, isCorrect: boolean }
+    options JSONB NOT NULL DEFAULT '[]' -- Array of { id: UUID, text: string, isCorrect: boolean, points: numeric, penaltyPoints: numeric }
 );
 CREATE INDEX idx_bank_questions_bank ON exams.bank_questions(bank_id);
 
@@ -802,6 +808,24 @@ SvelteKit Client mengaktifkan modul pencegahan kecurangan secara reaktif berdasa
    - Menjalankan `AudioContext` & `AnalyserNode` untuk mendeteksi lonjakan intensitas suara percakapan yang mencurigakan di sekitar peserta.
 7. **Automated Disqualification & Proctor Escalation**:
    - Jika `AutoDisqualifyOnExceed = true` dan `Violations.Count >= MaxAllowedViolations`, SignalR `ExamHub` otomatis mendiskualifikasi submission, melakukan flush jawaban dari Redis, dan memutuskan sambungan klien secara permanen.
+
+### 7.4 Automated Objective Grading Engine & Multi-Strategy Scoring
+Sistem evaluasi otomatis (`ExamFinalizerService`) mendukung berbagai strategi penilaian soal pilihan ganda maupun skala psikometrik/Likert:
+
+1. **Multiple Choice Multiple Answer (Multi-Select)**:
+   - **`PartialWithPenalty` (Default & Rekomendasi)**: Menilai secara proporsional jawaban benar dan memberikan penalti proporsional untuk jawaban salah yang dicentang guna mencegah *Select-All Exploit*.
+     $$\text{Earned Score} = \max\Big(0, (\text{CorrectSelected} \times \text{PointPerCorrect}) - (\text{IncorrectSelected} \times \text{PenaltyPerIncorrect})\Big)$$
+     di mana $\text{PointPerCorrect} = \frac{\text{QuestionPoints}}{|\text{CorrectOptions}|}$ dan $\text{PenaltyPerIncorrect} = \frac{\text{QuestionPoints}}{\max(1, |\text{IncorrectOptions}|)}$. Skor akhir dibulatkan 2 desimal dan dibatasi di interval $[0, \text{QuestionPoints}]$.
+   - **`AllOrNothing`**: Peserta hanya memperoleh poin penuh jika mencentang seluruh opsi benar tanpa ada satupun opsi salah yang dipilih ($\text{Selected} = \text{CorrectOptions}$).
+   - **`PartialWithoutPenalty`**: Memberikan kredit proporsional untuk jawaban benar yang dicentang, asalkan tidak ada satupun pilihan salah yang dicentang.
+   - **`OptionWeighted`**: Menghitung skor berdasarkan penjumlahan bobot poin individual dari tiap pilihan yang dipilih peserta:
+     $$\text{Earned Score} = \max\Big(0, \min\Big(\text{QuestionPoints}, \sum_{o \in \text{Selected}} (o.\text{Points} - o.\text{PenaltyPoints})\Big)\Big)$$
+
+2. **Word Question Bank Parser Enhanced Syntax**:
+   Engine parser `.docx` (`WordQuestionBankService`) secara otomatis mendeteksi:
+   - **Format Standar Multi-Jawaban**: Mendukung `Answer: A, C` atau tanda bintang `*A. ... *C.` dan otomatis mengonfigurasi `GradingMethod.PartialWithPenalty`.
+   - **Deklarasi Strategi Penilaian**: Baris `Grading: AllOrNothing` atau `Grading: PartialWithPenalty` atau `Grading: OptionWeighted`.
+   - **Poin Individual per Opsi**: Sintaks `A. [Points: 5] Teks opsi` atau `A. (+5) Teks opsi` untuk soal berbobot bertingkat/Likert scale.
 
 ---
 

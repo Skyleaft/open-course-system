@@ -15,6 +15,8 @@ public sealed partial class UpdateQuestionCommand : ICommand<ApiResponse<Questio
 
     public QuestionType Type { get; init; } = QuestionType.SingleChoice;
 
+    public GradingMethod? GradingMethod { get; init; }
+
     public decimal Points { get; init; } = 1m;
 
     public string? Explanation { get; init; }

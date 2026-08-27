@@ -112,31 +112,87 @@ public sealed class ExamFinalizerService : IExamFinalizerService
                     .Select(o => o.Id)
                     .ToHashSet();
 
+                decimal questionAwardedScore = 0m;
+
                 switch (question.Type)
                 {
                     case QuestionType.SingleChoice:
                     case QuestionType.TrueFalse:
-                        if (answer.SelectedOptionIds.Count == 1 && correctOptionIds.Contains(answer.SelectedOptionIds[0]))
+                        if (answer.SelectedOptionIds.Count == 1)
                         {
-                            answer.SetAwardedScore(points);
-                            earnedPoints += points;
-                        }
-                        else
-                        {
-                            answer.SetAwardedScore(0m);
+                            var selectedId = answer.SelectedOptionIds[0];
+                            if (question.GradingMethod == GradingMethod.OptionWeighted)
+                            {
+                                var chosenOpt = question.Options.FirstOrDefault(o => o.Id == selectedId);
+                                if (chosenOpt is not null)
+                                {
+                                    questionAwardedScore = Math.Max(0m, Math.Min(points, chosenOpt.Points));
+                                }
+                            }
+                            else if (correctOptionIds.Contains(selectedId))
+                            {
+                                questionAwardedScore = points;
+                            }
                         }
                         break;
 
                     case QuestionType.MultipleChoice:
-                        var selected = answer.SelectedOptionIds.ToHashSet();
-                        if (selected.SetEquals(correctOptionIds))
+                        var selectedOptionIds = answer.SelectedOptionIds.ToHashSet();
+                        var correctOptions = question.Options.Where(o => o.IsCorrect).ToList();
+                        var incorrectOptions = question.Options.Where(o => !o.IsCorrect).ToList();
+
+                        var correctSelectedCount = selectedOptionIds.Count(id => correctOptions.Any(c => c.Id == id));
+                        var incorrectSelectedCount = selectedOptionIds.Count(id => incorrectOptions.Any(i => i.Id == id));
+
+                        switch (question.GradingMethod)
                         {
-                            answer.SetAwardedScore(points);
-                            earnedPoints += points;
-                        }
-                        else
-                        {
-                            answer.SetAwardedScore(0m);
+                            case GradingMethod.AllOrNothing:
+                                if (correctOptions.Count > 0 &&
+                                    correctSelectedCount == correctOptions.Count &&
+                                    incorrectSelectedCount == 0)
+                                {
+                                    questionAwardedScore = points;
+                                }
+                                break;
+
+                            case GradingMethod.PartialWithPenalty:
+                                if (correctOptions.Count > 0)
+                                {
+                                    decimal pointPerCorrect = points / correctOptions.Count;
+                                    decimal penaltyPerIncorrect = incorrectOptions.Count > 0
+                                        ? points / incorrectOptions.Count
+                                        : pointPerCorrect;
+
+                                    decimal earned = (correctSelectedCount * pointPerCorrect) - (incorrectSelectedCount * penaltyPerIncorrect);
+                                    questionAwardedScore = Math.Max(0m, Math.Min(points, Math.Round(earned, 2)));
+                                }
+                                break;
+
+                            case GradingMethod.PartialWithoutPenalty:
+                                if (correctOptions.Count > 0 && incorrectSelectedCount == 0)
+                                {
+                                    decimal pointPerCorrect = points / correctOptions.Count;
+                                    decimal earned = correctSelectedCount * pointPerCorrect;
+                                    questionAwardedScore = Math.Max(0m, Math.Min(points, Math.Round(earned, 2)));
+                                }
+                                break;
+
+                            case GradingMethod.OptionWeighted:
+                                decimal totalWeighted = 0m;
+                                foreach (var optId in selectedOptionIds)
+                                {
+                                    var opt = question.Options.FirstOrDefault(o => o.Id == optId);
+                                    if (opt is not null)
+                                    {
+                                        totalWeighted += opt.Points;
+                                        if (opt.PenaltyPoints > 0m)
+                                        {
+                                            totalWeighted -= opt.PenaltyPoints;
+                                        }
+                                    }
+                                }
+                                questionAwardedScore = Math.Max(0m, Math.Min(points, Math.Round(totalWeighted, 2)));
+                                break;
                         }
                         break;
 
@@ -144,6 +200,9 @@ public sealed class ExamFinalizerService : IExamFinalizerService
                         // Essay score remains pending manual grading
                         break;
                 }
+
+                answer.SetAwardedScore(questionAwardedScore);
+                earnedPoints += questionAwardedScore;
             }
         }
 
