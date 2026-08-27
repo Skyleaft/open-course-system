@@ -2,12 +2,14 @@
 	import { Edra, createEditor } from '$lib/components/edra/shadcn/index.ts';
 	import '$lib/components/edra/shadcn/editor.css';
 	import '$lib/components/edra/onedark.css';
+	import SimpleToolbar from './SimpleToolbar.svelte';
 	import { untrack } from 'svelte';
 
 	interface Props {
 		content?: string;
 		placeholder?: string;
 		readonly?: boolean;
+		variant?: 'full' | 'simple';
 		minHeight?: string;
 		onUpdate?: (jsonContent: string, htmlContent: string) => void;
 		onFileUpload?: (file: File) => Promise<string>;
@@ -17,7 +19,8 @@
 		content = $bindable(''),
 		placeholder = 'Write something or press "/" for commands...',
 		readonly = false,
-		minHeight = '220px',
+		variant = 'full',
+		minHeight = variant === 'simple' ? '100px' : '220px',
 		onUpdate,
 		onFileUpload
 	}: Props = $props();
@@ -81,13 +84,17 @@
 		<Edra {editor}>
 			{#if !readonly}
 				<div class="sticky top-0 z-10 border-b border-base-content/10 px-2 py-1.5 backdrop-blur-xl bg-base-200/60 rounded-t-2xl">
-					<Edra.Toolbar />
+					{#if variant === 'simple'}
+						<SimpleToolbar />
+					{:else}
+						<Edra.Toolbar />
+					{/if}
 				</div>
 			{/if}
 
 			<div class="prose dark:prose-invert max-w-none px-4 py-3 focus:outline-none text-base-content text-sm leading-relaxed" style="min-height: {minHeight};">
 				<Edra.Content />
-				{#if !readonly}
+				{#if !readonly && variant === 'full'}
 					<Edra.BubbleMenu />
 					<Edra.DragHandle />
 				{/if}

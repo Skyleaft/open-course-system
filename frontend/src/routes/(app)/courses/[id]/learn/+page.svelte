@@ -332,6 +332,8 @@
 
 							<RichEditor
 								bind:content={newThreadContent}
+								variant="simple"
+								minHeight="100px"
 								placeholder="Describe your question or discussion in detail..."
 							/>
 

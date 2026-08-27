@@ -12,5 +12,6 @@ public sealed partial class PostThreadCommentCommand : ICommand<ApiResponse<Thre
     public Guid? ParentCommentId { get; init; }
 
     [Required]
+    [StringLength(50000, MinimumLength = 1)]
     public string Content { get; init; } = string.Empty;
 }
