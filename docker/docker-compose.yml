@@ -3,13 +3,14 @@ services:
   # 1. DATABASE ENGINE (PostgreSQL - Latest)
   # =========================================================================
   postgres:
-    image: postgres:alpine
+    image: postgres:17-alpine
     container_name: lms-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-lms_db}
       POSTGRES_USER: ${POSTGRES_USER:-lms_user}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lms_secret_password}
+      PGDATA: /var/lib/postgresql/data
     ports:
       - "5432:5432"
     volumes:
@@ -100,7 +101,6 @@ services:
       - COLLECTOR_OTLP_ENABLED=true
     ports:
       - "16686:16686" # Jaeger Web UI
-      - "4317:4317"   # Internal gRPC
     networks:
       - lms-network
 
