@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MonoSlice.Modules.Assessments.Contracts;
 using MonoSlice.Modules.Assessments.EventHandlers;
 using MonoSlice.Modules.Assessments.Features.Admin.GetDeadLetters;
+using MonoSlice.Modules.Assessments.Features.Admin.GetSystemHealth;
 using MonoSlice.Modules.Assessments.Features.Admin.RedriveDeadLetter;
 using MonoSlice.Modules.Assessments.Features.GetCertificate;
 using MonoSlice.Modules.Assessments.Features.GetMyCertificates;
@@ -80,6 +81,10 @@ public static class AssessmentsModule
 
         adminDlqGroup.MapGetDeadLettersEndpoint();
         adminDlqGroup.MapRedriveDeadLetterEndpoint();
+
+        var dashboardGroup = app.MapGroup("/api/v1")
+            .WithTags("Dashboard");
+        dashboardGroup.MapGetSystemHealthEndpoint();
 
         return app;
     }

@@ -26,6 +26,9 @@ using MonoSlice.Modules.Exams.Features.SaveAnswer;
 using MonoSlice.Modules.Exams.Features.StartExam;
 using MonoSlice.Modules.Exams.Features.SubmitExam;
 using MonoSlice.Modules.Exams.Features.UpdateExam;
+using MonoSlice.Modules.Exams.Features.Analytics.GetExamAnalytics;
+using MonoSlice.Modules.Exams.Features.Analytics.GetSecurityViolationsSummary;
+using MonoSlice.Modules.Exams.Features.Proctor.GetProctorLiveSummary;
 using MonoSlice.Modules.Exams.Features.CreateQuestionBank;
 using MonoSlice.Modules.Exams.Features.DeleteQuestionBank;
 using MonoSlice.Modules.Exams.Features.GetQuestionBank;
@@ -145,6 +148,12 @@ public static class ExamsModule
         proctorV1Group.MapWarnCandidateEndpoint();
         proctorV1Group.MapBroadcastExamMessageEndpoint();
         proctorV1Group.MapForceDisconnectCandidateEndpoint();
+
+        var dashboardGroup = app.MapGroup("/api/v1")
+            .WithTags("Dashboard");
+        dashboardGroup.MapGetExamAnalyticsEndpoint();
+        dashboardGroup.MapGetSecurityViolationsSummaryEndpoint();
+        dashboardGroup.MapGetProctorLiveSummaryEndpoint();
 
         return app;
     }

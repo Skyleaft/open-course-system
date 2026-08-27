@@ -30,6 +30,8 @@ using MonoSlice.Modules.Catalog.Features.GetEnrolledCourses;
 using MonoSlice.Modules.Catalog.Features.GetCourseEnrollments;
 using MonoSlice.Modules.Catalog.Features.AdminEnrollStudent;
 using MonoSlice.Modules.Catalog.Features.AdminRemoveEnrollment;
+using MonoSlice.Modules.Catalog.Features.Analytics.GetCourseAnalytics;
+using MonoSlice.Modules.Catalog.Features.Dashboard.GetStudentDashboardOverview;
 using MonoSlice.Modules.Catalog.Persistence;
 using MonoSlice.Shared.Abstractions.Contracts;
 using MonoSlice.Shared.Abstractions.Messaging;
@@ -108,6 +110,11 @@ public static class CatalogModule
         coursesV1Group.MapSubmitAssignmentEndpoint();
         coursesV1Group.MapAttachExamEndpoint();
         coursesV1Group.MapDetachExamEndpoint();
+
+        var dashboardGroup = app.MapGroup("/api/v1")
+            .WithTags("Dashboard");
+        dashboardGroup.MapGetCourseAnalyticsEndpoint();
+        dashboardGroup.MapGetStudentDashboardOverviewEndpoint();
 
         return app;
     }

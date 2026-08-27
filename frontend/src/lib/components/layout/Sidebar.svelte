@@ -13,7 +13,9 @@
 		ShieldCheck,
 		FileCheck2,
 		HelpCircle,
-		Sliders
+		Sliders,
+		BarChart3,
+		Activity
 	} from '@lucide/svelte';
 
 	interface Props {
@@ -157,6 +159,17 @@
 						</li>
 						<li>
 							<a
+								href="/instructor/analytics"
+								class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors {isActive('/instructor/analytics')
+									? 'bg-secondary/15 text-secondary font-semibold border border-secondary/20'
+									: 'text-base-content/80 hover:bg-base-100/40 hover:text-base-content'}"
+							>
+								<BarChart3 class="h-4 w-4" />
+								Analytics Studio
+							</a>
+						</li>
+						<li>
+							<a
 								href="/instructor/settings"
 								class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors {isActive('/instructor/settings')
 									? 'bg-primary/15 text-primary font-semibold border border-primary/20'
@@ -184,6 +197,26 @@
 							>
 								<ShieldCheck class="h-4 w-4" />
 								Live Examination Monitor
+							</a>
+						</li>
+					</ul>
+				</div>
+			{/if}
+
+			<!-- Admin Console -->
+			{#if authStore.isAdmin}
+				<div>
+					<div class="px-3 mb-2 text-[10px] font-bold uppercase tracking-wider text-primary/70">Administration</div>
+					<ul class="space-y-1">
+						<li>
+							<a
+								href="/admin/dashboard"
+								class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors {isActive('/admin/dashboard')
+									? 'bg-primary/15 text-primary font-semibold border border-primary/20'
+									: 'text-base-content/80 hover:bg-base-100/40 hover:text-base-content'}"
+							>
+								<Activity class="h-4 w-4 text-primary" />
+								Observability Hub
 							</a>
 						</li>
 					</ul>
