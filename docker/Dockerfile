@@ -1,4 +1,4 @@
-# Stage 1: Build & Publish with IL Trimming
+# Stage 1: Build & Publish
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /app
 
@@ -20,17 +20,13 @@ COPY src/MonoSlice.Host/*.csproj ./src/MonoSlice.Host/
 
 RUN dotnet restore src/MonoSlice.Host/MonoSlice.Host.csproj
 
-# Copy source tree and publish self-contained trimmed binary
+# Copy source tree and publish
 COPY . .
 WORKDIR /app/src/MonoSlice.Host
-RUN dotnet publish -c Release -r linux-x64 --self-contained \
-    -p:PublishTrimmed=true \
-    -p:TrimMode=partial \
-    -p:StripSymbols=true \
-    -o /out
+RUN dotnet publish -c Release -o /out
 
-# Stage 2: Ultra-lightweight Chiseled / Distroless Runtime with ICU support (~60MB total image size)
-FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble-chiseled-extra AS runtime
+# Stage 2: ASP.NET Core Runtime (Secure chiseled image with ICU and complete System.Text.Json reflection support)
+FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble-chiseled-extra AS runtime
 WORKDIR /app
 
 EXPOSE 8080
@@ -39,5 +35,5 @@ ENV ASPNETCORE_ENVIRONMENT=Production
 
 COPY --from=build /out .
 
-# Run self-contained executable directly
-ENTRYPOINT ["./MonoSlice.Host"]
+# Run ASP.NET Core Web Host
+ENTRYPOINT ["dotnet", "MonoSlice.Host.dll"]

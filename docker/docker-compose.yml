@@ -6,6 +6,8 @@ services:
     image: postgres:17-alpine
     container_name: lms-postgres
     restart: unless-stopped
+    env_file:
+      - ../.env
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-lms_db}
       POSTGRES_USER: ${POSTGRES_USER:-lms_user}
@@ -31,6 +33,8 @@ services:
     image: redis:alpine
     container_name: lms-redis
     restart: unless-stopped
+    env_file:
+      - ../.env
     command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-redis_secret_password}"]
     ports:
       - "6379:6379"
@@ -51,6 +55,8 @@ services:
     image: minio/minio:latest
     container_name: lms-minio
     restart: unless-stopped
+    env_file:
+      - ../.env
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
@@ -129,19 +135,32 @@ services:
     image: lms-backend:latest
     container_name: lms-api
     restart: unless-stopped
+    env_file:
+      - ../.env
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_HTTP_PORTS=8080
-      - ConnectionStrings__Database=Host=postgres;Port=5432;Database=${POSTGRES_DB:-lms_db};Username=${POSTGRES_USER:-lms_user};Password=${POSTGRES_PASSWORD:-lms_secret_password};
-      - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-redis_secret_password}
-      - Minio__Endpoint=minio:9000
-      - Minio__PublicEndpoint=http://localhost:9000
-      - Minio__AccessKey=${MINIO_ROOT_USER:-minioadmin}
-      - Minio__SecretKey=${MINIO_ROOT_PASSWORD:-minioadmin123}
-      - Minio__UseSSL=false
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-      - OTEL_SERVICE_NAME=lms-modular-api
+      - ConnectionStrings__Database=${ConnectionStrings__Database:-Host=postgres;Port=5432;Database=${POSTGRES_DB:-lms_db};Username=${POSTGRES_USER:-lms_user};Password=${POSTGRES_PASSWORD:-lms_secret_password};}
+      - ConnectionStrings__Redis=${ConnectionStrings__Redis:-redis:6379,password=${REDIS_PASSWORD:-redis_secret_password}}
+      - Cache__Provider=${Cache__Provider:-Redis}
+      - Cache__Redis__ConnectionString=${Cache__Redis__ConnectionString:-redis:6379,password=${REDIS_PASSWORD:-redis_secret_password}}
+      - Minio__Endpoint=${Minio__Endpoint:-minio:9000}
+      - Minio__PublicEndpoint=${Minio__PublicEndpoint:-http://localhost:9000}
+      - Minio__AccessKey=${Minio__AccessKey:-${MINIO_ROOT_USER:-minioadmin}}
+      - Minio__SecretKey=${Minio__SecretKey:-${MINIO_ROOT_PASSWORD:-minioadmin123}}
+      - Minio__UseSSL=${Minio__UseSSL:-false}
+      - Auth__JwtSecret=${Auth__JwtSecret:-OpenCourseEngine_Super_Secret_Key_Change_In_Production_At_Least_32_Chars_Long!}
+      - Auth__JwtIssuer=${Auth__JwtIssuer:-OpenCourseEngine}
+      - Auth__JwtAudience=${Auth__JwtAudience:-OpenCourseEngine}
+      - Auth__AccessTokenExpiryMinutes=${Auth__AccessTokenExpiryMinutes:-60}
+      - Auth__RefreshTokenExpiryDays=${Auth__RefreshTokenExpiryDays:-7}
+      - Auth__EnableCookieAuth=${Auth__EnableCookieAuth:-true}
+      - Auth__CookieName=${Auth__CookieName:-.OpenCourseEngine.Auth}
+      - Auth__GoogleClientId=${Auth__GoogleClientId:-}
+      - Auth__GoogleClientSecret=${Auth__GoogleClientSecret:-}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL:-grpc}
+      - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-lms-modular-api}
     ports:
       - "8080:8080"
     depends_on:
