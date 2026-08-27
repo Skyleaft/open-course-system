@@ -17,6 +17,9 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
     [GeneratedRegex(@"^(?:Answer|Jawaban|Kunci|Key|Ans)\s*[:=]\s*(.+)$", RegexOptions.IgnoreCase)]
     private static partial Regex AnswerKeyRegex();
 
+    [GeneratedRegex(@"^(?:Type|Tipe|Jenis)\s*[:=]\s*(.+)$", RegexOptions.IgnoreCase)]
+    private static partial Regex QuestionTypeRegex();
+
     [GeneratedRegex(@"^(?:Points?|Point|Nilai|Skor|Score)\s*[:=]\s*(\d+(?:\.\d+)?)$", RegexOptions.IgnoreCase)]
     private static partial Regex PointsRegex();
 
@@ -32,10 +35,10 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
     [GeneratedRegex(@"^(?:Category|Kategori)\s*[:=]\s*(.+)$", RegexOptions.IgnoreCase)]
     private static partial Regex CategoryHeaderRegex();
 
-    [GeneratedRegex(@"^\[(?:Points?|Skor|Poin|Nilai)\s*[:=]\s*([+-]?\d+(?:\.\d+)?)\]\s*(.*)$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^\[(?:Points?|Skor|Poin|Nilai)\s*[:=]\s*([+-]?\d+(?:\.\d+)?)(?:\s*,\s*(?:Penalty|Penalti|Denda)\s*[:=]\s*([+-]?\d+(?:\.\d+)?))?\]\s*(.*)$", RegexOptions.IgnoreCase)]
     private static partial Regex BracketOptionPointsRegex();
 
-    [GeneratedRegex(@"^\(([+-]?\d+(?:\.\d+)?)\s*(?:pts|poin|points)?\)\s*(.*)$", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"^\(([+-]?\d+(?:\.\d+)?)\s*(?:pts|poin|points)?(?:\s*,\s*([+-]?\d+(?:\.\d+)?)\s*(?:pen|penalty|denda)?)?\)\s*(.*)$", RegexOptions.IgnoreCase)]
     private static partial Regex ParenOptionPointsRegex();
 
     public async Task<WordQuestionBankParseResult> ParseDocxAsync(Stream docxStream, CancellationToken ct = default)
@@ -111,6 +114,8 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
 
                 // Check answer key line
                 var ansMatch = AnswerKeyRegex().Match(text);
+                // Check question type line
+                var typeMatch = QuestionTypeRegex().Match(text);
                 // Check points line
                 var ptsMatch = PointsRegex().Match(text);
                 // Check grading method line
@@ -121,6 +126,10 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
                 if (ansMatch.Success && currentBuilder != null)
                 {
                     currentBuilder.AnswerKeyRaw = ansMatch.Groups[1].Value.Trim();
+                }
+                else if (typeMatch.Success && currentBuilder != null)
+                {
+                    currentBuilder.QuestionTypeRaw = typeMatch.Groups[1].Value.Trim();
                 }
                 else if (ptsMatch.Success && currentBuilder != null)
                 {
@@ -144,6 +153,7 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
                     var letter = optMatch.Success ? optMatch.Groups[2].Value.ToUpperInvariant() : GetOptionLetter(currentBuilder!.Options.Count);
 
                     decimal? explicitPoints = null;
+                    decimal? explicitPenalty = null;
                     var cleanText = optionRawText;
 
                     var bracketMatch = BracketOptionPointsRegex().Match(optionRawText);
@@ -153,7 +163,11 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
                         {
                             explicitPoints = p;
                         }
-                        cleanText = bracketMatch.Groups[2].Value.Trim();
+                        if (bracketMatch.Groups[2].Success && decimal.TryParse(bracketMatch.Groups[2].Value, out var pen))
+                        {
+                            explicitPenalty = pen;
+                        }
+                        cleanText = bracketMatch.Groups[3].Value.Trim();
                     }
                     else
                     {
@@ -164,7 +178,11 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
                             {
                                 explicitPoints = p;
                             }
-                            cleanText = parenMatch.Groups[2].Value.Trim();
+                            if (parenMatch.Groups[2].Success && decimal.TryParse(parenMatch.Groups[2].Value, out var pen))
+                            {
+                                explicitPenalty = pen;
+                            }
+                            cleanText = parenMatch.Groups[3].Value.Trim();
                         }
                     }
 
@@ -173,7 +191,8 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
                         Letter = letter,
                         Text = string.IsNullOrWhiteSpace(cleanText) ? optionRawText : cleanText,
                         IsMarkedCorrect = isStarred,
-                        ExplicitPoints = explicitPoints
+                        ExplicitPoints = explicitPoints,
+                        ExplicitPenalty = explicitPenalty
                     });
                 }
                 else if (isExplicitQuestion)
@@ -224,7 +243,7 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
             body.Append(CreateHeadingParagraph("Question Bank Import Template", 32, "1E3A8A", true));
             body.Append(CreateParagraph("Title: Sample Certification Question Bank", true, "334155"));
             body.Append(CreateParagraph("Category: General Computer Science", true, "334155"));
-            body.Append(CreateParagraph("Guidelines: Use standard numbering for questions (1., 2.) and choices (A., B., C., D.). Specify correct answers using 'Answer: A' or by putting an asterisk '*' before the choice like '*A.'. For Multiple Choice Multiple Answer, use 'Answer: A, C' or mark multiple choices with '*'. Optional per-question grading method: 'Grading: PartialWithPenalty' or 'Grading: AllOrNothing'. Optional per-option points: 'A. [Points: 5] Text'.", false, "64748B"));
+            body.Append(CreateParagraph("Guidelines: Use standard numbering for questions (1., 2.) and choices (A., B., C., D.). Specify correct answers using 'Answer: A' or by putting an asterisk '*' before the choice like '*A.'. For Multiple Choice Multiple Answer, use 'Answer: A, C' or mark multiple choices with '*'. Optional per-question grading method: 'Grading: PartialWithPenalty', 'Grading: AllOrNothing', or 'Grading: OptionWeighted'. Optional per-option points: 'A. [Points: 5] Text' or 'A. [Points: 5, Penalty: 2] Text'.", false, "64748B"));
             body.Append(CreateHorizontalRule());
 
             // Question 1: Single Choice with Answer: Key
@@ -260,12 +279,13 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
             body.Append(CreateParagraph("Explanation: 4xx series status codes indicate client-side errors, whereas 5xx are server errors and 2xx are successful requests.", false, "475569"));
             body.Append(CreateSpacer());
 
-            // Question 4: Option Weighted Question (Survey / Likert / Granular Score)
+            // Question 4: Single Choice Option-Weighted (Survey / Likert Scale / Tiered Points)
             body.Append(CreateHeadingParagraph("4. How frequently does your engineering team perform automated regression tests?", 24, "0F172A", true));
             body.Append(CreateParagraph("A. [Points: 5] On every commit via CI/CD pipeline", false));
             body.Append(CreateParagraph("B. [Points: 3] Nightly scheduled regression suites", false));
             body.Append(CreateParagraph("C. [Points: 1] Manually before major production releases", false));
             body.Append(CreateParagraph("D. [Points: 0] We do not have automated regression tests", false));
+            body.Append(CreateParagraph("Type: SingleChoice", false, "7C3AED"));
             body.Append(CreateParagraph("Grading: OptionWeighted", false, "2563EB"));
             body.Append(CreateParagraph("Points: 5", false, "475569"));
             body.Append(CreateParagraph("Explanation: Continuous testing on every commit reflects the highest DevOps maturity level.", false, "475569"));
@@ -300,88 +320,79 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
         runProps.Append(new Color { Val = hexColor });
         runProps.Append(new RunFonts { Ascii = "Segoe UI", HighAnsi = "Segoe UI" });
 
-        var run = new Run();
-        run.Append(runProps);
-        run.Append(new Text(text));
+        var run = new Run(new Text(text)) { RunProperties = runProps };
+        var paraProps = new ParagraphProperties(
+            new SpacingBetweenLines { Before = "200", After = "80", Line = "260", LineRule = LineSpacingRuleValues.Auto }
+        );
 
-        var pProps = new ParagraphProperties(new SpacingBetweenLines { Before = "120", After = "80" });
-        var p = new Paragraph(pProps);
-        p.Append(run);
-        return p;
+        return new Paragraph(run) { ParagraphProperties = paraProps };
     }
 
-    private static Paragraph CreateParagraph(string text, bool bold = false, string hexColor = "1E293B")
+    private static Paragraph CreateParagraph(string text, bool bold, string? hexColor = null)
     {
         var runProps = new RunProperties();
         if (bold) runProps.Append(new Bold());
-        runProps.Append(new FontSize { Val = "21" }); // ~10.5pt
-        runProps.Append(new Color { Val = hexColor });
+        runProps.Append(new FontSize { Val = "20" }); // 10pt
         runProps.Append(new RunFonts { Ascii = "Segoe UI", HighAnsi = "Segoe UI" });
+        if (!string.IsNullOrEmpty(hexColor))
+        {
+            runProps.Append(new Color { Val = hexColor });
+        }
 
-        var run = new Run();
-        run.Append(runProps);
-        run.Append(new Text(text));
+        var run = new Run(new Text(text)) { RunProperties = runProps };
+        var paraProps = new ParagraphProperties(
+            new SpacingBetweenLines { Before = "40", After = "40", Line = "240", LineRule = LineSpacingRuleValues.Auto }
+        );
 
-        var pProps = new ParagraphProperties(new SpacingBetweenLines { After = "60" });
-        var p = new Paragraph(pProps);
-        p.Append(run);
+        return new Paragraph(run) { ParagraphProperties = paraProps };
+    }
+
+    private static Paragraph CreateHorizontalRule()
+    {
+        var p = new Paragraph();
+        var pPr = new ParagraphProperties();
+        var pBdr = new ParagraphBorders();
+        pBdr.BottomBorder = new BottomBorder { Val = BorderValues.Single, Size = 12, Space = 1, Color = "CBD5E1" };
+        pPr.Append(pBdr);
+        pPr.Append(new SpacingBetweenLines { Before = "120", After = "180" });
+        p.ParagraphProperties = pPr;
         return p;
     }
 
     private static Paragraph CreateSpacer()
     {
-        return new Paragraph(new ParagraphProperties(new SpacingBetweenLines { After = "120" }));
-    }
-
-    private static Paragraph CreateHorizontalRule()
-    {
-        var pProps = new ParagraphProperties(
-            new ParagraphBorders(new BottomBorder { Val = BorderValues.Single, Size = 6, Space = 1, Color = "CBD5E1" }),
-            new SpacingBetweenLines { After = "140" }
-        );
-        return new Paragraph(pProps);
-    }
-
-    private static string GetParagraphCleanText(Paragraph paragraph)
-    {
-        return string.Concat(paragraph.Elements<Run>().SelectMany(r => r.Elements<Text>().Select(t => t.Text)));
+        var p = new Paragraph();
+        var pPr = new ParagraphProperties(new SpacingBetweenLines { Before = "160", After = "0" });
+        p.ParagraphProperties = pPr;
+        return p;
     }
 
     private static string GetOptionLetter(int index)
     {
-        return ((char)('A' + Math.Min(25, index))).ToString();
+        return index < 26 ? ((char)('A' + index)).ToString() : $"Opt{index + 1}";
     }
 
-    private static string GetNumberingFormat(NumberingDefinitionsPart numberingPart, int numId, int level)
+    private static string GetParagraphCleanText(Paragraph paragraph)
     {
-        if (numberingPart == null) return "decimal";
+        return string.Join("", paragraph.Descendants<Text>().Select(t => t.Text));
+    }
 
-        var numberingInstance = numberingPart.Numbering
-            .Elements<NumberingInstance>()
+    private static string? GetNumberingFormat(NumberingDefinitionsPart numberingPart, int numId, int level)
+    {
+        var numInstance = numberingPart.Numbering.Elements<NumberingInstance>()
             .FirstOrDefault(n => n.NumberID?.Value == numId);
+        if (numInstance?.AbstractNumId?.Val is null) return null;
 
-        if (numberingInstance != null)
-        {
-            var abstractNumId = numberingInstance.AbstractNumId?.Val?.Value;
-            var abstractNum = numberingPart.Numbering
-                .Elements<AbstractNum>()
-                .FirstOrDefault(a => a.AbstractNumberId?.Value == abstractNumId);
+        var abstractNumId = numInstance.AbstractNumId.Val.Value;
+        var abstractNum = numberingPart.Numbering.Elements<AbstractNum>()
+            .FirstOrDefault(a => a.AbstractNumberId?.Value == abstractNumId);
+        if (abstractNum == null) return null;
 
-            if (abstractNum != null)
-            {
-                var levelOverride = abstractNum
-                    .Elements<LevelOverride>()
-                    .FirstOrDefault(o => o.LevelIndex?.Value == level);
+        var lvl = abstractNum.Elements<Level>()
+            .FirstOrDefault(l => l.LevelIndex?.Value == level);
 
-                var levelData = levelOverride?.Level ?? abstractNum
-                    .Elements<Level>()
-                    .FirstOrDefault(l => l.LevelIndex?.Value == level);
-                var formatVal = levelData?.NumberingFormat?.Val;
-                return formatVal is not null ? formatVal.Value.ToString() : "decimal";
-            }
-        }
-
-        return "decimal";
+        var formatVal = lvl?.NumberingFormat?.Val;
+        return formatVal is not null ? formatVal.Value.ToString() : "decimal";
     }
 
     private sealed class OptionDraft
@@ -399,6 +410,7 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
         public decimal Points { get; set; } = 1m;
         public string? Explanation { get; set; }
         public string? AnswerKeyRaw { get; set; }
+        public string? QuestionTypeRaw { get; set; }
         public string? GradingMethodRaw { get; set; }
         public List<OptionDraft> Options { get; set; } = [];
 
@@ -483,6 +495,27 @@ public sealed partial class WordQuestionBankService : IWordQuestionBankService
             else if (isTrueFalse)
             {
                 type = QuestionType.TrueFalse;
+            }
+            else if (!string.IsNullOrWhiteSpace(QuestionTypeRaw))
+            {
+                var rawType = QuestionTypeRaw.Trim().ToLowerInvariant();
+                if (rawType.Contains("single") || rawType.Contains("tunggal"))
+                {
+                    type = QuestionType.SingleChoice;
+                }
+                else if (rawType.Contains("multiple") || rawType.Contains("ganda") || rawType.Contains("multi"))
+                {
+                    type = QuestionType.MultipleChoice;
+                }
+                else if (rawType.Contains("truefalse") || rawType.Contains("tf") || rawType.Contains("benar"))
+                {
+                    type = QuestionType.TrueFalse;
+                }
+                else
+                {
+                    var correctCount = parsedOptions.Count(o => o.IsCorrect);
+                    type = correctCount > 1 ? QuestionType.MultipleChoice : QuestionType.SingleChoice;
+                }
             }
             else
             {

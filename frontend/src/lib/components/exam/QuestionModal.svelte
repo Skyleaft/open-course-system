@@ -20,7 +20,8 @@
 		Scale,
 		ShieldCheck,
 		Sliders,
-		Percent
+		Percent,
+		Radio
 	} from 'lucide-svelte';
 	import type { QuestionType, GradingMethod, QuestionOption, BankQuestion } from '$lib/api/types.ts';
 	import RichEditor from '$lib/components/editor/RichEditor.svelte';
@@ -55,7 +56,7 @@
 
 	let questionText = $state('');
 	let questionType = $state<QuestionType>('SingleChoice');
-	let questionGradingMethod = $state<GradingMethod>('PartialWithPenalty');
+	let questionGradingMethod = $state<GradingMethod>('AllOrNothing');
 	let questionPoints = $state<number>(5);
 	let questionExplanation = $state('');
 	let options = $state<Array<{ id?: string; text: string; isCorrect: boolean; points?: number; penaltyPoints?: number }>>([]);
@@ -69,7 +70,7 @@
 		{
 			id: 'SingleChoice',
 			label: 'Single Choice',
-			description: 'One correct answer choice',
+			description: 'One option selected by candidate',
 			icon: CheckCircle2
 		},
 		{
@@ -92,7 +93,7 @@
 		}
 	];
 
-	const gradingStrategies: Array<{
+	const multipleChoiceStrategies: Array<{
 		id: GradingMethod;
 		label: string;
 		tag: string;
@@ -128,6 +129,38 @@
 			icon: Sliders
 		}
 	];
+
+	const singleChoiceStrategies: Array<{
+		id: GradingMethod;
+		label: string;
+		tag: string;
+		description: string;
+		icon: typeof Scale;
+	}> = [
+		{
+			id: 'AllOrNothing',
+			label: 'Standard Scoring',
+			tag: 'Default',
+			description: 'Candidate receives total question points if they pick the marked correct answer choice',
+			icon: CheckCircle2
+		},
+		{
+			id: 'OptionWeighted',
+			label: 'Option-Weighted Points',
+			tag: 'Likert / Tiered',
+			description: 'Each choice awards custom points (ideal for Likert scales, surveys, or tiered answers)',
+			icon: Sliders
+		}
+	];
+
+	// Derived list of strategies based on current questionType
+	const currentStrategies = $derived(
+		questionType === 'MultipleChoice'
+			? multipleChoiceStrategies
+			: questionType === 'SingleChoice'
+				? singleChoiceStrategies
+				: []
+	);
 
 	// Track previous state to avoid unnecessary re-initialization
 	let prevOpen = $state(false);
@@ -174,7 +207,7 @@
 				} else {
 					questionText = '';
 					questionType = 'SingleChoice';
-					questionGradingMethod = 'PartialWithPenalty';
+					questionGradingMethod = 'AllOrNothing';
 					questionPoints = 5;
 					questionExplanation = '';
 					initDefaultOptions('SingleChoice');
@@ -206,10 +239,17 @@
 
 	function handleTypeChange(newType: QuestionType) {
 		if (questionType === newType) return;
+		const oldType = questionType;
 		questionType = newType;
 
 		if (newType === 'MultipleChoice') {
-			questionGradingMethod = 'PartialWithPenalty';
+			if (questionGradingMethod !== 'OptionWeighted') {
+				questionGradingMethod = 'PartialWithPenalty';
+			}
+		} else if (newType === 'SingleChoice') {
+			if (questionGradingMethod !== 'OptionWeighted') {
+				questionGradingMethod = 'AllOrNothing';
+			}
 		} else {
 			questionGradingMethod = 'AllOrNothing';
 		}
@@ -221,7 +261,7 @@
 			];
 		} else if (newType === 'Essay') {
 			options = [];
-		} else if (options.length === 0 || questionType === 'TrueFalse') {
+		} else if (options.length === 0 || oldType === 'TrueFalse') {
 			options = [
 				{ text: 'Option A', isCorrect: true, points: 0, penaltyPoints: 0 },
 				{ text: 'Option B', isCorrect: false, points: 0, penaltyPoints: 0 },
@@ -229,7 +269,7 @@
 				{ text: 'Option D', isCorrect: false, points: 0, penaltyPoints: 0 }
 			];
 		} else if (newType === 'SingleChoice') {
-			// Ensure only one is correct
+			// Ensure only one is correct if standard scoring
 			let foundFirst = false;
 			options = options.map((opt) => {
 				if (opt.isCorrect && !foundFirst) {
@@ -261,7 +301,7 @@
 		}
 		const wasCorrect = options[index].isCorrect;
 		options = options.filter((_, i) => i !== index);
-		if (wasCorrect && !options.some((o) => o.isCorrect) && options.length > 0) {
+		if (wasCorrect && !options.some((o) => o.isCorrect) && options.length > 0 && questionGradingMethod !== 'OptionWeighted') {
 			options[0].isCorrect = true;
 		}
 	}
@@ -303,9 +343,11 @@
 		}
 
 		const safeGradingMethod: GradingMethod =
-			questionType === 'MultipleChoice'
-				? (questionGradingMethod || 'PartialWithPenalty')
-				: (questionGradingMethod === 'OptionWeighted' ? 'OptionWeighted' : 'AllOrNothing');
+			questionGradingMethod === 'OptionWeighted'
+				? 'OptionWeighted'
+				: questionType === 'MultipleChoice'
+					? (questionGradingMethod || 'PartialWithPenalty')
+					: 'AllOrNothing';
 
 		onSave({
 			questionText: questionText.trim(),
@@ -439,19 +481,21 @@
 					</div>
 				</div>
 
-				<!-- Grading Strategy Selector (For Multiple Choice or Option Weighted) -->
-				{#if questionType === 'MultipleChoice'}
+				<!-- Grading Strategy Selector (For Multiple Choice or Single Choice) -->
+				{#if currentStrategies.length > 0}
 					<div class="space-y-2 p-3.5 rounded-2xl bg-primary/5 border border-primary/15">
 						<div class="flex items-center justify-between">
 							<label class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-primary">
 								<Scale class="w-3.5 h-3.5" />
-								<span>Multiple Choice Grading Strategy</span>
+								<span>{questionType === 'MultipleChoice' ? 'Multiple Choice Grading Strategy' : 'Single Choice Scoring Mode'}</span>
 							</label>
-							<span class="badge badge-xs badge-primary badge-outline font-mono text-[9px]">Multi-Select Engine</span>
+							<span class="badge badge-xs badge-primary badge-outline font-mono text-[9px]">
+								{questionType === 'MultipleChoice' ? 'Multi-Select Engine' : 'Single-Select Engine'}
+							</span>
 						</div>
 
 						<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-							{#each gradingStrategies as gs}
+							{#each currentStrategies as gs}
 								{@const isSelected = questionGradingMethod === gs.id}
 								{@const Icon = gs.icon}
 								<button
@@ -514,7 +558,7 @@
 							class="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-base-content/80"
 						>
 							<Award class="w-3.5 h-3.5 text-warning" />
-							<span>Total Points</span>
+							<span>{questionGradingMethod === 'OptionWeighted' ? 'Max Total Points' : 'Total Points'}</span>
 							<span class="text-error">*</span>
 						</label>
 						<input
@@ -560,9 +604,10 @@
 									<span>Answer Choices</span>
 								</span>
 								<p class="text-[11px] text-base-content/50 mt-0.5">
-									Click the badge pill to mark as {questionType === 'MultipleChoice' ? 'a correct answer' : 'the correct answer'}.
 									{#if questionGradingMethod === 'OptionWeighted'}
-										Specify exact reward/penalty points for each choice below.
+										Specify exact reward point (+Pts) for each choice. Candidate will be awarded the points of the option they select.
+									{:else}
+										Click the badge pill to mark as {questionType === 'MultipleChoice' ? 'a correct answer' : 'the correct answer'}.
 									{/if}
 								</p>
 							</div>
@@ -616,28 +661,28 @@
 									<!-- Custom Option Points (when OptionWeighted) -->
 									{#if questionGradingMethod === 'OptionWeighted'}
 										<div class="flex items-center gap-1.5 shrink-0">
-											<div class="flex items-center gap-1">
+											<div class="flex items-center gap-1" title="Awarded points for choosing this option">
 												<span class="text-[10px] font-bold text-success">+</span>
 												<input
 													type="number"
 													step="0.5"
 													bind:value={opt.points}
 													placeholder="Pts"
-													title="Awarded points for choosing this option"
 													class="input input-xs w-16 bg-base-100 rounded-lg text-center font-mono text-xs border-base-content/20 text-success font-bold"
 												/>
 											</div>
-											<div class="flex items-center gap-1">
-												<span class="text-[10px] font-bold text-error">-</span>
-												<input
-													type="number"
-													step="0.5"
-													bind:value={opt.penaltyPoints}
-													placeholder="Pen"
-													title="Penalty deducted for choosing this option"
-													class="input input-xs w-16 bg-base-100 rounded-lg text-center font-mono text-xs border-base-content/20 text-error font-bold"
-												/>
-											</div>
+											{#if questionType === 'MultipleChoice'}
+												<div class="flex items-center gap-1" title="Penalty deducted for choosing this option">
+													<span class="text-[10px] font-bold text-error">-</span>
+													<input
+														type="number"
+														step="0.5"
+														bind:value={opt.penaltyPoints}
+														placeholder="Pen"
+														class="input input-xs w-16 bg-base-100 rounded-lg text-center font-mono text-xs border-base-content/20 text-error font-bold"
+													/>
+												</div>
+											{/if}
 										</div>
 									{/if}
 

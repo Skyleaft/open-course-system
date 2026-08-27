@@ -615,7 +615,7 @@
 										<span class="badge badge-sm badge-outline badge-primary font-bold text-[10px]">
 											{q.type}
 										</span>
-										{#if q.type === 'MultipleChoice' || q.gradingMethod}
+										{#if q.type === 'MultipleChoice' || q.gradingMethod === 'OptionWeighted' || (q.gradingMethod && q.gradingMethod !== 'AllOrNothing')}
 											<span class="badge badge-sm badge-outline badge-secondary font-semibold text-[10px]">
 												{q.gradingMethod === 'PartialWithPenalty'
 													? 'Partial with Penalty'
@@ -625,7 +625,7 @@
 															? 'Partial (No Penalty)'
 															: q.gradingMethod === 'OptionWeighted'
 																? 'Option Weighted'
-																: q.gradingMethod || 'Partial with Penalty'}
+																: q.gradingMethod}
 											</span>
 										{/if}
 										<span class="badge badge-sm badge-neutral font-mono text-[10px] font-bold">
