@@ -13,11 +13,26 @@
 		// Public course detail page /courses/[id] (but NOT /courses/[id]/learn or /courses/[id]/assignments)
 		if (/^\/courses\/[^\/]+$/.test(pathname)) return true;
 		// Public certificate verification /certificates/verify/[hash]
-		if (/^\/certificates\/verify\/[^\/]+$/.test(pathname)) return true;
+		if (/^\/certificates\/verify/.test(pathname)) return true;
 		return false;
 	}
 
+	function isSidebarRoute(pathname: string): boolean {
+		// Public catalog and course details use full-width layout without sidebar
+		if (pathname === '/' || pathname === '/courses') return false;
+		if (/^\/courses\/[^\/]+$/.test(pathname)) return false;
+		if (/^\/certificates\/verify/.test(pathname)) return false;
+
+		// Examination environment: PreExamChecker and Exam Submissions runner use focused layout without sidebar
+		if (/^\/exams\/[^\/]+\/start/.test(pathname)) return false;
+		if (/^\/exams\/submissions\//.test(pathname)) return false;
+
+		// All authenticated learning, instructor, proctor, and admin portals use the sidebar
+		return authStore.isAuthenticated;
+	}
+
 	const isPublic = $derived(isPublicRoute(page.url.pathname));
+	const showSidebar = $derived(isSidebarRoute(page.url.pathname));
 
 	$effect(() => {
 		if (!isPublic && !authStore.isLoading && !authStore.isAuthenticated) {
@@ -28,11 +43,11 @@
 </script>
 
 {#if isPublic || authStore.isAuthenticated}
-	<PageShell showSidebar={true}>
+	<PageShell {showSidebar}>
 		{@render children()}
 	</PageShell>
 {:else if authStore.isLoading}
-	<PageShell showSidebar={true}>
+	<PageShell {showSidebar}>
 		<div class="space-y-6 animate-pulse p-4">
 			<div class="glass-panel h-36 rounded-3xl border border-white/10"></div>
 			<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -65,4 +80,3 @@
 		</div>
 	</PageShell>
 {/if}
-
