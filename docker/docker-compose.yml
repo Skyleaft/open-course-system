@@ -140,15 +140,15 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
       - ASPNETCORE_HTTP_PORTS=8080
-      - ConnectionStrings__Database=${ConnectionStrings__Database:-Host=postgres;Port=5432;Database=${POSTGRES_DB:-lms_db};Username=${POSTGRES_USER:-lms_user};Password=${POSTGRES_PASSWORD:-lms_secret_password};}
-      - ConnectionStrings__Redis=${ConnectionStrings__Redis:-redis:6379,password=${REDIS_PASSWORD:-redis_secret_password},abortConnect=false}
-      - Cache__Provider=${Cache__Provider:-Redis}
-      - Cache__Redis__ConnectionString=${Cache__Redis__ConnectionString:-redis:6379,password=${REDIS_PASSWORD:-redis_secret_password},abortConnect=false}
-      - Minio__Endpoint=${Minio__Endpoint:-minio:9000}
+      - ConnectionStrings__Database=Host=postgres;Port=5432;Database=${POSTGRES_DB:-lms_db};Username=${POSTGRES_USER:-lms_user};Password=${POSTGRES_PASSWORD:-lms_secret_password};
+      - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-redis_secret_password},abortConnect=false
+      - Cache__Provider=Redis
+      - Cache__Redis__ConnectionString=redis:6379,password=${REDIS_PASSWORD:-redis_secret_password},abortConnect=false
+      - Minio__Endpoint=minio:9000
       - Minio__PublicEndpoint=${Minio__PublicEndpoint:-http://localhost:9000}
-      - Minio__AccessKey=${Minio__AccessKey:-${MINIO_ROOT_USER:-minioadmin}}
-      - Minio__SecretKey=${Minio__SecretKey:-${MINIO_ROOT_PASSWORD:-minioadmin123}}
-      - Minio__UseSSL=${Minio__UseSSL:-false}
+      - Minio__AccessKey=${MINIO_ROOT_USER:-minioadmin}
+      - Minio__SecretKey=${MINIO_ROOT_PASSWORD:-minioadmin123}
+      - Minio__UseSSL=false
       - Auth__JwtSecret=${Auth__JwtSecret:-OpenCourseEngine_Super_Secret_Key_Change_In_Production_At_Least_32_Chars_Long!}
       - Auth__JwtIssuer=${Auth__JwtIssuer:-OpenCourseEngine}
       - Auth__JwtAudience=${Auth__JwtAudience:-OpenCourseEngine}
@@ -158,8 +158,8 @@ services:
       - Auth__CookieName=${Auth__CookieName:-.OpenCourseEngine.Auth}
       - Auth__GoogleClientId=${Auth__GoogleClientId:-}
       - Auth__GoogleClientSecret=${Auth__GoogleClientSecret:-}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
-      - OTEL_EXPORTER_OTLP_PROTOCOL=${OTEL_EXPORTER_OTLP_PROTOCOL:-grpc}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
       - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-lms-modular-api}
     ports:
       - "8080:8080"
