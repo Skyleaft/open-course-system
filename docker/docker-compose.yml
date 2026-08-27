@@ -81,9 +81,11 @@ services:
       mc mb --ignore-existing myminio/exam-snapshots;
       mc mb --ignore-existing myminio/course-materials;
       mc mb --ignore-existing myminio/assignment-submissions;
+      mc mb --ignore-existing myminio/branding-assets;
       mc anonymous set none myminio/exam-snapshots;
       mc anonymous set none myminio/course-materials;
       mc anonymous set none myminio/assignment-submissions;
+      mc anonymous set download myminio/branding-assets;
       exit 0;
       "
 

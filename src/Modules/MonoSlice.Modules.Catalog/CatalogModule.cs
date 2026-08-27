@@ -20,6 +20,8 @@ using MonoSlice.Modules.Catalog.Features.GetCourse;
 using MonoSlice.Modules.Catalog.Features.GetLesson;
 using MonoSlice.Modules.Catalog.Features.ListCourses;
 using MonoSlice.Modules.Catalog.Features.PublishCourse;
+using MonoSlice.Modules.Catalog.Features.PresignAssignmentUpload;
+using MonoSlice.Modules.Catalog.Features.PresignCourseThumbnail;
 using MonoSlice.Modules.Catalog.Features.SubmitAssignment;
 using MonoSlice.Modules.Catalog.Features.UpdateCourse;
 using MonoSlice.Modules.Catalog.Features.UpdateLesson;
@@ -87,6 +89,7 @@ public static class CatalogModule
             .WithTags("Courses");
 
         coursesV1Group.MapCreateCourseEndpoint();
+        coursesV1Group.MapPresignCourseThumbnailEndpoint();
         coursesV1Group.MapListCoursesEndpoint();
         coursesV1Group.MapGetCourseEndpoint();
         coursesV1Group.MapUpdateCourseEndpoint();
@@ -107,6 +110,7 @@ public static class CatalogModule
         coursesV1Group.MapUpdateLessonEndpoint();
         coursesV1Group.MapDeleteLessonEndpoint();
         coursesV1Group.MapCreateAssignmentEndpoint();
+        coursesV1Group.MapPresignAssignmentUploadEndpoint();
         coursesV1Group.MapSubmitAssignmentEndpoint();
         coursesV1Group.MapAttachExamEndpoint();
         coursesV1Group.MapDetachExamEndpoint();

@@ -16,6 +16,7 @@ public sealed class SystemHealthDto
     public int TotalGradeRecords { get; init; }
     public string RedisStreamStatus { get; init; } = "Healthy";
     public string StorageStatus { get; init; } = "Healthy";
+    public Dictionary<string, bool> BucketStatus { get; init; } = [];
     public List<RecentDlqItemDto> RecentDeadLetters { get; init; } = [];
     public DateTime CheckedAtUtc { get; init; }
 }

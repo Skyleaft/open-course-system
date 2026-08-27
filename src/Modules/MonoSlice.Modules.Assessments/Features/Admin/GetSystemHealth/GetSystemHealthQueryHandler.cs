@@ -3,6 +3,7 @@ using MonoSlice.Modules.Assessments.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
 using MonoSlice.Shared.Abstractions.Interfaces;
+using MonoSlice.Shared.Abstractions.Storage;
 
 namespace MonoSlice.Modules.Assessments.Features.Admin.GetSystemHealth;
 
@@ -10,13 +11,24 @@ public sealed class GetSystemHealthQueryHandler : IQueryHandler<GetSystemHealthQ
 {
     private readonly AssessmentsDbContext _dbContext;
     private readonly ICacheService _cacheService;
+    private readonly IObjectStorageService _storageService;
+
+    private static readonly string[] RequiredBuckets = 
+    [
+        "exam-snapshots", 
+        "course-materials", 
+        "assignment-submissions", 
+        "branding-assets"
+    ];
 
     public GetSystemHealthQueryHandler(
         AssessmentsDbContext dbContext,
-        ICacheService cacheService)
+        ICacheService cacheService,
+        IObjectStorageService storageService)
     {
         _dbContext = dbContext;
         _cacheService = cacheService;
+        _storageService = storageService;
     }
 
     public async ValueTask<ApiResponse<SystemHealthDto>> Handle(GetSystemHealthQuery query, CancellationToken cancellationToken)
@@ -56,7 +68,11 @@ public sealed class GetSystemHealthQueryHandler : IQueryHandler<GetSystemHealthQ
                 })
                 .ToListAsync(cancellationToken);
 
+            var isStorageHealthy = await _storageService.CheckHealthAsync(cancellationToken);
+            var bucketHealth = await _storageService.CheckBucketsHealthAsync(RequiredBuckets, cancellationToken);
+
             var streamStatus = unresolvedCount > 0 ? "Warning" : "Healthy";
+            var storageStatus = isStorageHealthy ? "Healthy" : "Degraded";
 
             return new SystemHealthDto
             {
@@ -65,7 +81,8 @@ public sealed class GetSystemHealthQueryHandler : IQueryHandler<GetSystemHealthQ
                 TotalCertificatesIssued = totalCerts,
                 TotalGradeRecords = totalGrades,
                 RedisStreamStatus = streamStatus,
-                StorageStatus = "Healthy",
+                StorageStatus = storageStatus,
+                BucketStatus = new Dictionary<string, bool>(bucketHealth),
                 RecentDeadLetters = recentDlq,
                 CheckedAtUtc = DateTime.UtcNow
             };

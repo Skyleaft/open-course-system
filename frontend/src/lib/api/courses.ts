@@ -186,6 +186,50 @@ export const coursesApi = {
 		return this.addAssignment(courseId, data);
 	},
 
+	async presignCourseThumbnail(
+		fileName: string,
+		contentType?: string
+	): Promise<{ storageKey: string; uploadUrl: string; downloadUrl: string; expiresAtUtc: string }> {
+		return apiClient.post<{ storageKey: string; uploadUrl: string; downloadUrl: string; expiresAtUtc: string }>(
+			'/api/v1/courses/thumbnails/presign',
+			{
+				fileName,
+				contentType: contentType || 'image/jpeg'
+			}
+		);
+	},
+
+	async uploadCourseThumbnail(file: File): Promise<string> {
+		const presign = await this.presignCourseThumbnail(file.name, file.type || 'image/jpeg');
+		const res = await fetch(presign.uploadUrl, {
+			method: 'PUT',
+			headers: {
+				'Content-Type': file.type || 'image/jpeg'
+			},
+			body: file
+		});
+
+		if (!res.ok) {
+			throw new Error(`Failed to upload thumbnail image: ${res.statusText}`);
+		}
+
+		return presign.downloadUrl;
+	},
+
+	async presignAssignmentSubmission(
+		assignmentId: string,
+		fileName: string,
+		contentType?: string
+	): Promise<{ storageKey: string; uploadUrl: string; expiresAtUtc: string }> {
+		return apiClient.post<{ storageKey: string; uploadUrl: string; expiresAtUtc: string }>(
+			`/api/v1/courses/assignments/${assignmentId}/presign`,
+			{
+				fileName,
+				contentType: contentType || 'application/octet-stream'
+			}
+		);
+	},
+
 	async submitAssignment(
 		assignmentId: string,
 		data: {

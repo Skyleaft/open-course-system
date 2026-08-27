@@ -12,15 +12,23 @@
 		DollarSign,
 		Key,
 		BookOpen,
-		Lock
+		Lock,
+		Image as ImageIcon,
+		UploadCloud,
+		Trash2,
+		RefreshCw
 	} from 'lucide-svelte';
 
 	let title = $state('');
 	let description = $state('');
+	let thumbnailUrl = $state('');
 	let accessType = $state<'OpenFree' | 'OpenPaid' | 'PrivateWithKey'>('OpenFree');
 	let price = $state(0);
 	let enrollmentKey = $state('');
 	let isSubmitting = $state(false);
+	let isUploadingThumbnail = $state(false);
+	let isThumbnailDragging = $state(false);
+	let thumbnailInputRef = $state<HTMLInputElement | null>(null);
 
 	const accessModels = [
 		{
@@ -49,6 +57,32 @@
 		}
 	] as const;
 
+	async function handleThumbnailUpload(files: FileList | null) {
+		if (!files || files.length === 0) return;
+		const file = files[0];
+
+		if (!file.type.startsWith('image/')) {
+			toast.error('Please select an image file (PNG, JPG, WebP, AVIF).');
+			return;
+		}
+
+		if (file.size > 5 * 1024 * 1024) {
+			toast.error('Image size must be less than 5 MB.');
+			return;
+		}
+
+		isUploadingThumbnail = true;
+		try {
+			const uploadedUrl = await coursesApi.uploadCourseThumbnail(file);
+			thumbnailUrl = uploadedUrl;
+			toast.success('Course cover thumbnail uploaded to MinIO storage!');
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to upload course thumbnail.');
+		} finally {
+			isUploadingThumbnail = false;
+		}
+	}
+
 	async function handleCreateCourse(e: Event) {
 		e.preventDefault();
 		if (!title.trim()) {
@@ -71,6 +105,7 @@
 			const res = await coursesApi.createCourse({
 				title: title.trim(),
 				description: description || undefined,
+				thumbnailUrl: thumbnailUrl.trim() || undefined,
 				accessType,
 				price: accessType === 'OpenPaid' ? Number(price) : 0,
 				enrollmentKey: accessType === 'PrivateWithKey' ? enrollmentKey.trim() : undefined
@@ -105,7 +140,7 @@
 			Create New Course
 		</h1>
 		<p class="text-xs text-base-content/70">
-			Define the primary details, access model, and rich curriculum overview for your course.
+			Define the primary details, cover thumbnail, access model, and rich curriculum overview for your course.
 		</p>
 	</div>
 
@@ -124,6 +159,98 @@
 					placeholder="e.g. Advanced Distributed Systems & Cloud Architecture"
 					bind:value={title}
 					required
+				/>
+			</div>
+
+			<!-- Course Thumbnail Cover Upload -->
+			<div class="space-y-2">
+				<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80 block">
+					Course Cover Thumbnail (MinIO Storage)
+				</label>
+
+				{#if thumbnailUrl}
+					<div class="glass-card relative overflow-hidden rounded-2xl border border-base-content/15 p-3 flex flex-col sm:flex-row items-center gap-4 bg-base-100/40">
+						<div class="relative aspect-video w-full sm:w-48 overflow-hidden rounded-xl bg-base-200 border border-base-content/10 shadow-sm shrink-0">
+							<img
+								src={thumbnailUrl}
+								alt="Course Cover Preview"
+								class="h-full w-full object-cover"
+							/>
+							<div class="absolute top-2 left-2 badge badge-xs badge-success text-white font-bold">
+								Uploaded
+							</div>
+						</div>
+
+						<div class="flex-1 space-y-2 text-center sm:text-left w-full">
+							<div class="text-xs font-bold text-base-content flex items-center justify-center sm:justify-start gap-1.5">
+								<ImageIcon class="w-4 h-4 text-primary" />
+								<span>Cover Image Active</span>
+							</div>
+							<p class="text-[11px] text-base-content/60 break-all truncate max-w-sm">
+								{thumbnailUrl}
+							</p>
+
+							<div class="flex items-center justify-center sm:justify-start gap-2 pt-1">
+								<button
+									type="button"
+									class="btn btn-xs btn-outline rounded-lg gap-1"
+									onclick={() => thumbnailInputRef?.click()}
+									disabled={isUploadingThumbnail}
+								>
+									{#if isUploadingThumbnail}
+										<span class="loading loading-spinner loading-xs"></span>
+									{:else}
+										<RefreshCw class="w-3 h-3" />
+									{/if}
+									Change Image
+								</button>
+								<button
+									type="button"
+									class="btn btn-xs btn-ghost text-error hover:bg-error/10 rounded-lg gap-1"
+									onclick={() => (thumbnailUrl = '')}
+								>
+									<Trash2 class="w-3 h-3" />
+									Remove
+								</button>
+							</div>
+						</div>
+					</div>
+				{:else}
+					<div
+						class="glass-card relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-base-content/20 p-6 text-center transition-all duration-200 hover:border-primary/50 hover:bg-base-100/50 cursor-pointer {isThumbnailDragging ? 'border-primary bg-primary/10' : ''}"
+						ondragover={(e) => { e.preventDefault(); isThumbnailDragging = true; }}
+						ondragleave={() => (isThumbnailDragging = false)}
+						ondrop={(e) => { e.preventDefault(); isThumbnailDragging = false; handleThumbnailUpload(e.dataTransfer?.files || null); }}
+						onclick={() => thumbnailInputRef?.click()}
+						role="button"
+						tabindex="0"
+						onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') thumbnailInputRef?.click(); }}
+					>
+						{#if isUploadingThumbnail}
+							<div class="flex flex-col items-center gap-2 py-4">
+								<span class="loading loading-spinner loading-md text-primary"></span>
+								<span class="text-xs font-bold text-base-content">Uploading to MinIO S3...</span>
+							</div>
+						{:else}
+							<div class="gradient-accent mb-2 flex h-10 w-10 items-center justify-center rounded-xl text-white shadow-md">
+								<UploadCloud class="h-5 w-5" />
+							</div>
+							<div class="text-xs font-bold text-base-content">
+								Click to upload course thumbnail cover or drag & drop
+							</div>
+							<div class="text-[10px] text-base-content/60 mt-0.5">
+								PNG, JPG, WebP or AVIF (Recommended 16:9 ratio, max 5 MB)
+							</div>
+						{/if}
+					</div>
+				{/if}
+
+				<input
+					type="file"
+					accept="image/png,image/jpeg,image/webp,image/avif"
+					class="hidden"
+					bind:this={thumbnailInputRef}
+					onchange={(e) => handleThumbnailUpload((e.target as HTMLInputElement).files)}
 				/>
 			</div>
 
@@ -224,7 +351,7 @@
 				<button
 					type="submit"
 					class="btn btn-primary btn-sm rounded-xl text-white font-bold shadow-lg gap-2 h-11 px-6"
-					disabled={isSubmitting}
+					disabled={isSubmitting || isUploadingThumbnail}
 				>
 					{#if isSubmitting}
 						<span class="loading loading-spinner loading-xs"></span>
