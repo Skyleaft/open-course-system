@@ -75,4 +75,37 @@ public sealed class CoursesModuleApi : ICoursesModuleApi
             .Select(ce => (Guid?)ce.CourseId)
             .FirstOrDefaultAsync(ct);
     }
+
+    public async Task<IReadOnlyList<CourseWithExamsContractDto>> GetCoursesWithExamsAsync(CancellationToken ct = default)
+    {
+        var courses = await _dbContext.Courses
+            .AsNoTracking()
+            .Include(c => c.Exams.OrderBy(e => e.OrderIndex))
+            .Where(c => c.Exams.Any())
+            .ToListAsync(ct);
+
+        var courseIds = courses.Select(c => c.Id).ToList();
+        var enrollmentCounts = await _dbContext.Enrollments
+            .AsNoTracking()
+            .Where(e => courseIds.Contains(e.CourseId))
+            .GroupBy(e => e.CourseId)
+            .Select(g => new { CourseId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.CourseId, x => x.Count, ct);
+
+        var result = courses.Select(c => new CourseWithExamsContractDto(
+            c.Id,
+            c.Title,
+            c.Description,
+            c.ThumbnailUrl,
+            c.InstructorId,
+            enrollmentCounts.GetValueOrDefault(c.Id, 0),
+            c.Exams.Select(e => new CourseExamContractDto(
+                e.ExamId,
+                e.OrderIndex,
+                e.IsMandatory
+            )).ToList()
+        )).ToList();
+
+        return result;
+    }
 }

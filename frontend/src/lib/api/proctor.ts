@@ -43,7 +43,47 @@ export interface CandidateSnapshotItem {
 	capturedAtUtc: string;
 }
 
+export interface ExamRuleConfigDto {
+	name?: string;
+	maxAllowedViolations: number;
+	forceFullscreen: boolean;
+	requireCamera: boolean;
+	snapshotIntervalSeconds: number;
+	requireMicrophone: boolean;
+	canTabSwitch: boolean;
+	restrictClipboardAndMouse: boolean;
+}
+
+export interface ProctorRoomExam {
+	examId: string;
+	title: string;
+	description?: string;
+	durationMinutes: number;
+	totalQuestions: number;
+	ruleConfig?: ExamRuleConfigDto;
+	activeCandidatesCount: number;
+	flaggedCount: number;
+	isPublished: boolean;
+}
+
+export interface ProctorCourseRoom {
+	courseId: string;
+	courseTitle: string;
+	courseDescription?: string;
+	thumbnailUrl?: string;
+	instructorId: string;
+	instructorName?: string;
+	enrolledStudentsCount: number;
+	totalActiveCandidates: number;
+	totalFlaggedViolations: number;
+	exams: ProctorRoomExam[];
+}
+
 export const proctorApi = {
+	async getProctorRooms(customFetch?: typeof fetch): Promise<ProctorCourseRoom[]> {
+		return apiClient.get<ProctorCourseRoom[]>('/api/v1/proctor/rooms', undefined, customFetch);
+	},
+
 	async getLiveCandidates(quizId: string, customFetch?: typeof fetch): Promise<LiveCandidate[]> {
 		return apiClient.get<LiveCandidate[]>(`/api/v1/proctor/exams/${quizId}/live-candidates`, undefined, customFetch);
 	},
