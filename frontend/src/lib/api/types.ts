@@ -204,6 +204,7 @@ export interface CourseStudentExamProgressDto {
 	isPassed?: boolean | null;
 	startedAtUtc?: string | null;
 	finishedAtUtc?: string | null;
+	submissionId?: string | null;
 }
 
 export interface CourseStudentEnrollmentDto {

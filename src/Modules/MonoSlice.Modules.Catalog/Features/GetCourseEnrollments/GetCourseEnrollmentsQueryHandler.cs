@@ -182,7 +182,8 @@ public sealed class GetCourseEnrollmentsQueryHandler
                     sub?.TotalScore,
                     sub != null && string.Equals(sub.Status, "Completed", StringComparison.OrdinalIgnoreCase) ? (bool?)(sub.TotalScore >= 70m) : null,
                     sub?.StartedAtUtc,
-                    sub?.FinishedAtUtc));
+                    sub?.FinishedAtUtc,
+                    sub?.Id));
             }
 
             items.Add(new CourseStudentEnrollmentDto(

@@ -181,7 +181,7 @@
 					questionText = currentQuestion.questionText || currentQuestion.text || '';
 					questionType = currentQuestion.type || 'SingleChoice';
 					
-					const rawMethod = currentQuestion.gradingMethod;
+					const rawMethod = currentQuestion.gradingMethod as any;
 					if (rawMethod && rawMethod !== 'null' && rawMethod !== 'undefined' && ['AllOrNothing', 'PartialWithPenalty', 'PartialWithoutPenalty', 'OptionWeighted'].includes(rawMethod)) {
 						questionGradingMethod = rawMethod as GradingMethod;
 					} else if (questionType === 'MultipleChoice') {

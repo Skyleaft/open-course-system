@@ -1,20 +1,21 @@
 using Microsoft.EntityFrameworkCore;
 using MonoSlice.Modules.Exams.Domain;
 using MonoSlice.Modules.Exams.Features.ExamRules;
+using MonoSlice.Modules.Exams.Features.GetExamResult;
 using MonoSlice.Modules.Exams.Persistence;
 using MonoSlice.Shared.Abstractions.Common;
 using MonoSlice.Shared.Abstractions.CQRS;
 using MonoSlice.Shared.Abstractions.Exceptions;
 using MonoSlice.Shared.Abstractions.Interfaces;
 
-namespace MonoSlice.Modules.Exams.Features.GetExamResult;
+namespace MonoSlice.Modules.Exams.Features.GradeEssaySubmission;
 
-public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery, ApiResponse<ExamResultDetailsDto>>
+public sealed class GradeEssaySubmissionCommandHandler : ICommandHandler<GradeEssaySubmissionCommand, ApiResponse<ExamResultDetailsDto>>
 {
     private readonly ExamsDbContext _dbContext;
     private readonly ICurrentUser _currentUser;
 
-    public GetExamResultQueryHandler(
+    public GradeEssaySubmissionCommandHandler(
         ExamsDbContext dbContext,
         ICurrentUser currentUser)
     {
@@ -23,7 +24,7 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
     }
 
     public async ValueTask<ApiResponse<ExamResultDetailsDto>> Handle(
-        GetExamResultQuery query,
+        GradeEssaySubmissionCommand command,
         CancellationToken cancellationToken)
     {
         if (!_currentUser.IsAuthenticated || !_currentUser.UserId.HasValue)
@@ -31,24 +32,22 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
             throw new UnauthorizedAccessException("Authentication required.");
         }
 
+        var isInstructorOrAdmin = _currentUser.IsInRole("Instructor") || _currentUser.IsInRole("Admin");
+        if (!isInstructorOrAdmin)
+        {
+            throw new UnauthorizedAccessException("Only instructors or admins can evaluate and grade essay answers.");
+        }
+
         var submission = await _dbContext.Submissions
-            .AsNoTracking()
             .Include(s => s.Answers)
-            .FirstOrDefaultAsync(s => s.Id == query.SubmissionId, cancellationToken);
+            .FirstOrDefaultAsync(s => s.Id == command.SubmissionId, cancellationToken);
 
         if (submission is null)
         {
-            throw new NotFoundException(nameof(QuizSubmission), query.SubmissionId);
-        }
-
-        var isInstructorOrAdmin = _currentUser.IsInRole("Instructor") || _currentUser.IsInRole("Admin");
-        if (submission.StudentId != _currentUser.UserId.Value && !isInstructorOrAdmin)
-        {
-            throw new UnauthorizedAccessException("You do not have access to this exam result.");
+            throw new NotFoundException(nameof(QuizSubmission), command.SubmissionId);
         }
 
         var exam = await _dbContext.Exams
-            .AsNoTracking()
             .Include(e => e.Sections)
                 .ThenInclude(s => s.QuestionBank)
                 .ThenInclude(qb => qb!.Questions)
@@ -59,12 +58,10 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
             throw new NotFoundException(nameof(QuizExam), submission.ExamId);
         }
 
-        var canViewExplanations = isInstructorOrAdmin ||
-                                  submission.AppliedRules.CanTabSwitch ||
-                                  submission.Status == SubmissionStatus.Completed ||
-                                  submission.Status == SubmissionStatus.TimedOut;
-
-        var resolvedQuestions = new List<(BankQuestion Question, decimal Points)>();
+        // Resolve exam questions and calculate total maximum points
+        decimal totalMaxPoints = 0m;
+        var questionMap = new Dictionary<Guid, (BankQuestion Question, decimal Points)>();
+        var resolvedQuestionsList = new List<(BankQuestion Question, decimal Points)>();
 
         foreach (var section in exam.Sections.OrderBy(s => s.OrderIndex))
         {
@@ -77,28 +74,62 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
 
             foreach (var q in questions)
             {
-                resolvedQuestions.Add((q, section.PointsOverride ?? q.Points));
+                var pts = section.PointsOverride ?? q.Points;
+                questionMap[q.Id] = (q, pts);
+                resolvedQuestionsList.Add((q, pts));
+                totalMaxPoints += pts;
             }
         }
 
+        // Apply manual essay grades
+        foreach (var grade in command.Grades)
+        {
+            var answer = submission.Answers.FirstOrDefault(a => a.QuestionId == grade.QuestionId);
+            if (answer is null)
+            {
+                answer = StudentAnswer.Create(submission.Id, grade.QuestionId, null, null);
+                await _dbContext.StudentAnswers.AddAsync(answer, cancellationToken);
+            }
+
+            if (questionMap.TryGetValue(grade.QuestionId, out var qInfo))
+            {
+                var validScore = Math.Clamp(grade.Score, 0m, qInfo.Points);
+                answer.SetAwardedScore(validScore);
+            }
+            else
+            {
+                answer.SetAwardedScore(Math.Max(0m, grade.Score));
+            }
+        }
+
+        // Recalculate total earned points across all answers
+        decimal totalEarnedPoints = submission.Answers.Sum(a => a.AwardedScore ?? 0m);
+        decimal calculatedPercentage = totalMaxPoints > 0m
+            ? Math.Clamp((totalEarnedPoints / totalMaxPoints) * 100m, 0m, 100m)
+            : 0m;
+
+        submission.UpdateManualGrade(Math.Round(calculatedPercentage, 2), exam.PassingScore);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Build updated ExamResultDetailsDto
         var rng = new Random(submission.RandomSeed);
         if (exam.ShuffleQuestions)
         {
-            resolvedQuestions = resolvedQuestions.OrderBy(_ => rng.Next()).ToList();
+            resolvedQuestionsList = resolvedQuestionsList.OrderBy(_ => rng.Next()).ToList();
         }
 
-        var questionReviews = resolvedQuestions.Select(item =>
+        var questionReviews = resolvedQuestionsList.Select(item =>
         {
             var q = item.Question;
-            var answer = submission.Answers.FirstOrDefault(a => a.QuestionId == q.Id);
-            var selectedIds = answer?.SelectedOptionIds ?? [];
-            var essayText = answer?.EssayText;
-            var awarded = answer?.AwardedScore;
+            var ans = submission.Answers.FirstOrDefault(a => a.QuestionId == q.Id);
+            var selectedIds = ans?.SelectedOptionIds ?? [];
+            var essayText = ans?.EssayText;
+            var awarded = ans?.AwardedScore;
 
             var options = q.Options.Select(o => new OptionReviewDto(
                 o.Id,
                 o.Text,
-                canViewExplanations && o.IsCorrect
+                true // Instructor can always view correct options
             )).ToList();
 
             if (exam.ShuffleOptions)
@@ -114,7 +145,7 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
                 awarded,
                 selectedIds,
                 essayText,
-                canViewExplanations ? q.Explanation : null,
+                q.Explanation,
                 options);
         }).ToList();
 
@@ -144,6 +175,6 @@ public sealed class GetExamResultQueryHandler : IQueryHandler<GetExamResultQuery
             submission.SubmittedAtUtc,
             questionReviews);
 
-        return ApiResponse.Ok(dto);
+        return ApiResponse.Ok(dto, "Essay answers evaluated and submission final grade calculated successfully.");
     }
 }

@@ -8,6 +8,7 @@ import type {
 	QuizSubmission,
 	StudentAnswer,
 	QuestionType,
+	GradingMethod,
 	QuestionBank,
 	BankQuestion,
 	StudentExamPaperDto,
@@ -357,5 +358,19 @@ export const examsApi = {
 		return apiClient.post<boolean>(`/api/v1/exams/${examId}/students/${studentId}/retake`, {
 			reason
 		});
+	},
+
+	async gradeEssaySubmission(
+		submissionId: string,
+		grades: Array<{
+			questionId: string;
+			score: number;
+			feedback?: string;
+		}>
+	): Promise<ExamResultDetailsDto> {
+		return apiClient.post<ExamResultDetailsDto>(
+			`/api/v1/exams/submissions/${submissionId}/grade`,
+			{ grades }
+		);
 	}
 };

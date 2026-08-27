@@ -38,6 +38,7 @@ using MonoSlice.Modules.Exams.Features.UpdateQuestionBank;
 using MonoSlice.Modules.Exams.Features.UpdateQuestion;
 using MonoSlice.Modules.Exams.Features.GetStudentExamOverview;
 using MonoSlice.Modules.Exams.Features.GetExamSubmissions;
+using MonoSlice.Modules.Exams.Features.GradeEssaySubmission;
 using MonoSlice.Modules.Exams.Features.GrantRetake;
 using MonoSlice.Modules.Exams.Features.ImportQuestionBank;
 using MonoSlice.Modules.Exams.Features.ExamRules.CreateExamRule;
@@ -138,6 +139,7 @@ public static class ExamsModule
         examsV1Group.MapPresignSnapshotEndpoint();
         examsV1Group.MapSubmitExamEndpoint();
         examsV1Group.MapGetExamResultEndpoint();
+        examsV1Group.MapGradeEssaySubmissionEndpoint();
 
         var proctorV1Group = app.MapGroup("/api/v1/proctor")
             .WithTags("Proctor");
