@@ -182,13 +182,19 @@ services:
     build:
       context: ../frontend
       dockerfile: Dockerfile
+      args:
+        PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8080}
+        PUBLIC_SIGNALR_URL: ${PUBLIC_SIGNALR_URL:-http://localhost:8080/hubs}
+        PUBLIC_MINIO_URL: ${PUBLIC_MINIO_URL:-http://localhost:9000}
     image: lms-frontend:latest
     container_name: lms-web
     restart: unless-stopped
+    env_file:
+      - ../.env
     environment:
-      - PUBLIC_API_URL=http://localhost:8080
-      - PUBLIC_SIGNALR_URL=http://localhost:8080/hubs
-      - PUBLIC_MINIO_URL=http://localhost:9000
+      - PUBLIC_API_URL=${PUBLIC_API_URL:-http://localhost:8080}
+      - PUBLIC_SIGNALR_URL=${PUBLIC_SIGNALR_URL:-http://localhost:8080/hubs}
+      - PUBLIC_MINIO_URL=${PUBLIC_MINIO_URL:-http://localhost:9000}
       - PORT=3001
       - HOST=0.0.0.0
     ports:

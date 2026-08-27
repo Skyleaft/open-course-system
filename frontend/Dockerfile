@@ -19,6 +19,13 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 # 3. Build Stage
 # ==========================================
 FROM base AS builder
+ARG PUBLIC_API_URL=http://localhost:8080
+ARG PUBLIC_SIGNALR_URL=http://localhost:8080/hubs
+ARG PUBLIC_MINIO_URL=http://localhost:9000
+ENV PUBLIC_API_URL=$PUBLIC_API_URL
+ENV PUBLIC_SIGNALR_URL=$PUBLIC_SIGNALR_URL
+ENV PUBLIC_MINIO_URL=$PUBLIC_MINIO_URL
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN pnpm build
