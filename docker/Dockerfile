@@ -3,17 +3,22 @@ FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /app
 
 # Copy solution and project files for caching restore layer
-COPY MonoSlice.slnx ./
+COPY OpenCourseEngine.slnx ./
 COPY Directory.Build.props ./
 COPY Directory.Packages.props ./
 COPY global.json ./
 COPY src/MonoSlice.Shared/MonoSlice.Shared.Abstractions/*.csproj ./src/MonoSlice.Shared/MonoSlice.Shared.Abstractions/
 COPY src/MonoSlice.Shared/MonoSlice.Shared.Infrastructure/*.csproj ./src/MonoSlice.Shared/MonoSlice.Shared.Infrastructure/
 COPY src/Modules/MonoSlice.Modules.Users/*.csproj ./src/Modules/MonoSlice.Modules.Users/
+COPY src/Modules/MonoSlice.Modules.Orders/*.csproj ./src/Modules/MonoSlice.Modules.Orders/
 COPY src/Modules/MonoSlice.Modules.Catalog/*.csproj ./src/Modules/MonoSlice.Modules.Catalog/
+COPY src/Modules/MonoSlice.Modules.Exams/*.csproj ./src/Modules/MonoSlice.Modules.Exams/
+COPY src/Modules/MonoSlice.Modules.Assessments/*.csproj ./src/Modules/MonoSlice.Modules.Assessments/
+COPY src/Modules/MonoSlice.Modules.Communications/*.csproj ./src/Modules/MonoSlice.Modules.Communications/
+COPY src/Modules/MonoSlice.Modules.Customization/*.csproj ./src/Modules/MonoSlice.Modules.Customization/
 COPY src/MonoSlice.Host/*.csproj ./src/MonoSlice.Host/
 
-RUN dotnet restore -r linux-x64 src/MonoSlice.Host/MonoSlice.Host.csproj
+RUN dotnet restore src/MonoSlice.Host/MonoSlice.Host.csproj
 
 # Copy source tree and publish self-contained trimmed binary
 COPY . .
