@@ -6,6 +6,8 @@ services:
     image: postgres:17-alpine
     container_name: lms-postgres
     restart: unless-stopped
+    profiles:
+      - optional
     env_file:
       - ../.env
     environment:
@@ -55,6 +57,8 @@ services:
     image: minio/minio:latest
     container_name: lms-minio
     restart: unless-stopped
+    profiles:
+      - optional
     env_file:
       - ../.env
     command: server /data --console-address ":9001"
@@ -77,14 +81,11 @@ services:
   minio-init:
     image: minio/mc:latest
     container_name: lms-minio-init
-    depends_on:
-      minio:
-        condition: service_healthy
     networks:
       - lms-network
     entrypoint: >
       /bin/sh -c "
-      mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin123};
+      mc alias set myminio $${MINIO_Endpoint:-http://minio:9000} $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin123};
       mc mb --ignore-existing myminio/exam-snapshots;
       mc mb --ignore-existing myminio/course-materials;
       mc mb --ignore-existing myminio/assignment-submissions;
@@ -97,7 +98,7 @@ services:
       "
 
   # =========================================================================
-  # 4. OBSERVABILITY (Jaeger & OpenTelemetry Collector)
+  # 4. OBSERVABILITY (Jaeger Distributed Tracing)
   # =========================================================================
   jaeger:
     image: jaegertracing/all-in-one:latest
@@ -107,21 +108,8 @@ services:
       - COLLECTOR_OTLP_ENABLED=true
     ports:
       - "16686:16686" # Jaeger Web UI
-    networks:
-      - lms-network
-
-  otel-collector:
-    image: otel/opentelemetry-collector-contrib:latest
-    container_name: lms-otel-collector
-    restart: unless-stopped
-    command: ["--config=/etc/otelcol-contrib/config.yaml"]
-    volumes:
-      - ./otel/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
-    ports:
-      - "4317:4317" # OTLP gRPC Ingest from API Host
-      - "4318:4318" # OTLP HTTP Ingest
-    depends_on:
-      - jaeger
+      - "4317:4317"   # OTLP gRPC Ingest
+      - "4318:4318"   # OTLP HTTP Ingest
     networks:
       - lms-network
 
@@ -144,7 +132,7 @@ services:
       - ConnectionStrings__Redis=redis:6379,password=${REDIS_PASSWORD:-redis_secret_password},abortConnect=false
       - Cache__Provider=Redis
       - Cache__Redis__ConnectionString=redis:6379,password=${REDIS_PASSWORD:-redis_secret_password},abortConnect=false
-      - Minio__Endpoint=minio:9000
+      - Minio__Endpoint=$${MINIO_Endpoint:-http://minio:9000}
       - Minio__PublicEndpoint=${Minio__PublicEndpoint:-http://localhost:9000}
       - Minio__AccessKey=${MINIO_ROOT_USER:-minioadmin}
       - Minio__SecretKey=${MINIO_ROOT_PASSWORD:-minioadmin123}
@@ -158,19 +146,15 @@ services:
       - Auth__CookieName=${Auth__CookieName:-.OpenCourseEngine.Auth}
       - Auth__GoogleClientId=${Auth__GoogleClientId:-}
       - Auth__GoogleClientSecret=${Auth__GoogleClientSecret:-}
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
       - OTEL_EXPORTER_OTLP_PROTOCOL=grpc
       - OTEL_SERVICE_NAME=${OTEL_SERVICE_NAME:-lms-modular-api}
     ports:
       - "8080:8080"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
-      otel-collector:
+      jaeger:
         condition: service_started
     networks:
       - lms-network
