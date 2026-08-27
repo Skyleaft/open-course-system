@@ -1,7 +1,7 @@
 # ==========================================
 # 1. Base Stage with pnpm
 # ==========================================
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
@@ -27,7 +27,7 @@ RUN pnpm prune --prod
 # ==========================================
 # 4. Production Runner Stage
 # ==========================================
-FROM node:22-alpine AS runner
+FROM node:26-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
