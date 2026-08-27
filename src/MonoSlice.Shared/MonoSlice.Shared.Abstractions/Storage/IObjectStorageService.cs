@@ -29,4 +29,11 @@ public interface IObjectStorageService
         string bucket, 
         string objectKey, 
         CancellationToken ct = default);
+
+    Task<bool> CheckHealthAsync(
+        CancellationToken ct = default);
+
+    Task<IReadOnlyDictionary<string, bool>> CheckBucketsHealthAsync(
+        IEnumerable<string> buckets, 
+        CancellationToken ct = default);
 }

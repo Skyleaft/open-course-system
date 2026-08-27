@@ -31,6 +31,18 @@
 		}
 	});
 
+	async function handlePresign(file: File) {
+		const res = await coursesApi.presignAssignmentSubmission(
+			assignmentId,
+			file.name,
+			file.type || 'application/octet-stream'
+		);
+		return {
+			uploadUrl: res.uploadUrl,
+			storageKey: res.storageKey
+		};
+	}
+
 	async function handleSubmit() {
 		if (!uploadedFileKey) {
 			toast.warning('Please upload your submission file first.');
@@ -111,6 +123,7 @@
 						<FileUpload
 							accept=".pdf,.zip,.tar.gz,.rar"
 							maxSizeMb={50}
+							presignFn={handlePresign}
 							onUploadComplete={(key) => (uploadedFileKey = key)}
 						/>
 					</div>

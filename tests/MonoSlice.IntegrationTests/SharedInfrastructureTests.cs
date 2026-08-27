@@ -103,4 +103,25 @@ public class SharedInfrastructureTests
         Assert.NotNull(downloadUrl);
         Assert.StartsWith("http://localhost:9000/course-materials/lecture-1.pdf", downloadUrl);
     }
+
+    [Fact]
+    public async Task MinioStorageService_WithInternalEndpointAndDistinctPublicEndpoint_ShouldSignForPublicEndpoint()
+    {
+        var settings = Options.Create(new StorageSettings
+        {
+            Endpoint = "minio:9000",
+            PublicEndpoint = "http://localhost:9000",
+            AccessKey = "minioadmin",
+            SecretKey = "minioadmin123",
+            UseSSL = false
+        });
+
+        var logger = NullLogger<MinioObjectStorageService>.Instance;
+        var storage = new MinioObjectStorageService(settings, logger);
+
+        var uploadUrl = await storage.GeneratePresignedUploadUrlAsync("assignment-submissions", "submission-1.zip", TimeSpan.FromMinutes(15), "application/zip");
+        Assert.NotNull(uploadUrl);
+        Assert.StartsWith("http://localhost:9000/assignment-submissions/submission-1.zip", uploadUrl);
+        Assert.Contains("X-Amz-Signature=", uploadUrl);
+    }
 }

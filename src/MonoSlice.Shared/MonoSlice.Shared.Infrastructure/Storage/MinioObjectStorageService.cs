@@ -9,6 +9,7 @@ namespace MonoSlice.Shared.Infrastructure.Storage;
 public class MinioObjectStorageService : IObjectStorageService
 {
     private readonly IAmazonS3 _s3Client;
+    private readonly IAmazonS3 _signingS3Client;
     private readonly StorageSettings _settings;
     private readonly ILogger<MinioObjectStorageService> _logger;
 
@@ -23,6 +24,7 @@ public class MinioObjectStorageService : IObjectStorageService
         if (s3Client != null)
         {
             _s3Client = s3Client;
+            _signingS3Client = s3Client;
         }
         else
         {
@@ -31,10 +33,28 @@ public class MinioObjectStorageService : IObjectStorageService
             {
                 ServiceURL = serviceUrl,
                 ForcePathStyle = true,
-                UseHttp = !_settings.UseSSL
+                UseHttp = !_settings.UseSSL,
+                AuthenticationRegion = _settings.Region
             };
 
             _s3Client = new AmazonS3Client(_settings.AccessKey, _settings.SecretKey, config);
+
+            if (!string.IsNullOrWhiteSpace(_settings.PublicEndpoint) && Uri.TryCreate(_settings.PublicEndpoint, UriKind.Absolute, out var publicUri))
+            {
+                var isPublicHttps = publicUri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase);
+                var signingConfig = new AmazonS3Config
+                {
+                    ServiceURL = _settings.PublicEndpoint.TrimEnd('/'),
+                    ForcePathStyle = true,
+                    UseHttp = !isPublicHttps,
+                    AuthenticationRegion = _settings.Region
+                };
+                _signingS3Client = new AmazonS3Client(_settings.AccessKey, _settings.SecretKey, signingConfig);
+            }
+            else
+            {
+                _signingS3Client = _s3Client;
+            }
         }
     }
 
@@ -44,6 +64,10 @@ public class MinioObjectStorageService : IObjectStorageService
         TimeSpan expiry, 
         string contentType)
     {
+        var isHttps = !string.IsNullOrWhiteSpace(_settings.PublicEndpoint)
+            ? _settings.PublicEndpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            : _settings.UseSSL;
+
         var request = new GetPreSignedUrlRequest
         {
             BucketName = bucket,
@@ -51,12 +75,10 @@ public class MinioObjectStorageService : IObjectStorageService
             Verb = HttpVerb.PUT,
             Expires = DateTime.UtcNow.Add(expiry),
             ContentType = contentType,
-            Protocol = _settings.UseSSL ? Protocol.HTTPS : Protocol.HTTP
+            Protocol = isHttps ? Protocol.HTTPS : Protocol.HTTP
         };
 
-        var url = _s3Client.GetPreSignedURL(request);
-        url = NormalizeUrlWithPublicEndpoint(url);
-
+        var url = _signingS3Client.GetPreSignedURL(request);
         _logger.LogDebug("Generated presigned upload URL for bucket '{Bucket}', key '{Key}'", bucket, objectKey);
         return Task.FromResult(url);
     }
@@ -66,18 +88,20 @@ public class MinioObjectStorageService : IObjectStorageService
         string objectKey, 
         TimeSpan expiry)
     {
+        var isHttps = !string.IsNullOrWhiteSpace(_settings.PublicEndpoint)
+            ? _settings.PublicEndpoint.StartsWith("https://", StringComparison.OrdinalIgnoreCase)
+            : _settings.UseSSL;
+
         var request = new GetPreSignedUrlRequest
         {
             BucketName = bucket,
             Key = objectKey,
             Verb = HttpVerb.GET,
             Expires = DateTime.UtcNow.Add(expiry),
-            Protocol = _settings.UseSSL ? Protocol.HTTPS : Protocol.HTTP
+            Protocol = isHttps ? Protocol.HTTPS : Protocol.HTTP
         };
 
-        var url = _s3Client.GetPreSignedURL(request);
-        url = NormalizeUrlWithPublicEndpoint(url);
-
+        var url = _signingS3Client.GetPreSignedURL(request);
         _logger.LogDebug("Generated presigned download URL for bucket '{Bucket}', key '{Key}'", bucket, objectKey);
         return Task.FromResult(url);
     }
@@ -160,24 +184,44 @@ public class MinioObjectStorageService : IObjectStorageService
         }
     }
 
-    private string NormalizeUrlWithPublicEndpoint(string url)
+    public async Task<bool> CheckHealthAsync(CancellationToken ct = default)
     {
-        if (!string.IsNullOrWhiteSpace(_settings.PublicEndpoint) && Uri.TryCreate(_settings.PublicEndpoint, UriKind.Absolute, out var publicUri) && Uri.TryCreate(url, UriKind.Absolute, out var generatedUri))
+        try
         {
-            var builder = new UriBuilder(generatedUri)
+            var response = await _s3Client.ListBucketsAsync(ct);
+            return response.HttpStatusCode == System.Net.HttpStatusCode.OK;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "MinIO health check failed connecting to endpoint '{Endpoint}'", _settings.Endpoint);
+            return false;
+        }
+    }
+
+    public async Task<IReadOnlyDictionary<string, bool>> CheckBucketsHealthAsync(
+        IEnumerable<string> buckets, 
+        CancellationToken ct = default)
+    {
+        var results = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        var bucketList = buckets.ToList();
+        try
+        {
+            var list = await _s3Client.ListBucketsAsync(ct);
+            var existing = new HashSet<string>(list.Buckets.Select(b => b.BucketName), StringComparer.OrdinalIgnoreCase);
+
+            foreach (var b in bucketList)
             {
-                Scheme = publicUri.Scheme,
-                Host = publicUri.Host,
-                Port = publicUri.IsDefaultPort ? -1 : publicUri.Port
-            };
-            return builder.Uri.ToString();
+                results[b] = existing.Contains(b);
+            }
         }
-
-        if (!_settings.UseSSL && url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        catch (Exception ex)
         {
-            return "http://" + url.Substring("https://".Length);
+            _logger.LogWarning(ex, "Failed to check MinIO buckets health status.");
+            foreach (var b in bucketList)
+            {
+                results[b] = false;
+            }
         }
-
-        return url;
+        return results;
     }
 }

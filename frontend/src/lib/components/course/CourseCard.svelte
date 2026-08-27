@@ -78,6 +78,18 @@
 			{/if}
 		</div>
 
+		<!-- Course Thumbnail Cover Preview -->
+		{#if course.thumbnailUrl}
+			<a href="/courses/{course.id}" class="block relative aspect-video w-full overflow-hidden rounded-xl bg-base-200 border border-base-content/10 group/thumb shadow-inner">
+				<img
+					src={course.thumbnailUrl}
+					alt={course.title}
+					class="h-full w-full object-cover transition-transform duration-300 group-hover/thumb:scale-105"
+					loading="lazy"
+				/>
+			</a>
+		{/if}
+
 		<!-- Title & Description -->
 		<div class="space-y-1.5 text-left">
 			<a href="/courses/{course.id}" class="block group">

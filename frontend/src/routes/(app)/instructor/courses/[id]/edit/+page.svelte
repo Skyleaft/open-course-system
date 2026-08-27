@@ -58,7 +58,9 @@
 		RotateCcw,
 		Award,
 		Zap,
-		Sparkles
+		Sparkles,
+		Image as ImageIcon,
+		UploadCloud
 	} from 'lucide-svelte';
 
 	const courseId = (page.params.id || '') as string;
@@ -162,10 +164,40 @@
 	// Course Settings State
 	let editCourseTitle = $state('');
 	let editCourseDescription = $state('');
+	let editCourseThumbnailUrl = $state('');
 	let editCourseAccessType = $state<'OpenFree' | 'OpenPaid' | 'PrivateWithKey'>('OpenFree');
 	let editCoursePrice = $state(0);
 	let editCourseEnrollmentKey = $state('');
 	let isSavingSettings = $state(false);
+	let isUploadingThumbnail = $state(false);
+	let isThumbnailDragging = $state(false);
+	let editThumbnailInputRef = $state<HTMLInputElement | null>(null);
+
+	async function handleThumbnailUpload(files: FileList | null) {
+		if (!files || files.length === 0) return;
+		const file = files[0];
+
+		if (!file.type.startsWith('image/')) {
+			toast.error('Please select an image file (PNG, JPG, WebP, AVIF).');
+			return;
+		}
+
+		if (file.size > 5 * 1024 * 1024) {
+			toast.error('Image size must be less than 5 MB.');
+			return;
+		}
+
+		isUploadingThumbnail = true;
+		try {
+			const uploadedUrl = await coursesApi.uploadCourseThumbnail(file);
+			editCourseThumbnailUrl = uploadedUrl;
+			toast.success('Course cover thumbnail uploaded to MinIO storage!');
+		} catch (err: any) {
+			toast.error(err?.message || 'Failed to upload course thumbnail.');
+		} finally {
+			isUploadingThumbnail = false;
+		}
+	}
 
 	// Section Modals
 	let isAddSectionModalOpen = $state(false);
@@ -318,6 +350,7 @@
 			if (course) {
 				editCourseTitle = course.title;
 				editCourseDescription = course.description || '';
+				editCourseThumbnailUrl = course.thumbnailUrl || '';
 				editCourseAccessType = (course.accessType as any) || 'OpenFree';
 				editCoursePrice = course.price || 0;
 				editCourseEnrollmentKey = '';
@@ -359,6 +392,7 @@
 			const updated = await coursesApi.updateCourse(courseId, {
 				title: editCourseTitle.trim(),
 				description: editCourseDescription || undefined,
+				thumbnailUrl: editCourseThumbnailUrl.trim() || undefined,
 				accessType: editCourseAccessType,
 				price: editCourseAccessType === 'OpenPaid' ? Number(editCoursePrice) : 0,
 				enrollmentKey:
@@ -370,6 +404,7 @@
 			if (course) {
 				course.title = updated.title;
 				course.description = updated.description;
+				course.thumbnailUrl = updated.thumbnailUrl;
 				course.accessType = updated.accessType;
 				course.price = updated.price;
 			}
@@ -1118,6 +1153,98 @@
 							bind:value={editCourseTitle}
 							class="input input-bordered w-full bg-base-100/50 font-semibold"
 							required
+						/>
+					</div>
+
+					<!-- Course Thumbnail Cover Upload -->
+					<div class="space-y-2">
+						<label class="label label-text text-xs font-bold uppercase tracking-wider text-base-content/80 block">
+							Course Cover Thumbnail (MinIO Storage)
+						</label>
+
+						{#if editCourseThumbnailUrl}
+							<div class="glass-card relative overflow-hidden rounded-2xl border border-base-content/15 p-3 flex flex-col sm:flex-row items-center gap-4 bg-base-100/40">
+								<div class="relative aspect-video w-full sm:w-48 overflow-hidden rounded-xl bg-base-200 border border-base-content/10 shadow-sm shrink-0">
+									<img
+										src={editCourseThumbnailUrl}
+										alt="Course Cover Preview"
+										class="h-full w-full object-cover"
+									/>
+									<div class="absolute top-2 left-2 badge badge-xs badge-success text-white font-bold">
+										Active
+									</div>
+								</div>
+
+								<div class="flex-1 space-y-2 text-center sm:text-left w-full">
+									<div class="text-xs font-bold text-base-content flex items-center justify-center sm:justify-start gap-1.5">
+										<ImageIcon class="w-4 h-4 text-primary" />
+										<span>Cover Image Active</span>
+									</div>
+									<p class="text-[11px] text-base-content/60 break-all truncate max-w-sm">
+										{editCourseThumbnailUrl}
+									</p>
+
+									<div class="flex items-center justify-center sm:justify-start gap-2 pt-1">
+										<button
+											type="button"
+											class="btn btn-xs btn-outline rounded-lg gap-1"
+											onclick={() => editThumbnailInputRef?.click()}
+											disabled={isUploadingThumbnail}
+										>
+											{#if isUploadingThumbnail}
+												<span class="loading loading-spinner loading-xs"></span>
+											{:else}
+												<RefreshCw class="w-3 h-3" />
+											{/if}
+											Change Image
+										</button>
+										<button
+											type="button"
+											class="btn btn-xs btn-ghost text-error hover:bg-error/10 rounded-lg gap-1"
+											onclick={() => (editCourseThumbnailUrl = '')}
+										>
+											<Trash2 class="w-3 h-3" />
+											Remove
+										</button>
+									</div>
+								</div>
+							</div>
+						{:else}
+							<div
+								class="glass-card relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-base-content/20 p-6 text-center transition-all duration-200 hover:border-primary/50 hover:bg-base-100/50 cursor-pointer {isThumbnailDragging ? 'border-primary bg-primary/10' : ''}"
+								ondragover={(e) => { e.preventDefault(); isThumbnailDragging = true; }}
+								ondragleave={() => (isThumbnailDragging = false)}
+								ondrop={(e) => { e.preventDefault(); isThumbnailDragging = false; handleThumbnailUpload(e.dataTransfer?.files || null); }}
+								onclick={() => editThumbnailInputRef?.click()}
+								role="button"
+								tabindex="0"
+								onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') editThumbnailInputRef?.click(); }}
+							>
+								{#if isUploadingThumbnail}
+									<div class="flex flex-col items-center gap-2 py-4">
+										<span class="loading loading-spinner loading-md text-primary"></span>
+										<span class="text-xs font-bold text-base-content">Uploading to MinIO S3...</span>
+									</div>
+								{:else}
+									<div class="gradient-accent mb-2 flex h-10 w-10 items-center justify-center rounded-xl text-white shadow-md">
+										<UploadCloud class="h-5 w-5" />
+									</div>
+									<div class="text-xs font-bold text-base-content">
+										Click to upload course thumbnail cover or drag & drop
+									</div>
+									<div class="text-[10px] text-base-content/60 mt-0.5">
+										PNG, JPG, WebP or AVIF (Recommended 16:9 ratio, max 5 MB)
+									</div>
+								{/if}
+							</div>
+						{/if}
+
+						<input
+							type="file"
+							accept="image/png,image/jpeg,image/webp,image/avif"
+							class="hidden"
+							bind:this={editThumbnailInputRef}
+							onchange={(e) => handleThumbnailUpload((e.target as HTMLInputElement).files)}
 						/>
 					</div>
 
