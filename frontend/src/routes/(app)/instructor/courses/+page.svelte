@@ -21,7 +21,12 @@
 		Eye,
 		Send,
 		Trash2,
-		Sparkles
+		Sparkles,
+		Users,
+		DollarSign,
+		Key,
+		Lock,
+		ExternalLink
 	} from 'lucide-svelte';
 
 	let courses = $state<Course[]>([]);
@@ -278,47 +283,133 @@
 	{#if isLoading}
 		<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 			{#each Array(6) as _}
-				<div class="glass-panel h-56 rounded-2xl animate-pulse"></div>
+				<div class="glass-card flex flex-col justify-between overflow-hidden rounded-3xl p-5 border border-base-content/10 space-y-4 animate-pulse">
+					<div class="aspect-video w-full rounded-2xl bg-base-100/50"></div>
+					<div class="space-y-2.5">
+						<div class="h-5 w-3/4 bg-base-100/50 rounded-lg"></div>
+						<div class="h-3.5 w-full bg-base-100/30 rounded-lg"></div>
+						<div class="h-3.5 w-2/3 bg-base-100/30 rounded-lg"></div>
+					</div>
+					<div class="pt-3 border-t border-base-content/5 flex items-center justify-between">
+						<div class="h-8 w-28 bg-base-100/40 rounded-xl"></div>
+						<div class="h-8 w-8 bg-base-100/40 rounded-xl"></div>
+					</div>
+				</div>
 			{/each}
 		</div>
 	{:else if courses.length > 0}
 		<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
 			{#each courses as course (course.id)}
-				<GlassCard class="flex flex-col justify-between p-5 space-y-4">
-					<div class="space-y-2">
-						<div class="flex items-center justify-between gap-2">
-							<span class="badge badge-primary badge-xs font-bold uppercase text-[9px]">{course.accessType}</span>
-							<span
-								class="badge {course.isPublished ? 'badge-success text-white' : 'badge-warning'} badge-xs font-semibold text-[9px]"
-							>
-								{course.isPublished ? 'Published' : 'Draft'}
-							</span>
+				<GlassCard class="flex flex-col justify-between overflow-hidden rounded-3xl p-4 sm:p-5 border border-base-content/10 hover:border-primary/30 transition-all duration-300 hover:shadow-2xl group">
+					<div class="space-y-3.5">
+						<!-- 16:9 Thumbnail Cover / Fallback Header with Floating Badges -->
+						<div class="relative aspect-video w-full overflow-hidden rounded-2xl bg-base-200/60 border border-base-content/10 shadow-inner group/thumb">
+							{#if course.thumbnailUrl}
+								<img
+									src={course.thumbnailUrl}
+									alt={course.title}
+									class="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+									loading="lazy"
+								/>
+							{:else}
+								<div class="h-full w-full relative flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary/15 via-base-200/70 to-secondary/15 transition-all duration-500 group-hover:from-primary/25 group-hover:to-secondary/25 overflow-hidden">
+									<!-- Ambient Glow Orbs -->
+									<div class="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-primary/20 blur-xl pointer-events-none"></div>
+									<div class="absolute -bottom-6 -left-6 w-24 h-24 rounded-full bg-secondary/20 blur-xl pointer-events-none"></div>
+
+									<!-- Center Icon & Brand -->
+									<div class="relative z-10 flex flex-col items-center justify-center gap-1.5 text-center">
+										<div class="h-10 w-10 rounded-2xl bg-base-100/80 border border-white/10 shadow-lg flex items-center justify-center text-primary group-hover:scale-110 transition-all duration-300 backdrop-blur-md">
+											<BookOpen class="w-5 h-5" />
+										</div>
+										<span class="text-[10px] font-bold text-base-content/60">Curriculum Studio</span>
+									</div>
+								</div>
+							{/if}
+
+							<!-- Floating Access Badge (Top-Left) -->
+							<div class="absolute top-2.5 left-2.5 z-10">
+								{#if course.accessType === 'OpenPaid'}
+									<span class="badge badge-primary font-mono font-extrabold text-[10px] shadow-md shadow-black/30">
+										${Number(course.price || 0).toFixed(2)}
+									</span>
+								{:else if course.accessType === 'PrivateWithKey'}
+									<span class="badge badge-warning text-warning-content font-bold text-[10px] gap-1 shadow-md shadow-black/30">
+										<Key class="w-2.5 h-2.5" />
+										Passkey
+									</span>
+								{:else}
+									<span class="badge badge-success text-white font-bold text-[10px] shadow-md shadow-black/30">
+										Free
+									</span>
+								{/if}
+							</div>
+
+							<!-- Floating Publish Status Badge (Top-Right) -->
+							<div class="absolute top-2.5 right-2.5 z-10">
+								<span
+									class="badge {course.isPublished ? 'badge-success text-white' : 'badge-warning text-warning-content'} text-[10px] font-bold shadow-md shadow-black/30 gap-1 backdrop-blur-md"
+								>
+									<span class="w-1.5 h-1.5 rounded-full {course.isPublished ? 'bg-white animate-pulse' : 'bg-current'}"></span>
+									{course.isPublished ? 'Published' : 'Draft'}
+								</span>
+							</div>
 						</div>
-						<h3 class="text-base font-bold text-base-content line-clamp-1">{course.title}</h3>
-						<p class="text-xs text-base-content/65 line-clamp-2">{getPlainDescription(course.description)}</p>
+
+						<!-- Title & Description -->
+						<div class="space-y-1.5 text-left">
+							<a href="/instructor/courses/{course.id}/edit" class="block group/link">
+								<h3 class="text-base font-extrabold text-base-content line-clamp-1 group-hover/link:text-primary transition-colors tracking-tight">
+									{course.title}
+								</h3>
+							</a>
+							<p class="text-xs text-base-content/65 line-clamp-2 leading-relaxed">
+								{getPlainDescription(course.description)}
+							</p>
+						</div>
+
+						<!-- Stat Badges Bar -->
+						<div class="flex items-center gap-3 pt-1 text-[11px] text-base-content/60 flex-wrap">
+							<span class="flex items-center gap-1">
+								<Layers class="w-3.5 h-3.5 text-primary" />
+								<span>{course.sections?.length || 0} Sections</span>
+							</span>
+							<span class="flex items-center gap-1">
+								<Users class="w-3.5 h-3.5 text-secondary" />
+								<span>{course.enrolledStudentsCount || 0} Enrolled</span>
+							</span>
+							{#if course.exams && course.exams.length > 0}
+								<span class="flex items-center gap-1">
+									<FileText class="w-3.5 h-3.5 text-accent" />
+									<span>{course.exams.length} Exams</span>
+								</span>
+							{/if}
+						</div>
 					</div>
 
-					<div class="flex items-center justify-between pt-3 border-t border-base-content/10 text-xs">
-						<div class="flex items-center gap-1">
+					<!-- Card Action Buttons Footer -->
+					<div class="pt-3 mt-3 border-t border-base-content/10 flex items-center justify-between gap-2">
+						<div class="flex items-center gap-1.5">
 							<a
 								href="/instructor/courses/{course.id}/edit"
-								class="btn btn-ghost btn-xs text-primary hover:bg-primary/10 gap-1 font-bold"
+								class="btn btn-primary gradient-accent btn-xs rounded-xl text-white font-bold border-0 shadow-xs gap-1 h-7 px-2.5"
 							>
-								<Edit3 class="w-3.5 h-3.5" />
-								Curriculum
+								<Edit3 class="w-3 h-3" />
+								<span>Manage</span>
 							</a>
 							<a
 								href="/courses/{course.id}"
-								class="btn btn-ghost btn-xs text-base-content/70 hover:bg-base-100/40 gap-1"
+								class="btn btn-ghost btn-xs rounded-xl text-base-content/70 hover:text-base-content hover:bg-base-100/60 gap-1 h-7 px-2"
+								title="View public student page"
 							>
-								<Eye class="w-3.5 h-3.5" />
-								Preview
+								<Eye class="w-3 h-3" />
+								<span>Preview</span>
 							</a>
 						</div>
 
 						<button
 							type="button"
-							class="btn btn-ghost btn-xs text-error/80 hover:text-error hover:bg-error/10 p-1.5 rounded-lg"
+							class="btn btn-ghost btn-xs text-error/70 hover:text-error hover:bg-error/10 h-7 w-7 p-0 rounded-xl"
 							title="Delete course"
 							onclick={() => openDeleteModal(course)}
 						>
