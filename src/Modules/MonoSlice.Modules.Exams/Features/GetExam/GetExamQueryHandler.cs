@@ -73,11 +73,15 @@ public sealed class GetExamQueryHandler : IQueryHandler<GetExamQuery, ApiRespons
                         q.Options.Select(o => new QuestionOptionDto(
                             o.Id,
                             o.Text,
-                            isInstructor && o.IsCorrect
+                            isInstructor && o.IsCorrect,
+                            o.Points,
+                            o.PenaltyPoints
                         )).ToList(),
                         sec.QuestionBank.CreatedBy,
                         sec.QuestionBank.UpdatedBy,
-                        sec.QuestionBank.CreatedAtUtc
+                        sec.QuestionBank.CreatedAtUtc,
+                        sec.QuestionBank.Id,
+                        q.GradingMethod.ToString()
                     );
 
                     secQuestions.Add(qDto);

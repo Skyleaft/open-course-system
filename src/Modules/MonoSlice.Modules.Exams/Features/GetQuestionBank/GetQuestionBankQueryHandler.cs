@@ -46,7 +46,8 @@ public sealed class GetQuestionBankQueryHandler : IQueryHandler<GetQuestionBankQ
                     q.Points,
                     q.OrderIndex,
                     q.Explanation,
-                    q.Options
+                    q.Options,
+                    q.GradingMethod.ToString()
                 ))
                 .ToList()
         );

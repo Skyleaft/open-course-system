@@ -16,6 +16,7 @@ public static class UpdateQuestionEndpoint
                 QuestionId = questionId,
                 QuestionText = command.QuestionText,
                 Type = command.Type,
+                GradingMethod = command.GradingMethod,
                 Points = command.Points,
                 Explanation = command.Explanation,
                 Category = command.Category,

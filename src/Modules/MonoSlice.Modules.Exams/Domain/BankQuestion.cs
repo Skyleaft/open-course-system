@@ -84,10 +84,6 @@ public sealed class BankQuestion : Entity<Guid>
         {
             GradingMethod = gradingMethod.Value;
         }
-        else if (type == QuestionType.MultipleChoice && GradingMethod == GradingMethod.AllOrNothing)
-        {
-            GradingMethod = GradingMethod.PartialWithPenalty;
-        }
 
         Points = points;
         Explanation = explanation?.Trim();

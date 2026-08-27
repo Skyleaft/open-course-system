@@ -147,7 +147,16 @@
 				if (currentMode === 'edit' && currentQuestion) {
 					questionText = currentQuestion.questionText || currentQuestion.text || '';
 					questionType = currentQuestion.type || 'SingleChoice';
-					questionGradingMethod = currentQuestion.gradingMethod || (questionType === 'MultipleChoice' ? 'PartialWithPenalty' : 'AllOrNothing');
+					
+					const rawMethod = currentQuestion.gradingMethod;
+					if (rawMethod && rawMethod !== 'null' && rawMethod !== 'undefined' && ['AllOrNothing', 'PartialWithPenalty', 'PartialWithoutPenalty', 'OptionWeighted'].includes(rawMethod)) {
+						questionGradingMethod = rawMethod as GradingMethod;
+					} else if (questionType === 'MultipleChoice') {
+						questionGradingMethod = 'PartialWithPenalty';
+					} else {
+						questionGradingMethod = 'AllOrNothing';
+					}
+
 					questionPoints = currentQuestion.points || 5;
 					questionExplanation = currentQuestion.explanation || '';
 					const loadedOpts = (currentQuestion.options || []).map((o) => ({
@@ -293,10 +302,15 @@
 			}
 		}
 
+		const safeGradingMethod: GradingMethod =
+			questionType === 'MultipleChoice'
+				? (questionGradingMethod || 'PartialWithPenalty')
+				: (questionGradingMethod === 'OptionWeighted' ? 'OptionWeighted' : 'AllOrNothing');
+
 		onSave({
 			questionText: questionText.trim(),
 			type: questionType,
-			gradingMethod: questionGradingMethod,
+			gradingMethod: safeGradingMethod,
 			points: Number(questionPoints) || 5,
 			explanation: questionExplanation.trim() || undefined,
 			options:
